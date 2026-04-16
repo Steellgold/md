@@ -134,3 +134,138 @@
     @apply font-sans;
   }
 }
+
+.markdown-preview .hljs {
+    display: block;
+    overflow-x: auto;
+    background: transparent;
+    color: #24292f;
+}
+
+.markdown-preview .hljs-comment,
+.markdown-preview .hljs-quote {
+    color: #6e7781;
+}
+
+.markdown-preview .hljs-keyword,
+.markdown-preview .hljs-selector-tag,
+.markdown-preview .hljs-subst {
+    color: #cf222e;
+}
+
+.markdown-preview .hljs-number,
+.markdown-preview .hljs-literal,
+.markdown-preview .hljs-variable,
+.markdown-preview .hljs-template-variable,
+.markdown-preview .hljs-tag .hljs-attr {
+    color: #0550ae;
+}
+
+.markdown-preview .hljs-string,
+.markdown-preview .hljs-doctag {
+    color: #0a3069;
+}
+
+.markdown-preview .hljs-title,
+.markdown-preview .hljs-title.function_,
+.markdown-preview .hljs-section,
+.markdown-preview .hljs-selector-id {
+    color: #8250df;
+}
+
+.markdown-preview .hljs-type,
+.markdown-preview .hljs-class .hljs-title {
+    color: #953800;
+}
+
+.markdown-preview .hljs-attribute,
+.markdown-preview .hljs-name,
+.markdown-preview .hljs-tag {
+    color: #116329;
+}
+
+.markdown-preview .hljs-regexp,
+.markdown-preview .hljs-link {
+    color: #0a3069;
+}
+
+.markdown-preview .hljs-symbol,
+.markdown-preview .hljs-bullet,
+.markdown-preview .hljs-built_in,
+.markdown-preview .hljs-builtin-name {
+    color: #8250df;
+}
+
+.markdown-preview .hljs-meta {
+    color: #6f42c1;
+}
+
+.markdown-preview .hljs-emphasis {
+    font-style: italic;
+}
+
+.markdown-preview .hljs-strong {
+    font-weight: 700;
+}
+
+.dark .markdown-preview .hljs {
+    color: #e6edf3;
+}
+
+.dark .markdown-preview .hljs-comment,
+.dark .markdown-preview .hljs-quote {
+    color: #8b949e;
+}
+
+.dark .markdown-preview .hljs-keyword,
+.dark .markdown-preview .hljs-selector-tag,
+.dark .markdown-preview .hljs-subst {
+    color: #ff7b72;
+}
+
+.dark .markdown-preview .hljs-number,
+.dark .markdown-preview .hljs-literal,
+.dark .markdown-preview .hljs-variable,
+.dark .markdown-preview .hljs-template-variable,
+.dark .markdown-preview .hljs-tag .hljs-attr {
+    color: #79c0ff;
+}
+
+.dark .markdown-preview .hljs-string,
+.dark .markdown-preview .hljs-doctag {
+    color: #a5d6ff;
+}
+
+.dark .markdown-preview .hljs-title,
+.dark .markdown-preview .hljs-title.function_,
+.dark .markdown-preview .hljs-section,
+.dark .markdown-preview .hljs-selector-id {
+    color: #d2a8ff;
+}
+
+.dark .markdown-preview .hljs-type,
+.dark .markdown-preview .hljs-class .hljs-title {
+    color: #ffa657;
+}
+
+.dark .markdown-preview .hljs-attribute,
+.dark .markdown-preview .hljs-name,
+.dark .markdown-preview .hljs-tag {
+    color: #7ee787;
+}
+
+.dark .markdown-preview .hljs-regexp,
+.dark .markdown-preview .hljs-link {
+    color: #a5d6ff;
+}
+
+.dark .markdown-preview .hljs-symbol,
+.dark .markdown-preview .hljs-bullet,
+.dark .markdown-preview .hljs-built_in,
+.dark .markdown-preview .hljs-builtin-name {
+    color: #d2a8ff;
+}
+
+.dark .markdown-preview .hljs-meta {
+    color: #bc8cff;
+}
