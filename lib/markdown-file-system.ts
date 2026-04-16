@@ -2,6 +2,7 @@
 
 import {
   MARKDOWN_FILE_TYPES,
+  getMarkdownDocumentStats,
   sortRecentFiles,
   upsertRecentFile,
 } from "@/lib/markdown-helpers";
@@ -9,10 +10,10 @@ import {
   type DataTransferItemWithHandle,
   type MarkdownFileHandle,
   type OpenFilePickerOptions,
-  type PickerOptions,
   type PermissionMode,
+  type PickerOptions,
   type RecentMarkdownFile,
-} from "@/lib/markdown-types";
+} from "@/types/markdown";
 
 const RECENT_FILES_KEY = "markdown-app:recent-files";
 const DB_NAME = "markdown-app";
@@ -25,7 +26,7 @@ declare global {
       options?: OpenFilePickerOptions
     ) => Promise<FileSystemFileHandle[]>;
     showSaveFilePicker?: (
-      options?: import("@/lib/markdown-types").SaveFilePickerOptions
+      options?: import("@/types/markdown").SaveFilePickerOptions
     ) => Promise<FileSystemFileHandle>;
   }
 }
@@ -147,6 +148,7 @@ const readContent = async (handle: FileSystemFileHandle) => {
 const createEntryFromHandle = async (
   handle: FileSystemFileHandle,
   source: RecentMarkdownFile["source"],
+  content: string,
   id = crypto.randomUUID()
 ) => {
   return {
@@ -155,6 +157,7 @@ const createEntryFromHandle = async (
     path: null,
     lastOpenedAt: new Date().toISOString(),
     source,
+    stats: getMarkdownDocumentStats(content),
   } satisfies RecentMarkdownFile;
 };
 
@@ -208,13 +211,14 @@ export const openMarkdownWithPicker = async (options: PickerOptions = {}) => {
     throw new Error("Read permission was denied.");
   }
 
+  const content = await readContent(handle);
   const existingEntry = await findMatchingRecentFile(handle);
   const entry = await createEntryFromHandle(
     handle,
     options.source ?? "picker",
+    content,
     existingEntry?.id ?? options.id
   );
-  const content = await readContent(handle);
 
   await saveHandle(entry.id, handle);
   const recentFiles = persistRecentEntry({
@@ -255,6 +259,7 @@ export const openDroppedMarkdownFile = async (
         path: file.webkitRelativePath || null,
         lastOpenedAt: new Date().toISOString(),
         source: "drop",
+        stats: getMarkdownDocumentStats(content),
       } satisfies RecentMarkdownFile,
       content,
       recentFiles: readRecentFilesFromStorage(),
@@ -269,7 +274,7 @@ export const openDroppedMarkdownFile = async (
 
   const existingEntry = await findMatchingRecentFile(handle);
   const entry = {
-    ...(await createEntryFromHandle(handle, "drop", existingEntry?.id)),
+    ...(await createEntryFromHandle(handle, "drop", content, existingEntry?.id)),
     path: file.webkitRelativePath || existingEntry?.path || null,
   } satisfies RecentMarkdownFile;
 
@@ -300,13 +305,14 @@ export const reopenRecentMarkdownFile = async (id: string) => {
     throw new Error("The recent file entry could not be found.");
   }
 
+  const content = await readContent(handle);
   const nextEntry = {
     ...knownEntry,
     name: handle.name,
     lastOpenedAt: new Date().toISOString(),
+    stats: getMarkdownDocumentStats(content),
   } satisfies RecentMarkdownFile;
 
-  const content = await readContent(handle);
   const recentFiles = persistRecentEntry(nextEntry);
 
   return { entry: nextEntry, content, recentFiles };
@@ -348,6 +354,7 @@ export const saveRecentMarkdownFile = async (id: string, content: string) => {
     ...knownEntry,
     name: handle.name,
     lastOpenedAt: new Date().toISOString(),
+    stats: getMarkdownDocumentStats(content),
   } satisfies RecentMarkdownFile;
 
   const recentFiles = persistRecentEntry(nextEntry);
@@ -394,6 +401,7 @@ export const createNewMarkdownFile = async (initialContent = "") => {
   const entry = await createEntryFromHandle(
     handle,
     "picker",
+    initialContent,
     existingEntry?.id
   );
 
@@ -412,6 +420,23 @@ export const removeRecentMarkdownFile = async (id: string) => {
   );
   writeRecentFilesToStorage(nextFiles);
   await deleteHandle(id);
+  return nextFiles;
+};
+
+export const syncRecentMarkdownFileSnapshot = async (
+  id: string,
+  content: string
+) => {
+  const nextFiles = readRecentFilesFromStorage().map((file) =>
+    file.id === id
+      ? {
+          ...file,
+          stats: getMarkdownDocumentStats(content),
+        }
+      : file
+  );
+
+  writeRecentFilesToStorage(nextFiles);
   return nextFiles;
 };
 

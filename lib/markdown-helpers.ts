@@ -1,6 +1,9 @@
 "use client";
 
-import { type RecentMarkdownFile } from "@/lib/markdown-types";
+import {
+  type MarkdownDocumentStats,
+  type RecentMarkdownFile,
+} from "@/types/markdown";
 
 export const MARKDOWN_FILE_TYPES = [
   {
@@ -36,10 +39,53 @@ export const upsertRecentFile = (
     currentFiles.filter((file) => file.id !== entry.id).concat(entry)
   ).slice(0, limit);
 
-export const buildFileLabel = (
-  file: RecentMarkdownFile | null,
-  fallback: string
-) => file?.path ?? fallback;
+export const getMarkdownDocumentStats = (
+  content: string
+): MarkdownDocumentStats => {
+  const trimmedContent = content.trim();
+
+  return {
+    characterCount: content.length,
+    wordCount: trimmedContent ? trimmedContent.split(/\s+/u).length : 0,
+    lineCount: content === "" ? 1 : content.split(/\r?\n/u).length,
+  };
+};
+
+const numberFormatter = new Intl.NumberFormat();
+
+export const formatMarkdownDocumentStats = (stats: MarkdownDocumentStats) =>
+  [
+    `${numberFormatter.format(stats.characterCount)} chars`,
+    `${numberFormatter.format(stats.wordCount)} words`,
+    `${numberFormatter.format(stats.lineCount)} lines`,
+  ].join(" • ");
+
+export const buildActiveDocumentMeta = (
+  content: string,
+  file: RecentMarkdownFile | null
+) => {
+  const statsLabel = formatMarkdownDocumentStats(
+    getMarkdownDocumentStats(content)
+  );
+
+  if (!file?.lastOpenedAt) {
+    return statsLabel;
+  }
+
+  return `${statsLabel} • opened ${new Date(file.lastOpenedAt).toLocaleString()}`;
+};
+
+export const buildRecentFileMeta = (file: RecentMarkdownFile) => {
+  if (file.stats) {
+    return formatMarkdownDocumentStats(file.stats);
+  }
+
+  if (file.path) {
+    return file.path;
+  }
+
+  return `Opened ${new Date(file.lastOpenedAt).toLocaleString()}`;
+};
 
 export const getScrollRatio = (element: HTMLElement) => {
   const maxScroll = element.scrollHeight - element.clientHeight;

@@ -1,19 +1,13 @@
 "use client";
 
 import {
-  CheckIcon,
-  CodeIcon,
-  CopyIcon,
-  FilePlus2Icon,
+  EllipsisIcon,
   FolderOpenIcon,
-  Heading1Icon,
   HistoryIcon,
   HouseIcon,
-  ItalicIcon,
-  ListIcon,
+  MonitorUpIcon,
   PanelLeftIcon,
   PanelRightIcon,
-  PilcrowIcon,
   RefreshCcwIcon,
   SaveIcon,
   Trash2Icon,
@@ -21,10 +15,11 @@ import {
   XIcon,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
@@ -33,22 +28,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Menubar,
-  MenubarCheckboxItem,
-  MenubarContent,
-  MenubarItem,
-  MenubarMenu,
-  MenubarRadioGroup,
-  MenubarRadioItem,
-  MenubarSeparator,
-  MenubarShortcut,
-  MenubarTrigger,
-} from "@/components/ui/menubar";
-import { buildFileLabel } from "@/lib/markdown-helpers";
-import { type RecentMarkdownFile } from "@/lib/markdown-types";
+  buildActiveDocumentMeta,
+  buildRecentFileMeta,
+} from "@/lib/markdown-helpers";
+import { type RecentMarkdownFile } from "@/types/markdown";
 
 type MarkdownToolbarProps = {
   activeFile: RecentMarkdownFile | null;
+  content: string;
   recentFiles: RecentMarkdownFile[];
   isBusy: boolean;
   openFileAction: () => void;
@@ -59,18 +46,10 @@ type MarkdownToolbarProps = {
   openRecentAction: (id: string) => void;
   removeRecentAction: (id: string) => void;
   clearRecentAction: () => void;
-  undoAction: () => void;
-  redoAction: () => void;
   cutAction: () => void;
   copyAction: () => void;
   pasteAction: () => void;
   selectAllAction: () => void;
-  boldAction: () => void;
-  italicAction: () => void;
-  headingAction: () => void;
-  inlineCodeAction: () => void;
-  codeBlockAction: () => void;
-  bulletListAction: () => void;
   focusEditorAction: () => void;
   focusPreviewAction: () => void;
   viewMode: "split" | "editor" | "preview";
@@ -79,8 +58,27 @@ type MarkdownToolbarProps = {
   toggleSyncScrollAction: () => void;
 };
 
+const viewOptions = [
+  {
+    value: "split" as const,
+    label: "Split",
+    icon: PanelLeftIcon,
+  },
+  {
+    value: "editor" as const,
+    label: "Editor",
+    icon: TypeIcon,
+  },
+  {
+    value: "preview" as const,
+    label: "Preview",
+    icon: PanelRightIcon,
+  },
+];
+
 export const MarkdownToolbar = ({
   activeFile,
+  content,
   recentFiles,
   isBusy,
   openFileAction,
@@ -91,18 +89,10 @@ export const MarkdownToolbar = ({
   openRecentAction,
   removeRecentAction,
   clearRecentAction,
-  undoAction,
-  redoAction,
   cutAction,
   copyAction,
   pasteAction,
   selectAllAction,
-  boldAction,
-  italicAction,
-  headingAction,
-  inlineCodeAction,
-  codeBlockAction,
-  bulletListAction,
   focusEditorAction,
   focusPreviewAction,
   viewMode,
@@ -110,245 +100,180 @@ export const MarkdownToolbar = ({
   syncScrollEnabled,
   toggleSyncScrollAction,
 }: MarkdownToolbarProps) => {
+  const secondaryLabel = buildActiveDocumentMeta(content, activeFile);
+
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-t-md border-b bg-card/80 p-3 backdrop-blur">
-      <div className="flex min-w-0 items-center gap-3">
-        <Menubar>
-          <MenubarMenu>
-            <MenubarTrigger>File</MenubarTrigger>
-            <MenubarContent>
-              <MenubarItem onSelect={goHomeAction}>
-                <HouseIcon />
-                Back to home
-              </MenubarItem>
-              <MenubarSeparator />
-              <MenubarItem onSelect={openFileAction}>
-                <FilePlus2Icon />
-                Open file
-                <MenubarShortcut>Ctrl+O</MenubarShortcut>
-              </MenubarItem>
-              <MenubarItem
-                onSelect={saveFileAction}
-                disabled={!activeFile || isBusy}
-              >
-                <SaveIcon />
-                Save file
-                <MenubarShortcut>Ctrl+S</MenubarShortcut>
-              </MenubarItem>
-              <MenubarItem
+    <div className="border-b bg-background/80 px-4 py-3 backdrop-blur">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={goHomeAction}
+            title="Close document"
+          >
+            <HouseIcon />
+          </Button>
+
+          <div className="min-w-0">
+            <div className="truncate text-sm font-medium">
+              {activeFile?.name ?? "Untitled document"}
+            </div>
+            <div className="truncate text-xs text-muted-foreground">
+              {secondaryLabel}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <ButtonGroup className="flex-wrap">
+            {viewOptions.map((option) => {
+              const Icon = option.icon;
+
+              return (
+                <Button
+                  key={option.value}
+                  variant={viewMode === option.value ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={() => setViewModeAction(option.value)}
+                >
+                  <Icon data-icon="inline-start" />
+                  {option.label}
+                </Button>
+              );
+            })}
+          </ButtonGroup>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" disabled={recentFiles.length === 0}>
+                <HistoryIcon data-icon="inline-start" />
+                Recent
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72">
+              <DropdownMenuLabel>Reopen a file</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {recentFiles.length > 0 ? (
+                <DropdownMenuGroup>
+                  {recentFiles.map((file) => {
+                    const itemLabel = buildRecentFileMeta(file);
+
+                    return (
+                      <DropdownMenuItem
+                        key={file.id}
+                        className="justify-between gap-3"
+                        onSelect={() => openRecentAction(file.id)}
+                      >
+                        <div className="flex min-w-0 items-start gap-2">
+                          <FolderOpenIcon />
+                          <div className="flex min-w-0 flex-col">
+                            <span className="truncate">{file.name}</span>
+                            <span className="truncate text-xs text-muted-foreground">
+                              {itemLabel}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="rounded-sm p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            void removeRecentAction(file.id);
+                          }}
+                          aria-label={`Remove ${file.name} from recent files`}
+                        >
+                          <Trash2Icon className="size-4" />
+                        </button>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuGroup>
+              ) : (
+                <DropdownMenuItem disabled>No recent files</DropdownMenuItem>
+              )}
+              {recentFiles.length > 0 ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={clearRecentAction}
+                    variant="destructive"
+                  >
+                    <Trash2Icon />
+                    Clear history
+                  </DropdownMenuItem>
+                </>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button variant="outline" onClick={openFileAction} disabled={isBusy}>
+            <FolderOpenIcon data-icon="inline-start" />
+            Open
+          </Button>
+
+          <Button onClick={saveFileAction} disabled={!activeFile || isBusy}>
+            <SaveIcon data-icon="inline-start" />
+            Save
+          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon-sm" title="More actions">
+                <EllipsisIcon />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Document actions</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
                 onSelect={refreshFileAction}
                 disabled={!activeFile || isBusy}
               >
                 <RefreshCcwIcon />
                 Reopen file
-              </MenubarItem>
-              <MenubarSeparator />
-              <MenubarItem
-                onSelect={clearDocumentAction}
-                disabled={!activeFile}
-              >
-                <XIcon />
-                Close document
-              </MenubarItem>
-            </MenubarContent>
-          </MenubarMenu>
-
-          <MenubarMenu>
-            <MenubarTrigger>Edit</MenubarTrigger>
-            <MenubarContent>
-              <MenubarItem onSelect={undoAction} disabled={!activeFile}>
-                <RefreshCcwIcon />
-                Undo
-                <MenubarShortcut>Ctrl+Z</MenubarShortcut>
-              </MenubarItem>
-              <MenubarItem onSelect={redoAction} disabled={!activeFile}>
-                <RefreshCcwIcon />
-                Redo
-                <MenubarShortcut>Ctrl+Y</MenubarShortcut>
-              </MenubarItem>
-              <MenubarSeparator />
-              <MenubarItem onSelect={cutAction} disabled={!activeFile}>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={focusEditorAction} disabled={!activeFile}>
                 <TypeIcon />
-                Cut
-                <MenubarShortcut>Ctrl+X</MenubarShortcut>
-              </MenubarItem>
-              <MenubarItem onSelect={copyAction} disabled={!activeFile}>
-                <CopyIcon />
-                Copy
-                <MenubarShortcut>Ctrl+C</MenubarShortcut>
-              </MenubarItem>
-              <MenubarItem onSelect={pasteAction} disabled={!activeFile}>
-                <PilcrowIcon />
-                Paste
-                <MenubarShortcut>Ctrl+V</MenubarShortcut>
-              </MenubarItem>
-              <MenubarSeparator />
-              <MenubarItem onSelect={selectAllAction} disabled={!activeFile}>
-                <CheckIcon />
-                Select all
-                <MenubarShortcut>Ctrl+A</MenubarShortcut>
-              </MenubarItem>
-            </MenubarContent>
-          </MenubarMenu>
-
-          <MenubarMenu>
-            <MenubarTrigger>Insert</MenubarTrigger>
-            <MenubarContent>
-              <MenubarItem onSelect={headingAction} disabled={!activeFile}>
-                <Heading1Icon />
-                Heading
-              </MenubarItem>
-              <MenubarItem onSelect={boldAction} disabled={!activeFile}>
-                <TypeIcon />
-                Bold
-                <MenubarShortcut>Ctrl+B</MenubarShortcut>
-              </MenubarItem>
-              <MenubarItem onSelect={italicAction} disabled={!activeFile}>
-                <ItalicIcon />
-                Italic
-                <MenubarShortcut>Ctrl+I</MenubarShortcut>
-              </MenubarItem>
-              <MenubarItem onSelect={inlineCodeAction} disabled={!activeFile}>
-                <CodeIcon />
-                Inline code
-              </MenubarItem>
-              <MenubarItem onSelect={codeBlockAction} disabled={!activeFile}>
-                <CodeIcon />
-                Code block
-              </MenubarItem>
-              <MenubarItem onSelect={bulletListAction} disabled={!activeFile}>
-                <ListIcon />
-                Bullet list
-              </MenubarItem>
-            </MenubarContent>
-          </MenubarMenu>
-
-          <MenubarMenu>
-            <MenubarTrigger>View</MenubarTrigger>
-            <MenubarContent>
-              <MenubarRadioGroup
-                value={viewMode}
-                onValueChange={(value) =>
-                  setViewModeAction(value as "split" | "editor" | "preview")
-                }
-              >
-                <MenubarRadioItem value="split">
-                  <PanelLeftIcon />
-                  Split view
-                </MenubarRadioItem>
-                <MenubarRadioItem value="editor">
-                  <TypeIcon />
-                  Editor only
-                </MenubarRadioItem>
-                <MenubarRadioItem value="preview">
-                  <PanelRightIcon />
-                  Preview only
-                </MenubarRadioItem>
-              </MenubarRadioGroup>
-              <MenubarSeparator />
-              <MenubarCheckboxItem
+                Focus editor
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={focusPreviewAction} disabled={!activeFile}>
+                <PanelRightIcon />
+                Focus preview
+              </DropdownMenuItem>
+              <DropdownMenuCheckboxItem
                 checked={syncScrollEnabled}
                 onCheckedChange={toggleSyncScrollAction}
               >
+                <MonitorUpIcon />
                 Sync scrolling
-              </MenubarCheckboxItem>
-              <MenubarSeparator />
-              <MenubarItem onSelect={focusEditorAction} disabled={!activeFile}>
-                <TypeIcon />
-                Focus editor
-              </MenubarItem>
-              <MenubarItem onSelect={focusPreviewAction} disabled={!activeFile}>
-                <PanelRightIcon />
-                Focus preview
-              </MenubarItem>
-            </MenubarContent>
-          </MenubarMenu>
-        </Menubar>
-
-        <div className="min-w-0">
-          <div className="truncate text-sm font-medium">
-            {activeFile?.name ?? "No document open"}
-          </div>
-          <div className="truncate text-xs text-muted-foreground">
-            {buildFileLabel(activeFile, "Local file")}
-          </div>
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={cutAction} disabled={!activeFile}>
+                Cut
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={copyAction} disabled={!activeFile}>
+                Copy
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={pasteAction} disabled={!activeFile}>
+                Paste
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={selectAllAction} disabled={!activeFile}>
+                Select all
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={clearDocumentAction}
+                disabled={!activeFile}
+                variant="destructive"
+              >
+                <XIcon />
+                Close document
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-      </div>
-
-      <div className="flex items-center gap-2">
-        {activeFile ? <Badge variant="outline">Local editing</Badge> : null}
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" disabled={recentFiles.length === 0}>
-              <HistoryIcon data-icon="inline-start" />
-              Recent
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-72">
-            <DropdownMenuLabel>Reopen a file</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {recentFiles.length > 0 ? (
-              <DropdownMenuGroup>
-                {recentFiles.map((file) => {
-                  const secondaryLabel = buildFileLabel(
-                    file,
-                    "Locally authorized file"
-                  );
-
-                  return (
-                    <DropdownMenuItem
-                      key={file.id}
-                      className="justify-between gap-3"
-                      onSelect={() => openRecentAction(file.id)}
-                    >
-                      <div className="flex min-w-0 items-start gap-2">
-                        <FolderOpenIcon />
-                        <div className="flex min-w-0 flex-col">
-                          <span className="truncate">{file.name}</span>
-                          <span className="truncate text-xs text-muted-foreground">
-                            {secondaryLabel}
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="rounded-sm p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          void removeRecentAction(file.id);
-                        }}
-                        aria-label={`Remove ${file.name} from recent files`}
-                      >
-                        <Trash2Icon className="size-4" />
-                      </button>
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuGroup>
-            ) : (
-              <DropdownMenuItem disabled>No recent files</DropdownMenuItem>
-            )}
-            {recentFiles.length > 0 ? (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onSelect={clearRecentAction}
-                  variant="destructive"
-                >
-                  <Trash2Icon />
-                  Clear history
-                </DropdownMenuItem>
-              </>
-            ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <Button onClick={openFileAction} disabled={isBusy}>
-          <FolderOpenIcon data-icon="inline-start" />
-          Open
-        </Button>
       </div>
     </div>
   );

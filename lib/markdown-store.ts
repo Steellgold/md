@@ -2,7 +2,6 @@
 
 import { create } from "zustand";
 
-import { getUnknownErrorMessage } from "@/lib/markdown-helpers";
 import {
   canUsePersistentLocalFiles,
   clearRecentMarkdownFiles,
@@ -13,8 +12,13 @@ import {
   removeRecentMarkdownFile,
   reopenRecentMarkdownFile,
   saveRecentMarkdownFile,
+  syncRecentMarkdownFileSnapshot,
 } from "@/lib/markdown-file-system";
-import { type MarkdownStore } from "@/lib/markdown-types";
+import {
+  getMarkdownDocumentStats,
+  getUnknownErrorMessage,
+} from "@/lib/markdown-helpers";
+import { type MarkdownStore } from "@/types/markdown";
 
 const getBusyState = () => ({ isBusy: true, error: null });
 
@@ -49,7 +53,30 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       canPersistFiles: canUsePersistentLocalFiles(),
     }),
   clearError: () => set({ error: null }),
-  setContent: (content) => set({ content }),
+  setContent: (content) =>
+    set((state) => {
+      if (!state.activeFile) {
+        return { content };
+      }
+
+      const stats = getMarkdownDocumentStats(content);
+
+      return {
+        content,
+        activeFile: {
+          ...state.activeFile,
+          stats,
+        },
+        recentFiles: state.recentFiles.map((file) =>
+          file.id === state.activeFile?.id
+            ? {
+                ...file,
+                stats,
+              }
+            : file
+        ),
+      };
+    }),
   openWithPicker: async () => {
     set(getBusyState());
 
@@ -149,9 +176,15 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
     }
   },
   clearDocument: () =>
-    set({
-      content: "",
-      activeFile: null,
-      error: null,
+    set((state) => {
+      if (state.activeFile) {
+        void syncRecentMarkdownFileSnapshot(state.activeFile.id, state.content);
+      }
+
+      return {
+        content: "",
+        activeFile: null,
+        error: null,
+      };
     }),
 }));
