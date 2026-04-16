@@ -5,6 +5,16 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  {
+    rules: {
+      quotes: [
+        "error",
+        "double",
+        { avoidEscape: true, allowTemplateLiterals: true },
+      ],
+      semi: ["error", "always"],
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
