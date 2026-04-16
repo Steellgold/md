@@ -18,6 +18,7 @@ import {
 import { useMarkdownStore } from "@/lib/markdown-store";
 import { cn } from "@/lib/utils";
 import { type ViewMode } from "@/types/view-mode";
+import { Button } from "./ui/button";
 
 export const MarkdownApp = () => {
   const {
@@ -185,7 +186,7 @@ export const MarkdownApp = () => {
   return (
     <div
       className={cn(
-        "flex min-h-svh flex-col",
+        "flex min-h-svh flex-col relative",
         activeFile ? "h-svh p-0" : "gap-4 p-4"
       )}
       onDragOver={handleDragOver}
@@ -193,16 +194,20 @@ export const MarkdownApp = () => {
       onDrop={handleDrop}
     >
       {error ? (
-        <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          <TriangleAlertIcon className="size-4" />
-          <span className="flex-1">{error}</span>
-          <button
-            type="button"
-            className="text-xs underline underline-offset-4"
-            onClick={clearError}
-          >
-            Close
-          </button>
+        <div className="absolute bottom-4 right-4 z-50">
+          <div className="flex mx-auto items-center gap-4 rounded-xl backdrop-blur-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <div className="flex items-center gap-2">
+              <TriangleAlertIcon className="size-4" />
+              {error}
+            </div>
+
+            <Button
+              variant="destructive"
+              onClick={clearError}
+            >
+              Close
+            </Button>
+          </div>
         </div>
       ) : null}
 
@@ -254,6 +259,7 @@ export const MarkdownApp = () => {
               isBusy={isBusy}
               canPersistFiles={canPersistFiles}
               openFileAction={openWithPicker}
+              createNewAction={createNewFile}
             />
 
             <MarkdownRecentFiles
@@ -261,7 +267,6 @@ export const MarkdownApp = () => {
               openRecentAction={reopenRecentFile}
               removeRecentAction={removeRecentFile}
               clearRecentAction={clearRecentFiles}
-              createNewAction={createNewFile}
             />
           </div>
         </div>

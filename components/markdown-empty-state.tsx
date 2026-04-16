@@ -1,8 +1,7 @@
 "use client";
 
-import { FileTextIcon, FolderOpenIcon, UploadIcon } from "lucide-react";
+import { FilePlusIcon, FolderOpenIcon, UploadIcon } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -18,6 +17,7 @@ type MarkdownEmptyStateProps = {
   isBusy: boolean;
   canPersistFiles: boolean;
   openFileAction: () => void;
+  createNewAction: () => void;
 };
 
 export const MarkdownEmptyState = ({
@@ -25,6 +25,7 @@ export const MarkdownEmptyState = ({
   isBusy,
   canPersistFiles,
   openFileAction,
+  createNewAction,
 }: MarkdownEmptyStateProps) => {
   return (
     <Empty
@@ -54,10 +55,15 @@ export const MarkdownEmptyState = ({
             <FolderOpenIcon data-icon="inline-start" />
             Open file
           </Button>
-          <Badge variant="outline">
-            <FileTextIcon />
-            Drag and drop supported
-          </Badge>
+
+          <Button
+            onClick={createNewAction}
+            disabled={isBusy}
+            variant="outline"
+          >
+            <FilePlusIcon data-icon="inline-start" />
+            Create new file
+          </Button>
         </div>
 
         {!canPersistFiles ? (
