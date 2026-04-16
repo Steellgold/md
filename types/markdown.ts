@@ -4,12 +4,19 @@ export type PermissionMode = "read" | "readwrite";
 
 export type RecentMarkdownFileSource = "picker" | "drop";
 
+export type MarkdownDocumentStats = {
+  characterCount: number;
+  wordCount: number;
+  lineCount: number;
+};
+
 export type RecentMarkdownFile = {
   id: string;
   name: string;
   path: string | null;
   lastOpenedAt: string;
   source: RecentMarkdownFileSource;
+  stats?: MarkdownDocumentStats;
 };
 
 export type OpenMarkdownResult = {
