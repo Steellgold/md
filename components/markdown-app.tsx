@@ -22,10 +22,8 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Command,
-  CommandDialog,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
@@ -38,6 +36,7 @@ import {
 } from "@/lib/markdown-editor";
 import { getScrollRatio, setScrollRatio } from "@/lib/markdown-helpers";
 import { useMarkdownStore } from "@/lib/markdown-store";
+import { getTextareaCaretCoordinates } from "@/lib/textarea-caret";
 
 export const MarkdownApp = () => {
   const {
@@ -54,6 +53,7 @@ export const MarkdownApp = () => {
     openWithPicker,
     openDroppedFile,
     reopenRecentFile,
+    createNewFile,
     saveActiveFile,
     removeRecentFile,
     clearRecentFiles,
@@ -70,9 +70,15 @@ export const MarkdownApp = () => {
     start: number;
     end: number;
   } | null>(null);
+  const [slashQuery, setSlashQuery] = React.useState("");
+  const [slashPopoverPosition, setSlashPopoverPosition] = React.useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const editorRef = React.useRef<HTMLTextAreaElement | null>(null);
   const previewRef = React.useRef<HTMLDivElement | null>(null);
   const syncingSourceRef = React.useRef<"editor" | "preview" | null>(null);
+  const slashPopoverRef = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
     hydrate();
@@ -192,9 +198,56 @@ export const MarkdownApp = () => {
       event.preventDefault();
       replaceRangeAction(editor, cursor, cursor, "/");
       setSlashRange({ start: cursor, end: cursor + 1 });
+      setSlashQuery("");
+      const caret = getTextareaCaretCoordinates(editor, cursor + 1);
+      setSlashPopoverPosition({
+        top: caret.top + caret.height + 8,
+        left: caret.left,
+      });
       setSlashMenuOpen(true);
     },
     []
+  );
+
+  const handleEditorChange = React.useCallback(
+    (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setContent(event.target.value);
+
+      if (!slashMenuOpen || !slashRange) {
+        return;
+      }
+
+      const editor = editorRef.current;
+
+      if (!editor) {
+        return;
+      }
+
+      const cursor = editor.selectionStart ?? slashRange.end;
+
+      if (cursor < slashRange.start) {
+        setSlashMenuOpen(false);
+        return;
+      }
+
+      const nextEnd = Math.max(cursor, slashRange.end);
+      const nextQuery = editor.value.slice(slashRange.start + 1, nextEnd);
+
+      if (nextQuery.includes("\n")) {
+        setSlashMenuOpen(false);
+        return;
+      }
+
+      setSlashRange({ start: slashRange.start, end: nextEnd });
+      setSlashQuery(nextQuery);
+
+      const caret = getTextareaCaretCoordinates(editor, nextEnd);
+      setSlashPopoverPosition({
+        top: caret.top + caret.height + 8,
+        left: caret.left,
+      });
+    },
+    [setContent, slashMenuOpen, slashRange]
   );
 
   React.useEffect(() => {
@@ -222,7 +275,35 @@ export const MarkdownApp = () => {
     }
 
     setSlashRange(null);
+    setSlashQuery("");
+    setSlashPopoverPosition(null);
   }, [slashMenuOpen, slashRange]);
+
+  React.useEffect(() => {
+    if (!slashMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const popover = slashPopoverRef.current;
+      const editor = editorRef.current;
+
+      if (
+        popover?.contains(event.target as Node) ||
+        editor?.contains(event.target as Node)
+      ) {
+        return;
+      }
+
+      setSlashMenuOpen(false);
+    };
+
+    window.addEventListener("mousedown", handlePointerDown);
+
+    return () => {
+      window.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, [slashMenuOpen]);
 
   const runSlashInsertAction = React.useCallback(
     (value: string, select?: { start: number; end: number }) => {
@@ -241,6 +322,8 @@ export const MarkdownApp = () => {
       );
       setSlashMenuOpen(false);
       setSlashRange(null);
+      setSlashQuery("");
+      setSlashPopoverPosition(null);
     },
     [slashRange]
   );
@@ -335,6 +418,23 @@ export const MarkdownApp = () => {
     ],
     []
   );
+
+  const filteredSlashActions = React.useMemo(() => {
+    const query = slashQuery.trim().toLowerCase();
+
+    if (!query) {
+      return slashActions;
+    }
+
+    return slashActions
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) =>
+          item.label.toLowerCase().includes(query)
+        ),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [slashActions, slashQuery]);
 
   const syncScroll = React.useCallback(
     (source: "editor" | "preview") => {
@@ -495,33 +595,6 @@ export const MarkdownApp = () => {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <CommandDialog
-        open={slashMenuOpen}
-        onOpenChange={(open) => setSlashMenuOpen(open)}
-        title="Insert block"
-        description="Type to search blocks to insert."
-      >
-        <Command>
-          <CommandInput placeholder="Search blocks..." />
-          <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
-            {slashActions.map((group) => (
-              <CommandGroup key={group.group} heading={group.group}>
-                {group.items.map((item) => (
-                  <CommandItem
-                    key={item.id}
-                    value={item.label}
-                    onSelect={() => runSlashInsertAction(item.value)}
-                  >
-                    {item.label}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            ))}
-          </CommandList>
-        </Command>
-      </CommandDialog>
-
       {error ? (
         <div className="flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <TriangleAlertIcon className="size-4" />
@@ -593,11 +666,50 @@ export const MarkdownApp = () => {
                     </div>
                   </CardHeader>
 
-                  <CardContent className="h-full px-0">
+                  <CardContent className="relative h-full px-0">
+                    {slashMenuOpen && slashPopoverPosition ? (
+                      <div
+                        ref={slashPopoverRef}
+                        className="absolute z-50 w-[320px] rounded-xl border bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10"
+                        style={{
+                          top: slashPopoverPosition.top,
+                          left: slashPopoverPosition.left,
+                        }}
+                      >
+                        <Command className="rounded-xl! bg-transparent p-0">
+                          <CommandList>
+                            <CommandEmpty>No blocks found.</CommandEmpty>
+                            {filteredSlashActions.map((group) => (
+                              <CommandGroup
+                                key={group.group}
+                                heading={group.group}
+                              >
+                                {group.items.map((item) => (
+                                  <CommandItem
+                                    key={item.id}
+                                    value={item.label}
+                                    onSelect={() =>
+                                      runSlashInsertAction(item.value)
+                                    }
+                                  >
+                                    {item.label}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            ))}
+                          </CommandList>
+                        </Command>
+                        {slashQuery ? (
+                          <div className="px-2 pt-2 pb-1 text-xs text-muted-foreground">
+                            /{slashQuery}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
                     <Textarea
                       ref={editorRef}
                       value={content}
-                      onChange={(event) => setContent(event.target.value)}
+                      onChange={handleEditorChange}
                       onKeyDown={handleEditorKeyDown}
                       onScroll={handleEditorScroll}
                       placeholder="Write or paste your markdown here..."
@@ -665,6 +777,7 @@ export const MarkdownApp = () => {
             <MarkdownRecentFiles
               recentFiles={recentFiles}
               openRecentAction={reopenRecentFile}
+              createNewAction={createNewFile}
             />
           </div>
         </div>

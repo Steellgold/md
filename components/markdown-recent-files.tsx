@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock3Icon, HistoryIcon } from "lucide-react";
+import { Clock3Icon, FilePlusIcon, HistoryIcon } from "lucide-react";
 
 import {
   Card,
@@ -24,16 +24,14 @@ import { type RecentMarkdownFile } from "@/lib/markdown-types";
 type MarkdownRecentFilesProps = {
   recentFiles: RecentMarkdownFile[];
   openRecentAction: (id: string) => void;
+  createNewAction: () => void;
 };
 
 export const MarkdownRecentFiles = ({
   recentFiles,
   openRecentAction,
+  createNewAction,
 }: MarkdownRecentFilesProps) => {
-  if (recentFiles.length === 0) {
-    return null;
-  }
-
   return (
     <Card className="w-full text-left" size="sm">
       <CardHeader className="border-b">
@@ -76,6 +74,27 @@ export const MarkdownRecentFiles = ({
               </button>
             </Item>
           ))}
+
+          <Item
+            asChild
+            variant="muted"
+            className="cursor-pointer border border-transparent bg-muted/40 hover:border-border hover:bg-muted"
+          >
+            <button type="button" onClick={createNewAction}>
+              <ItemMedia variant="icon">
+                <FilePlusIcon />
+              </ItemMedia>
+
+              <ItemContent>
+                <ItemHeader>
+                  <ItemTitle>Create new</ItemTitle>
+                </ItemHeader>
+                <ItemDescription>
+                  Create a new Markdown document
+                </ItemDescription>
+              </ItemContent>
+            </button>
+          </Item>
         </ItemGroup>
       </CardContent>
     </Card>

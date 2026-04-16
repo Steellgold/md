@@ -24,6 +24,9 @@ declare global {
     showOpenFilePicker?: (
       options?: OpenFilePickerOptions
     ) => Promise<FileSystemFileHandle[]>;
+    showSaveFilePicker?: (
+      options?: import("@/lib/markdown-types").SaveFilePickerOptions
+    ) => Promise<FileSystemFileHandle>;
   }
 }
 
@@ -356,6 +359,52 @@ export const getRecentMarkdownFiles = () =>
   sortRecentFiles(readRecentFilesFromStorage());
 
 export const canUsePersistentLocalFiles = () => supportsOpenFilePicker();
+
+export const createNewMarkdownFile = async (initialContent = "") => {
+  if (
+    !supportsOpenFilePicker() ||
+    typeof window.showSaveFilePicker !== "function"
+  ) {
+    throw new Error("This browser does not support saving local files.");
+  }
+
+  const handle = await window.showSaveFilePicker({
+    id: "markdown-save",
+    suggestedName: "Untitled.md",
+    excludeAcceptAllOption: true,
+    types: MARKDOWN_FILE_TYPES,
+  });
+
+  const markdownHandle = handle as MarkdownFileHandle;
+  const hasPermission = await ensurePermission(markdownHandle, "readwrite");
+
+  if (!hasPermission) {
+    throw new Error("Write permission was denied for this local file.");
+  }
+
+  if (!markdownHandle.createWritable) {
+    throw new Error("This browser does not support writing to local files.");
+  }
+
+  const writable = await markdownHandle.createWritable();
+  await writable.write(initialContent);
+  await writable.close();
+
+  const existingEntry = await findMatchingRecentFile(handle);
+  const entry = await createEntryFromHandle(
+    handle,
+    "picker",
+    existingEntry?.id
+  );
+
+  await saveHandle(entry.id, handle);
+  const recentFiles = persistRecentEntry({
+    ...entry,
+    path: existingEntry?.path ?? entry.path,
+  });
+
+  return { entry, content: initialContent, recentFiles };
+};
 
 export const removeRecentMarkdownFile = async (id: string) => {
   const nextFiles = readRecentFilesFromStorage().filter(

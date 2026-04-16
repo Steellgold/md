@@ -35,6 +35,14 @@ export type OpenFilePickerOptions = {
   types?: FilePickerAcceptType[];
 };
 
+export type SaveFilePickerOptions = {
+  excludeAcceptAllOption?: boolean;
+  id?: string;
+  suggestedName?: string;
+  startIn?: string;
+  types?: FilePickerAcceptType[];
+};
+
 export type MarkdownFileHandle = FileSystemFileHandle & {
   requestPermission?: (descriptor?: {
     mode?: PermissionMode;
@@ -70,6 +78,7 @@ export type MarkdownStore = {
     items?: DataTransferItemList | null
   ) => Promise<void>;
   reopenRecentFile: (id: string) => Promise<void>;
+  createNewFile: () => Promise<void>;
   saveActiveFile: () => Promise<void>;
   removeRecentFile: (id: string) => Promise<void>;
   clearRecentFiles: () => Promise<void>;

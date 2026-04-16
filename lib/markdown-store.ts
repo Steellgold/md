@@ -6,6 +6,7 @@ import { getUnknownErrorMessage } from "@/lib/markdown-helpers";
 import {
   canUsePersistentLocalFiles,
   clearRecentMarkdownFiles,
+  createNewMarkdownFile,
   getRecentMarkdownFiles,
   openDroppedMarkdownFile,
   openMarkdownWithPicker,
@@ -78,6 +79,16 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
     try {
       const { entry, content, recentFiles } =
         await reopenRecentMarkdownFile(id);
+      set(getResolvedState(entry, content, recentFiles));
+    } catch (error) {
+      set(getErrorState(error));
+    }
+  },
+  createNewFile: async () => {
+    set(getBusyState());
+
+    try {
+      const { entry, content, recentFiles } = await createNewMarkdownFile("");
       set(getResolvedState(entry, content, recentFiles));
     } catch (error) {
       set(getErrorState(error));
