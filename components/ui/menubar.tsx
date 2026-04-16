@@ -1,10 +1,10 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Menubar as MenubarPrimitive } from "radix-ui"
+import * as React from "react";
+import { Menubar as MenubarPrimitive } from "radix-ui";
 
-import { cn } from "@/lib/utils"
-import { CheckIcon, ChevronRightIcon } from "lucide-react"
+import { cn } from "@/lib/utils";
+import { CheckIcon, ChevronRightIcon } from "lucide-react";
 
 function Menubar({
   className,
@@ -19,25 +19,25 @@ function Menubar({
       )}
       {...props}
     />
-  )
+  );
 }
 
 function MenubarMenu({
   ...props
 }: React.ComponentProps<typeof MenubarPrimitive.Menu>) {
-  return <MenubarPrimitive.Menu data-slot="menubar-menu" {...props} />
+  return <MenubarPrimitive.Menu data-slot="menubar-menu" {...props} />;
 }
 
 function MenubarGroup({
   ...props
 }: React.ComponentProps<typeof MenubarPrimitive.Group>) {
-  return <MenubarPrimitive.Group data-slot="menubar-group" {...props} />
+  return <MenubarPrimitive.Group data-slot="menubar-group" {...props} />;
 }
 
 function MenubarPortal({
   ...props
 }: React.ComponentProps<typeof MenubarPrimitive.Portal>) {
-  return <MenubarPrimitive.Portal data-slot="menubar-portal" {...props} />
+  return <MenubarPrimitive.Portal data-slot="menubar-portal" {...props} />;
 }
 
 function MenubarRadioGroup({
@@ -45,7 +45,7 @@ function MenubarRadioGroup({
 }: React.ComponentProps<typeof MenubarPrimitive.RadioGroup>) {
   return (
     <MenubarPrimitive.RadioGroup data-slot="menubar-radio-group" {...props} />
-  )
+  );
 }
 
 function MenubarTrigger({
@@ -61,7 +61,7 @@ function MenubarTrigger({
       )}
       {...props}
     />
-  )
+  );
 }
 
 function MenubarContent({
@@ -82,7 +82,7 @@ function MenubarContent({
         {...props}
       />
     </MenubarPortal>
-  )
+  );
 }
 
 function MenubarItem({
@@ -105,7 +105,7 @@ function MenubarItem({
       )}
       {...props}
     />
-  )
+  );
 }
 
 function MenubarCheckboxItem({
@@ -136,7 +136,7 @@ function MenubarCheckboxItem({
       </span>
       {children}
     </MenubarPrimitive.CheckboxItem>
-  )
+  );
 }
 
 function MenubarRadioItem({
@@ -165,7 +165,7 @@ function MenubarRadioItem({
       </span>
       {children}
     </MenubarPrimitive.RadioItem>
-  )
+  );
 }
 
 function MenubarLabel({
@@ -185,7 +185,7 @@ function MenubarLabel({
       )}
       {...props}
     />
-  )
+  );
 }
 
 function MenubarSeparator({
@@ -198,7 +198,7 @@ function MenubarSeparator({
       className={cn("-mx-1 my-1 h-px bg-border", className)}
       {...props}
     />
-  )
+  );
 }
 
 function MenubarShortcut({
@@ -214,13 +214,13 @@ function MenubarShortcut({
       )}
       {...props}
     />
-  )
+  );
 }
 
 function MenubarSub({
   ...props
 }: React.ComponentProps<typeof MenubarPrimitive.Sub>) {
-  return <MenubarPrimitive.Sub data-slot="menubar-sub" {...props} />
+  return <MenubarPrimitive.Sub data-slot="menubar-sub" {...props} />;
 }
 
 function MenubarSubTrigger({
@@ -244,7 +244,7 @@ function MenubarSubTrigger({
       {children}
       <ChevronRightIcon className="ml-auto size-4" />
     </MenubarPrimitive.SubTrigger>
-  )
+  );
 }
 
 function MenubarSubContent({
@@ -257,7 +257,7 @@ function MenubarSubContent({
       className={cn("z-50 min-w-32 origin-(--radix-menubar-content-transform-origin) overflow-hidden rounded-lg bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/10 duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95", className )}
       {...props}
     />
-  )
+  );
 }
 
 export {
@@ -277,4 +277,4 @@ export {
   MenubarSub,
   MenubarSubTrigger,
   MenubarSubContent,
-}
+};

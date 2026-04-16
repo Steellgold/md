@@ -1,10 +1,10 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Checkbox as CheckboxPrimitive } from "radix-ui"
+import * as React from "react";
+import { Checkbox as CheckboxPrimitive } from "radix-ui";
 
-import { cn } from "@/lib/utils"
-import { CheckIcon } from "lucide-react"
+import { cn } from "@/lib/utils";
+import { CheckIcon } from "lucide-react";
 
 function Checkbox({
   className,
@@ -27,7 +27,7 @@ function Checkbox({
         />
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
-  )
+  );
 }
 
-export { Checkbox }
+export { Checkbox };
