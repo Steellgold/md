@@ -16,8 +16,8 @@ export const MarkdownPreviewPanel = ({
   onScroll,
 }: MarkdownPreviewPanelProps) => {
   return (
-    <Card className="flex h-full min-h-0 flex-col rounded-none border-0 bg-transparent ring-0">
-      <CardHeader className="border-b">
+    <Card className="flex h-full min-h-0 flex-col gap-0 rounded-none border-0 bg-transparent py-0 ring-0">
+      <CardHeader className="border-b px-4 py-3">
         <div className="flex items-center gap-2">
           <div className="rounded-md bg-primary/5 p-2">
             <EyeIcon className="size-4" />
