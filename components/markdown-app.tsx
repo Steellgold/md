@@ -156,8 +156,8 @@ export const MarkdownApp = () => {
     wrapSelectionAction(editorRef.current, "_", "_", "italic text");
   }, []);
 
-  const headingAction = React.useCallback(() => {
-    insertBlockAction(editorRef.current, "# ", "", "Heading");
+  const headingAction = React.useCallback((level: 1 | 2 | 3 | 4 | 5 | 6) => {
+    insertBlockAction(editorRef.current, `${"#".repeat(level)} `, "", "Heading");
   }, []);
 
   const inlineCodeAction = React.useCallback(() => {

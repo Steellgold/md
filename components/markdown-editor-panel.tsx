@@ -15,6 +15,12 @@ import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   InputGroup,
   InputGroupAddon,
   InputGroupTextarea,
@@ -32,7 +38,7 @@ type MarkdownEditorPanelProps = {
   redoAction: () => void;
   boldAction: () => void;
   italicAction: () => void;
-  headingAction: () => void;
+  headingAction: (level: 1 | 2 | 3 | 4 | 5 | 6) => void;
   inlineCodeAction: () => void;
   codeBlockAction: () => void;
   bulletListAction: () => void;
@@ -48,11 +54,6 @@ const quickActions = [
     label: "Redo",
     icon: Redo2Icon,
     actionKey: "redoAction",
-  },
-  {
-    label: "Heading",
-    icon: Heading1Icon,
-    actionKey: "headingAction",
   },
   {
     label: "Bold",
@@ -81,6 +82,8 @@ const quickActions = [
   },
 ] as const;
 
+const headingLevels = [1, 2, 3, 4, 5, 6] as const;
+
 export const MarkdownEditorPanel = ({
   activeFile,
   content,
@@ -101,7 +104,6 @@ export const MarkdownEditorPanel = ({
     redoAction,
     boldAction,
     italicAction,
-    headingAction,
     inlineCodeAction,
     codeBlockAction,
     bulletListAction,
@@ -136,6 +138,30 @@ export const MarkdownEditorPanel = ({
               </div>
 
               <ButtonGroup className="max-w-full flex-wrap">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      title="Heading level"
+                      aria-label="Heading level"
+                    >
+                      <Heading1Icon />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-40">
+                    {headingLevels.map((level) => (
+                      <DropdownMenuItem
+                        key={level}
+                        onSelect={() => headingAction(level)}
+                      >
+                        <Heading1Icon />
+                        Heading {level}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
                 {quickActions.map((item) => {
                   const Icon = item.icon;
 

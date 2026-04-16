@@ -220,7 +220,7 @@ export const MarkdownToolbar = ({
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon-sm" title="More actions">
+              <Button variant="outline" size="icon" title="More actions">
                 <EllipsisIcon />
               </Button>
             </DropdownMenuTrigger>
