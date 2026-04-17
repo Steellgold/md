@@ -20,7 +20,10 @@ import {
   buildActiveDocumentMeta,
   buildRecentFileMeta,
 } from "@/lib/markdown-helpers";
-import { type RecentMarkdownFile } from "@/types/markdown";
+import {
+  type MarkdownDocumentStats,
+  type RecentMarkdownFile,
+} from "@/types/markdown";
 import {
   ChevronDownIcon,
   CommandIcon,
@@ -42,7 +45,7 @@ import { useState } from "react";
 
 type MarkdownToolbarProps = {
   activeFile: RecentMarkdownFile | null;
-  content: string;
+  stats: MarkdownDocumentStats;
   openDocumentsCount: number;
   recentFiles: RecentMarkdownFile[];
   isBusy: boolean;
@@ -81,7 +84,7 @@ const viewOptions = [
 
 export const MarkdownToolbar = ({
   activeFile,
-  content,
+  stats,
   openDocumentsCount,
   recentFiles,
   isBusy,
@@ -99,7 +102,7 @@ export const MarkdownToolbar = ({
   syncScrollEnabled,
   toggleSyncScrollAction,
 }: MarkdownToolbarProps) => {
-  const secondaryLabel = buildActiveDocumentMeta(content, activeFile);
+  const secondaryLabel = buildActiveDocumentMeta(stats, activeFile);
   const canSaveFile = activeFile?.source !== "url";
   const refreshLabel =
     activeFile?.source === "url" ? "Reload URL" : "Reopen file";

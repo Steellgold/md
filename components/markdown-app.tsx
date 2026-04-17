@@ -29,7 +29,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   type ChangeEvent,
   type DragEvent as ReactDragEvent,
+  startTransition,
   useCallback,
+  useDeferredValue,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -37,12 +39,19 @@ import {
   useState,
 } from "react";
 import { Button } from "./ui/button";
+import { getMarkdownDocumentStats } from "@/lib/markdown-helpers";
 
 const defaultDocumentTitle = ".MD";
+const LARGE_FILE_THRESHOLD = 20_000;
+const LARGE_FILE_SYNC_DELAY_MS = 180;
+const LARGE_FILE_PREVIEW_SYNC_DELAY_MS = 80;
+const LARGE_FILE_HISTORY_GROUP_WINDOW_MS = 800;
+const MAX_HISTORY_ENTRIES = 100;
 
 type EditorHistoryEntry = {
   content: string;
   selection: MarkdownViewerSelection;
+  timestamp: number;
 };
 
 type EditorHistoryState = {
@@ -65,6 +74,7 @@ export const MarkdownApp = () => {
     hydrate,
     clearError,
     setContent,
+    setDocumentContent,
     openWithPicker,
     openFromUrl,
     openDeepLinkUrl,
@@ -100,16 +110,35 @@ export const MarkdownApp = () => {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isOpenUrlDialogOpen, setIsOpenUrlDialogOpen] = useState(false);
   const [previewDetached, setPreviewDetached] = useState(false);
+  const [previewRenderContent, setPreviewRenderContent] = useState(content);
   const [uiError, setUiError] = useState<string | null>(null);
   const [editorSelection, setEditorSelection] =
     useState<MarkdownViewerSelection | null>(null);
 
   const attemptedDeepLinkRef = useRef<string | null>(null);
   const historyRef = useRef<Map<string, EditorHistoryState>>(new Map());
+  const contentSyncTimeoutRef = useRef<number | null>(null);
+  const previewSyncTimeoutRef = useRef<number | null>(null);
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const pendingSelectionRef = useRef<MarkdownViewerSelection | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const searchParamsKey = searchParams.toString();
+  const isLargeDocument = content.length >= LARGE_FILE_THRESHOLD;
+  const isPreviewVisible = previewDetached || viewMode !== "editor";
+  const shouldTrackPreviewSelection =
+    !isLargeDocument && (previewDetached || viewMode !== "editor");
+  const deferredStatsContent = useDeferredValue(content);
+  const deferredPreviewContent = useDeferredValue(previewRenderContent);
+  const previewContent = isLargeDocument
+    ? previewRenderContent
+    : deferredPreviewContent;
+  const deferredPreviewSelection = useDeferredValue(
+    shouldTrackPreviewSelection ? editorSelection : null
+  );
+  const activeDocumentStats = useMemo(
+    () => getMarkdownDocumentStats(deferredStatsContent),
+    [deferredStatsContent]
+  );
 
   const parsedDeepLink = useMemo(
     () =>
@@ -120,6 +149,46 @@ export const MarkdownApp = () => {
   useEffect(() => {
     hydrate();
   }, [hydrate]);
+
+  useEffect(() => {
+    return () => {
+      if (contentSyncTimeoutRef.current) {
+        window.clearTimeout(contentSyncTimeoutRef.current);
+      }
+
+      if (previewSyncTimeoutRef.current) {
+        window.clearTimeout(previewSyncTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const syncPreviewContent = useCallback(
+    (nextValue: string, options?: { immediate?: boolean }) => {
+      if (previewSyncTimeoutRef.current) {
+        window.clearTimeout(previewSyncTimeoutRef.current);
+        previewSyncTimeoutRef.current = null;
+      }
+
+      const applyPreviewContent = () => {
+        startTransition(() => {
+          setPreviewRenderContent((currentValue) =>
+            currentValue === nextValue ? currentValue : nextValue
+          );
+        });
+      };
+
+      if (!isPreviewVisible || options?.immediate || !isLargeDocument) {
+        applyPreviewContent();
+        return;
+      }
+
+      previewSyncTimeoutRef.current = window.setTimeout(() => {
+        applyPreviewContent();
+        previewSyncTimeoutRef.current = null;
+      }, LARGE_FILE_PREVIEW_SYNC_DELAY_MS);
+    },
+    [isLargeDocument, isPreviewVisible]
+  );
 
   useEffect(() => {
     if (!parsedDeepLink) {
@@ -158,6 +227,14 @@ export const MarkdownApp = () => {
   }, [activeFile]);
 
   useEffect(() => {
+    const nextPreviewContent = isPreviewVisible
+      ? (editorRef.current?.value ?? content)
+      : content;
+
+    syncPreviewContent(nextPreviewContent, { immediate: true });
+  }, [activeDocumentId, content, isPreviewVisible, syncPreviewContent]);
+
+  useEffect(() => {
     const nextHistory = new Map<string, EditorHistoryState>();
 
     openDocuments.forEach((document) => {
@@ -173,6 +250,7 @@ export const MarkdownApp = () => {
             {
               content: document.content,
               selection: initialSelection,
+              timestamp: Date.now(),
             },
           ],
           index: 0,
@@ -188,6 +266,7 @@ export const MarkdownApp = () => {
             {
               content: document.content,
               selection: initialSelection,
+              timestamp: Date.now(),
             },
           ],
           index: 0,
@@ -229,6 +308,8 @@ export const MarkdownApp = () => {
   const handleEditorChange = useCallback(
     (event: ChangeEvent<HTMLTextAreaElement>) => {
       const nextValue = event.target.value;
+      const documentId = activeDocumentId;
+      const now = Date.now();
       const nextSelection = {
         start: event.target.selectionStart,
         end: event.target.selectionEnd,
@@ -242,28 +323,105 @@ export const MarkdownApp = () => {
         const activeEntry = currentHistory.entries[currentHistory.index];
 
         if (activeEntry?.content !== nextValue) {
-          const nextEntries = currentHistory.entries
-            .slice(0, currentHistory.index + 1)
-            .concat({
+          const shouldReplaceActiveEntry =
+            isLargeDocument &&
+            Boolean(activeEntry) &&
+            currentHistory.index === currentHistory.entries.length - 1 &&
+            now - (activeEntry?.timestamp ?? 0) <
+              LARGE_FILE_HISTORY_GROUP_WINDOW_MS;
+
+          if (shouldReplaceActiveEntry) {
+            currentHistory.entries[currentHistory.index] = {
               content: nextValue,
               selection: nextSelection,
+              timestamp: now,
+            };
+          } else {
+            const nextEntries = currentHistory.entries.slice(
+              0,
+              currentHistory.index + 1
+            );
+            nextEntries.push({
+              content: nextValue,
+              selection: nextSelection,
+              timestamp: now,
             });
 
-          historyRef.current.set(activeDocumentId, {
-            entries: nextEntries,
-            index: nextEntries.length - 1,
-          });
+            if (nextEntries.length > MAX_HISTORY_ENTRIES) {
+              nextEntries.splice(0, nextEntries.length - MAX_HISTORY_ENTRIES);
+            }
+
+            historyRef.current.set(activeDocumentId, {
+              entries: nextEntries,
+              index: nextEntries.length - 1,
+            });
+          }
         }
       }
 
-      setContent(nextValue);
+      if (contentSyncTimeoutRef.current) {
+        window.clearTimeout(contentSyncTimeoutRef.current);
+      }
+
+      syncPreviewContent(nextValue);
+
+      if (!isLargeDocument) {
+        startTransition(() => {
+          if (documentId) {
+            setDocumentContent(documentId, nextValue);
+            return;
+          }
+
+          setContent(nextValue);
+        });
+        return;
+      }
+
+      contentSyncTimeoutRef.current = window.setTimeout(() => {
+        startTransition(() => {
+          if (documentId) {
+            setDocumentContent(documentId, nextValue);
+            return;
+          }
+
+          setContent(nextValue);
+        });
+        contentSyncTimeoutRef.current = null;
+      }, LARGE_FILE_SYNC_DELAY_MS);
     },
-    [activeDocumentId, setContent]
+    [
+      activeDocumentId,
+      isLargeDocument,
+      setContent,
+      setDocumentContent,
+      syncPreviewContent,
+    ]
   );
 
+  const flushPendingEditorContent = useCallback(() => {
+    if (contentSyncTimeoutRef.current) {
+      window.clearTimeout(contentSyncTimeoutRef.current);
+      contentSyncTimeoutRef.current = null;
+    }
+
+    const editorContent = editorRef.current?.value;
+
+    if (typeof editorContent === "string" && editorContent !== content) {
+      if (activeDocumentId) {
+        setDocumentContent(activeDocumentId, editorContent);
+      } else {
+        setContent(editorContent);
+      }
+    }
+
+    return editorContent ?? content;
+  }, [activeDocumentId, content, setContent, setDocumentContent]);
+
   const clearEditorSelection = useCallback(() => {
+    flushPendingEditorContent();
+
     setEditorSelection(null);
-  }, []);
+  }, [flushPendingEditorContent]);
 
   const syncEditorSelection = useCallback(
     (editor: HTMLTextAreaElement | null) => {
@@ -280,20 +438,15 @@ export const MarkdownApp = () => {
         const currentHistory = historyRef.current.get(activeDocumentId);
 
         if (currentHistory && currentHistory.index >= 0) {
-          const nextEntries = currentHistory.entries.map((entry, index) =>
-            index === currentHistory.index
-              ? {
-                  ...entry,
-                  selection: nextSelection,
-                }
-              : entry
-          );
-
-          historyRef.current.set(activeDocumentId, {
-            entries: nextEntries,
-            index: currentHistory.index,
-          });
+          currentHistory.entries[currentHistory.index] = {
+            ...currentHistory.entries[currentHistory.index],
+            selection: nextSelection,
+          };
         }
+      }
+
+      if (!shouldTrackPreviewSelection) {
+        return;
       }
 
       setEditorSelection((currentValue) =>
@@ -303,7 +456,7 @@ export const MarkdownApp = () => {
           : nextSelection
       );
     },
-    [activeDocumentId]
+    [activeDocumentId, shouldTrackPreviewSelection]
   );
 
   const { handleEditorScroll, handlePreviewScroll, syncPreviewToEditor } =
@@ -338,6 +491,10 @@ export const MarkdownApp = () => {
   ]);
 
   useEffect(() => {
+    if (!shouldTrackPreviewSelection) {
+      return;
+    }
+
     if (!activeFile) {
       setTimeout(() => setEditorSelection(null), 0);
       return;
@@ -352,7 +509,13 @@ export const MarkdownApp = () => {
     }
 
     syncEditorSelection(editorRef.current);
-  }, [activeFile, content, editorSelection, syncEditorSelection]);
+  }, [
+    activeFile,
+    content,
+    editorSelection,
+    shouldTrackPreviewSelection,
+    syncEditorSelection,
+  ]);
 
   useLayoutEffect(() => {
     const pendingSelection = pendingSelectionRef.current;
@@ -367,9 +530,11 @@ export const MarkdownApp = () => {
       pendingSelection.start,
       pendingSelection.end
     );
-    setEditorSelection(pendingSelection);
+    if (shouldTrackPreviewSelection) {
+      setEditorSelection(pendingSelection);
+    }
     pendingSelectionRef.current = null;
-  }, [activeDocumentId, content]);
+  }, [activeDocumentId, content, shouldTrackPreviewSelection]);
 
   useEffect(() => {
     if (!activeFile) {
@@ -434,14 +599,52 @@ export const MarkdownApp = () => {
   );
 
   const handleRefresh = useCallback(async () => {
+    flushPendingEditorContent();
+
     if (!activeFile) {
       return;
     }
 
     await reopenRecentFile(activeFile.id);
-  }, [activeFile, reopenRecentFile]);
+  }, [activeFile, flushPendingEditorContent, reopenRecentFile]);
+
+  const saveActiveFileAction = useCallback(async () => {
+    flushPendingEditorContent();
+    await saveActiveFile();
+  }, [flushPendingEditorContent, saveActiveFile]);
+
+  const goHomeAction = useCallback(() => {
+    flushPendingEditorContent();
+    goHome();
+  }, [flushPendingEditorContent, goHome]);
+
+  const clearDocumentAction = useCallback(() => {
+    flushPendingEditorContent();
+    clearDocument();
+  }, [clearDocument, flushPendingEditorContent]);
+
+  const setActiveDocumentAction = useCallback(
+    (id: string) => {
+      flushPendingEditorContent();
+      setActiveDocument(id);
+    },
+    [flushPendingEditorContent, setActiveDocument]
+  );
+
+  const closeDocumentAction = useCallback(
+    (id: string) => {
+      flushPendingEditorContent();
+      closeDocument(id);
+    },
+    [closeDocument, flushPendingEditorContent]
+  );
 
   const undoAction = useCallback(() => {
+    if (contentSyncTimeoutRef.current) {
+      window.clearTimeout(contentSyncTimeoutRef.current);
+      contentSyncTimeoutRef.current = null;
+    }
+
     if (!activeDocumentId) {
       return;
     }
@@ -460,10 +663,18 @@ export const MarkdownApp = () => {
       index: nextIndex,
     });
     pendingSelectionRef.current = nextEntry.selection;
-    setContent(nextEntry.content);
-  }, [activeDocumentId, setContent]);
+    syncPreviewContent(nextEntry.content, { immediate: true });
+    startTransition(() => {
+      setContent(nextEntry.content);
+    });
+  }, [activeDocumentId, setContent, syncPreviewContent]);
 
   const redoAction = useCallback(() => {
+    if (contentSyncTimeoutRef.current) {
+      window.clearTimeout(contentSyncTimeoutRef.current);
+      contentSyncTimeoutRef.current = null;
+    }
+
     if (!activeDocumentId) {
       return;
     }
@@ -485,13 +696,16 @@ export const MarkdownApp = () => {
       index: nextIndex,
     });
     pendingSelectionRef.current = nextEntry.selection;
-    setContent(nextEntry.content);
-  }, [activeDocumentId, setContent]);
+    syncPreviewContent(nextEntry.content, { immediate: true });
+    startTransition(() => {
+      setContent(nextEntry.content);
+    });
+  }, [activeDocumentId, setContent, syncPreviewContent]);
 
   useMarkdownHotkeys({
     enabled: Boolean(activeFile),
     saveEnabled: activeFile?.source !== "url",
-    onSaveAction: saveActiveFile,
+    onSaveAction: saveActiveFileAction,
     onOpenSwitcherAction: () => setIsCommandPaletteOpen(true),
     onUndoAction: undoAction,
     onRedoAction: redoAction,
@@ -554,24 +768,28 @@ export const MarkdownApp = () => {
       return;
     }
 
+    const nextContent = flushPendingEditorContent();
+
     downloadTextFile(
       buildMarkdownExportFileName(activeFile.name, "md"),
-      content,
+      nextContent,
       "text/markdown;charset=utf-8"
     );
-  }, [activeFile, content]);
+  }, [activeFile, flushPendingEditorContent]);
 
   const exportHtmlFile = useCallback(() => {
     if (!activeFile) {
       return;
     }
 
+    const nextContent = flushPendingEditorContent();
+
     downloadTextFile(
       buildMarkdownExportFileName(activeFile.name, "html"),
-      buildMarkdownExportHtml(activeFile.name, content),
+      buildMarkdownExportHtml(activeFile.name, nextContent),
       "text/html;charset=utf-8"
     );
-  }, [activeFile, content]);
+  }, [activeFile, flushPendingEditorContent]);
 
   if (!hydrated) {
     return (
@@ -632,6 +850,8 @@ export const MarkdownApp = () => {
           recentFiles={recentFiles}
           isBusy={isBusy}
           content={content}
+          stats={activeDocumentStats}
+          previewContent={previewContent}
           editorRef={editorRef}
           previewRef={previewRef}
           onEditorChange={handleEditorChange}
@@ -639,7 +859,7 @@ export const MarkdownApp = () => {
           onEditorSelectionChange={syncEditorSelection}
           onEditorScroll={handleEditorScroll}
           onPreviewScroll={handlePreviewScroll}
-          editorSelection={editorSelection}
+          previewSelection={deferredPreviewSelection}
           viewMode={viewMode}
           setViewModeAction={setViewMode}
           previewDetached={previewDetached}
@@ -651,12 +871,12 @@ export const MarkdownApp = () => {
           openFileAction={openWithPicker}
           showCommandPaletteAction={showCommandPalette}
           showOpenUrlDialogAction={showOpenUrlDialog}
-          goHomeAction={goHome}
-          saveFileAction={saveActiveFile}
+          goHomeAction={goHomeAction}
+          saveFileAction={saveActiveFileAction}
           refreshFileAction={handleRefresh}
-          clearDocumentAction={clearDocument}
-          setActiveDocumentAction={setActiveDocument}
-          closeDocumentAction={closeDocument}
+          clearDocumentAction={clearDocumentAction}
+          setActiveDocumentAction={setActiveDocumentAction}
+          closeDocumentAction={closeDocumentAction}
           openRecentAction={reopenRecentFile}
           clearRecentAction={clearRecentFiles}
           undoAction={undoAction}
@@ -767,19 +987,19 @@ export const MarkdownApp = () => {
           void createNewFile();
         }}
         saveFileAction={() => {
-          void saveActiveFile();
+          void saveActiveFileAction();
         }}
         refreshFileAction={() => {
           void handleRefresh();
         }}
         exportMarkdownAction={exportMarkdownFile}
         exportHtmlAction={exportHtmlFile}
-        goHomeAction={goHome}
-        closeDocumentAction={clearDocument}
+        goHomeAction={goHomeAction}
+        closeDocumentAction={clearDocumentAction}
         openRecentAction={(id) => {
           void reopenRecentFile(id);
         }}
-        setActiveDocumentAction={setActiveDocument}
+        setActiveDocumentAction={setActiveDocumentAction}
         setViewModeAction={setViewMode}
       />
     </div>

@@ -15,7 +15,10 @@ import {
   saveRecentMarkdownFile,
   syncRecentMarkdownFileSnapshot,
 } from "@/lib/markdown-file-system";
-import { getUnknownErrorMessage } from "@/lib/markdown-helpers";
+import {
+  getMarkdownDocumentStats,
+  getUnknownErrorMessage,
+} from "@/lib/markdown-helpers";
 import {
   type MarkdownStore,
   type OpenMarkdownDocument,
@@ -24,6 +27,47 @@ import {
 } from "@/types/markdown";
 
 const getBusyState = () => ({ isBusy: true, error: null });
+
+const updateDocumentContent = (
+  state: MarkdownStore,
+  documentId: string,
+  content: string
+) => {
+  const activeDocumentIndex = state.openDocuments.findIndex(
+    (document) => document.id === documentId
+  );
+
+  if (activeDocumentIndex === -1) {
+    return { content: state.content };
+  }
+
+  const currentDocument = state.openDocuments[activeDocumentIndex];
+  const stats = getMarkdownDocumentStats(content);
+  const nextDocument = {
+    ...currentDocument,
+    content,
+    isDirty: content !== currentDocument.savedContent,
+    file: {
+      ...currentDocument.file,
+      stats,
+    },
+  };
+  const nextDocuments = [...state.openDocuments];
+  nextDocuments[activeDocumentIndex] = nextDocument;
+
+  return {
+    openDocuments: nextDocuments,
+    content:
+      state.activeDocumentId === documentId ? content : state.content,
+    activeFile:
+      state.activeDocumentId === documentId
+        ? nextDocument.file
+        : state.activeFile,
+    recentFiles: state.recentFiles.map((file) =>
+      file.id === documentId ? nextDocument.file : file
+    ),
+  };
+};
 
 const createOpenDocument = (
   entry: RecentMarkdownFile,
@@ -133,43 +177,10 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
         return { content };
       }
 
-      const nextDocuments = state.openDocuments.map((document) => {
-        if (document.id !== activeDocumentId) {
-          return document;
-        }
-
-        const stats = {
-          characterCount: content.length,
-          wordCount: content.trim() ? content.trim().split(/\s+/u).length : 0,
-          lineCount: content === "" ? 1 : content.split(/\r?\n/u).length,
-        };
-
-        return {
-          ...document,
-          content,
-          isDirty: content !== document.savedContent,
-          file: {
-            ...document.file,
-            stats,
-          },
-        };
-      });
-
-      const activeDocument =
-        nextDocuments.find((document) => document.id === activeDocumentId) ??
-        null;
-
-      return {
-        openDocuments: nextDocuments,
-        content,
-        activeFile: activeDocument?.file ?? null,
-        recentFiles: state.recentFiles.map((file) =>
-          file.id === activeDocumentId && activeDocument
-            ? activeDocument.file
-            : file
-        ),
-      };
+      return updateDocumentContent(state, activeDocumentId, content);
     }),
+  setDocumentContent: (id, content) =>
+    set((state) => updateDocumentContent(state, id, content)),
   setActiveDocument: (id) =>
     set((state) => {
       const activeDocument =

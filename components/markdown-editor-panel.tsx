@@ -13,7 +13,10 @@ import {
   InputGroupTextarea,
 } from "@/components/ui/input-group";
 import { buildActiveDocumentMeta } from "@/lib/markdown-helpers";
-import { type RecentMarkdownFile } from "@/types/markdown";
+import {
+  type MarkdownDocumentStats,
+  type RecentMarkdownFile,
+} from "@/types/markdown";
 import {
   BoldIcon,
   Code2Icon,
@@ -25,11 +28,19 @@ import {
   Redo2Icon,
   Undo2Icon,
 } from "lucide-react";
-import { ChangeEvent, RefObject, SyntheticEvent, useCallback, useEffect, useRef } from "react";
+import {
+  ChangeEvent,
+  RefObject,
+  SyntheticEvent,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 
 type MarkdownEditorPanelProps = {
   activeFile: RecentMarkdownFile;
   content: string;
+  stats: MarkdownDocumentStats;
   editorRef: RefObject<HTMLTextAreaElement | null>;
   onTopbarHeightChange?: (height: number) => void;
   onChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
@@ -89,6 +100,7 @@ const headingLevels = [1, 2, 3, 4, 5, 6] as const;
 export const MarkdownEditorPanel = ({
   activeFile,
   content,
+  stats,
   editorRef,
   onTopbarHeightChange,
   onChange,
@@ -139,6 +151,16 @@ export const MarkdownEditorPanel = ({
     };
   }, [onTopbarHeightChange]);
 
+  useEffect(() => {
+    const editorElement = editorRef.current;
+
+    if (!editorElement || editorElement.value === content) {
+      return;
+    }
+
+    editorElement.value = content;
+  }, [content, editorRef]);
+
   const handleEditorChange = useCallback(
     (event: ChangeEvent<HTMLTextAreaElement>) => {
       onChange(event);
@@ -179,7 +201,7 @@ export const MarkdownEditorPanel = ({
                   {activeFile.name}
                 </div>
                 <div className="truncate text-xs text-muted-foreground">
-                  {buildActiveDocumentMeta(content, activeFile)}
+                  {buildActiveDocumentMeta(stats, activeFile)}
                 </div>
               </div>
 
@@ -230,12 +252,10 @@ export const MarkdownEditorPanel = ({
 
           <InputGroupTextarea
             ref={editorRef}
-            value={content}
             onChange={handleEditorChange}
             onBlur={onBlur}
             onScroll={onScroll}
             onFocus={handleEditorSelectionChange}
-            onKeyUp={handleEditorSelectionChange}
             onMouseUp={handleEditorSelectionChange}
             onSelect={handleEditorSelectionChange}
             placeholder="Write or paste your markdown here..."

@@ -7,6 +7,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import {
+  type MarkdownDocumentStats,
   type OpenMarkdownDocument,
   type RecentMarkdownFile,
 } from "@/types/markdown";
@@ -24,6 +25,8 @@ type MarkdownActiveDocumentProps = {
   recentFiles: RecentMarkdownFile[];
   isBusy: boolean;
   content: string;
+  stats: MarkdownDocumentStats;
+  previewContent: string;
   editorRef: RefObject<HTMLTextAreaElement | null>;
   previewRef: RefObject<HTMLDivElement | null>;
   onEditorChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
@@ -31,7 +34,7 @@ type MarkdownActiveDocumentProps = {
   onEditorSelectionChange: (editor: HTMLTextAreaElement) => void;
   onEditorScroll: () => void;
   onPreviewScroll: () => void;
-  editorSelection: MarkdownViewerSelection | null;
+  previewSelection: MarkdownViewerSelection | null;
   viewMode: ViewMode;
   setViewModeAction: (value: ViewMode) => void;
   previewDetached: boolean;
@@ -68,6 +71,8 @@ export const MarkdownActiveDocument = ({
   recentFiles,
   isBusy,
   content,
+  stats,
+  previewContent,
   editorRef,
   previewRef,
   onEditorChange,
@@ -75,7 +80,7 @@ export const MarkdownActiveDocument = ({
   onEditorSelectionChange,
   onEditorScroll,
   onPreviewScroll,
-  editorSelection,
+  previewSelection,
   viewMode,
   setViewModeAction,
   previewDetached,
@@ -111,7 +116,7 @@ export const MarkdownActiveDocument = ({
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <MarkdownToolbar
         activeFile={activeFile}
-        content={content}
+        stats={stats}
         openDocumentsCount={openDocuments.length}
         recentFiles={recentFiles}
         isBusy={isBusy}
@@ -149,6 +154,7 @@ export const MarkdownActiveDocument = ({
             <MarkdownEditorPanel
               activeFile={activeFile}
               content={content}
+              stats={stats}
               editorRef={editorRef}
               onTopbarHeightChange={setEditorTopbarHeight}
               onChange={onEditorChange}
@@ -179,9 +185,9 @@ export const MarkdownActiveDocument = ({
             minSize={30}
           >
             <MarkdownPreviewPanel
-              content={content}
+              content={previewContent}
               previewRef={previewRef}
-              editorSelection={editorSelection}
+              editorSelection={previewSelection}
               topOverlayHeight={editorTopbarHeight}
               onScroll={onPreviewScroll}
               previewDetached={previewDetached}
@@ -198,9 +204,9 @@ export const MarkdownActiveDocument = ({
         onBlocked={onDetachedPreviewBlocked}
       >
         <MarkdownPreviewPanel
-          content={content}
+          content={previewContent}
           previewRef={previewRef}
-          editorSelection={editorSelection}
+          editorSelection={previewSelection}
           onScroll={onPreviewScroll}
           previewDetached={previewDetached}
           togglePreviewDetachedAction={togglePreviewDetachedAction}

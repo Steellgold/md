@@ -1,15 +1,15 @@
 import { ArrowUpRightIcon, EyeIcon } from "lucide-react";
 
-
 import { MarkdownPreview } from "@/components/markdown-preview";
 import { Button } from "@/components/ui/button";
 import {
-  Card, CardContent,
+  Card,
+  CardContent,
   CardHeader,
-  CardTitle
+  CardTitle,
 } from "@/components/ui/card";
 import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection";
-import { RefObject } from "react";
+import { type RefObject } from "react";
 
 type MarkdownPreviewPanelProps = {
   content: string;

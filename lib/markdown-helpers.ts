@@ -61,12 +61,10 @@ export const formatMarkdownDocumentStats = (stats: MarkdownDocumentStats) =>
   ].join(" • ");
 
 export const buildActiveDocumentMeta = (
-  content: string,
+  stats: MarkdownDocumentStats,
   file: RecentMarkdownFile | null
 ) => {
-  const statsLabel = formatMarkdownDocumentStats(
-    getMarkdownDocumentStats(content)
-  );
+  const statsLabel = formatMarkdownDocumentStats(stats);
 
   if (!file?.lastOpenedAt) {
     return statsLabel;

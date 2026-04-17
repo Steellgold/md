@@ -115,6 +115,7 @@ export type MarkdownStore = {
   hydrate: () => void;
   clearError: () => void;
   setContent: (content: string) => void;
+  setDocumentContent: (id: string, content: string) => void;
   setActiveDocument: (id: string) => void;
   openWithPicker: () => Promise<void>;
   openFromUrl: (

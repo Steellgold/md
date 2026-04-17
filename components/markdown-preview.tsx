@@ -1,6 +1,5 @@
 "use client";
 
-
 import { rehypeMarkdownViewerSelection } from "@/lib/markdown-viewer-selection";
 import { cn } from "@/lib/utils";
 import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection";
@@ -42,6 +41,8 @@ const getCodeLanguage = (className?: string) => {
   return languageAliases[language] ?? language;
 };
 
+const MAX_SELECTION_HIGHLIGHT_CONTENT_LENGTH = 20_000;
+
 export const MarkdownPreview = ({
   content,
   editorSelection,
@@ -49,10 +50,14 @@ export const MarkdownPreview = ({
 }: MarkdownPreviewProps) => {
   const { resolvedTheme } = useTheme();
   const syntaxTheme = resolvedTheme === "dark" ? oneDark : oneLight;
+  const shouldHighlightSelection =
+    content.length <= MAX_SELECTION_HIGHLIGHT_CONTENT_LENGTH;
   const rehypePlugins = useMemo<PluggableList>(
     () =>
-      editorSelection ? [[rehypeMarkdownViewerSelection, editorSelection]] : [],
-    [editorSelection]
+      shouldHighlightSelection && editorSelection
+        ? [[rehypeMarkdownViewerSelection, editorSelection]]
+        : [],
+    [editorSelection, shouldHighlightSelection]
   );
 
   return (
