@@ -1,14 +1,17 @@
 "use client";
 
 import { ArrowUpRightIcon, TriangleAlertIcon } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 
 import { MarkdownActiveDocument } from "@/components/markdown-active-document";
 import { MarkdownEmptyState } from "@/components/markdown-empty-state";
 import { MarkdownImportSelectionDialog } from "@/components/markdown-import-selection-dialog";
+import { MarkdownRemoteSelectionDialog } from "@/components/markdown-remote-selection-dialog";
 import { MarkdownRecentFiles } from "@/components/markdown-recent-files";
 import { Spinner } from "@/components/ui/spinner";
 import { useMarkdownHotkeys } from "@/hooks/use-markdown-hotkeys";
+import { extractMarkdownDeepLink } from "@/lib/markdown-deep-link";
 import { useScrollSync } from "@/hooks/use-scroll-sync";
 import {
   insertBlockAction,
@@ -28,6 +31,7 @@ export const MarkdownApp = () => {
     content,
     activeFile,
     pendingImports,
+    pendingRemoteOpen,
     recentFiles,
     hydrated,
     isBusy,
@@ -38,17 +42,23 @@ export const MarkdownApp = () => {
     setContent,
     openWithPicker,
     openFromUrl,
+    openDeepLinkUrl,
     openDroppedFiles,
     openPendingImport,
+    openPendingRemoteFile,
     reopenRecentFile,
     createNewFile,
     saveActiveFile,
     removeRecentFile,
     clearRecentFiles,
     clearPendingImports,
+    clearPendingRemoteOpen,
     clearDocument,
   } = useMarkdownStore();
 
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const viewMode = useMarkdownUiStore((state) => state.viewMode);
   const syncScrollEnabled = useMarkdownUiStore(
     (state) => state.syncScrollEnabled
@@ -58,12 +68,42 @@ export const MarkdownApp = () => {
     (state) => state.toggleSyncScroll
   );
   const [isDragActive, setIsDragActive] = React.useState(false);
+  const attemptedDeepLinkRef = React.useRef<string | null>(null);
   const editorRef = React.useRef<HTMLTextAreaElement | null>(null);
   const previewRef = React.useRef<HTMLDivElement | null>(null);
+  const searchParamsKey = searchParams.toString();
+  const parsedDeepLink = React.useMemo(
+    () => extractMarkdownDeepLink(pathname, new URLSearchParams(searchParamsKey)),
+    [pathname, searchParamsKey]
+  );
 
   React.useEffect(() => {
     hydrate();
   }, [hydrate]);
+
+  React.useEffect(() => {
+    if (!parsedDeepLink) {
+      attemptedDeepLinkRef.current = null;
+      return;
+    }
+
+    if (!hydrated || activeFile) {
+      return;
+    }
+
+    const deepLinkKey = `${parsedDeepLink.source}:${parsedDeepLink.targetUrl}`;
+
+    if (attemptedDeepLinkRef.current === deepLinkKey) {
+      return;
+    }
+
+    attemptedDeepLinkRef.current = deepLinkKey;
+
+    void (async () => {
+      await openDeepLinkUrl(parsedDeepLink.targetUrl);
+      router.replace("/", { scroll: false });
+    })();
+  }, [activeFile, hydrated, openDeepLinkUrl, parsedDeepLink, router]);
 
   React.useEffect(() => {
     document.title = activeFile
@@ -281,6 +321,14 @@ export const MarkdownApp = () => {
         pendingImports={pendingImports}
         openImportAction={openPendingImport}
         clearPendingImportsAction={clearPendingImports}
+      />
+      <MarkdownRemoteSelectionDialog
+        isBusy={isBusy}
+        files={pendingRemoteOpen?.files ?? []}
+        openFileAction={(fileName) => {
+          void openPendingRemoteFile(fileName);
+        }}
+        clearRemoteSelectionAction={clearPendingRemoteOpen}
       />
     </div>
   );

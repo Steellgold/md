@@ -38,6 +38,11 @@ export type PendingMarkdownImport = {
   content: string;
 };
 
+export type PendingRemoteMarkdownOpen = {
+  url: string;
+  files: string[];
+};
+
 export type OpenMarkdownResult = {
   entry: RecentMarkdownFile;
   content: string;
@@ -91,6 +96,7 @@ export type MarkdownStore = {
   content: string;
   activeFile: RecentMarkdownFile | null;
   pendingImports: PendingMarkdownImport[];
+  pendingRemoteOpen: PendingRemoteMarkdownOpen | null;
   recentFiles: RecentMarkdownFile[];
   hydrated: boolean;
   isBusy: boolean;
@@ -104,12 +110,15 @@ export type MarkdownStore = {
     url: string,
     fileName?: string
   ) => Promise<MarkdownOpenFromUrlActionResult>;
+  openDeepLinkUrl: (url: string) => Promise<void>;
   openDroppedFiles: (
     files: File[],
     items?: DataTransferItemList | null
   ) => Promise<void>;
   openPendingImport: (id: string) => void;
   clearPendingImports: () => void;
+  openPendingRemoteFile: (fileName: string) => Promise<void>;
+  clearPendingRemoteOpen: () => void;
   reopenRecentFile: (id: string) => Promise<void>;
   createNewFile: () => Promise<void>;
   saveActiveFile: () => Promise<void>;

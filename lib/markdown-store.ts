@@ -31,6 +31,7 @@ const getResolvedState = (
   activeFile: entry,
   content,
   pendingImports: [],
+  pendingRemoteOpen: null,
   recentFiles,
   isBusy: false,
   error: null,
@@ -40,12 +41,14 @@ const getErrorState = (error: unknown) => ({
   error: getUnknownErrorMessage(error),
   isBusy: false,
   pendingImports: [],
+  pendingRemoteOpen: null,
 });
 
 export const useMarkdownStore = create<MarkdownStore>((set) => ({
   content: "",
   activeFile: null,
   pendingImports: [],
+  pendingRemoteOpen: null,
   recentFiles: [],
   hydrated: false,
   isBusy: false,
@@ -55,6 +58,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
     set({
       hydrated: true,
       pendingImports: [],
+      pendingRemoteOpen: null,
       recentFiles: getRecentMarkdownFiles(),
       canPersistFiles: canUsePersistentLocalFiles(),
     }),
@@ -116,6 +120,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       if (result.status === "selection-required") {
         set({
           pendingImports: [],
+          pendingRemoteOpen: null,
           isBusy: false,
           error: null,
         });
@@ -130,6 +135,30 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       return { status: "error" };
     }
   },
+  openDeepLinkUrl: async (url) => {
+    set(getBusyState());
+
+    try {
+      const result = await openMarkdownFromUrl(url);
+
+      if (result.status === "selection-required") {
+        set({
+          pendingImports: [],
+          pendingRemoteOpen: {
+            url,
+            files: result.files,
+          },
+          isBusy: false,
+          error: null,
+        });
+        return;
+      }
+
+      set(getResolvedState(result.entry, result.content, result.recentFiles));
+    } catch (error) {
+      set(getErrorState(error));
+    }
+  },
   openDroppedFiles: async (files, items) => {
     set(getBusyState());
 
@@ -139,6 +168,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       if (result.status === "selection-required") {
         set({
           pendingImports: result.documents,
+          pendingRemoteOpen: null,
           recentFiles: result.recentFiles,
           isBusy: false,
           error: null,
@@ -173,6 +203,43 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       };
     }),
   clearPendingImports: () => set({ pendingImports: [] }),
+  openPendingRemoteFile: async (fileName) => {
+    const state = useMarkdownStore.getState();
+    const pendingRemoteOpen = state.pendingRemoteOpen;
+
+    if (!pendingRemoteOpen) {
+      set(getErrorState(new Error("No remote file is waiting to be opened.")));
+      return;
+    }
+
+    set(getBusyState());
+
+    try {
+      const result = await openMarkdownFromUrl(pendingRemoteOpen.url, {
+        fileName,
+      });
+
+      if (result.status === "selection-required") {
+        set({
+          pendingRemoteOpen: {
+            url: pendingRemoteOpen.url,
+            files: result.files,
+          },
+          isBusy: false,
+          error: null,
+        });
+        return;
+      }
+
+      set(getResolvedState(result.entry, result.content, result.recentFiles));
+    } catch (error) {
+      set({
+        error: getUnknownErrorMessage(error),
+        isBusy: false,
+      });
+    }
+  },
+  clearPendingRemoteOpen: () => set({ pendingRemoteOpen: null }),
   reopenRecentFile: async (id) => {
     set(getBusyState());
 
@@ -229,6 +296,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
         recentFiles,
         isBusy: false,
         pendingImports: [],
+        pendingRemoteOpen: null,
         error: null,
       });
     } catch (error) {
@@ -244,6 +312,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
         recentFiles: [],
         isBusy: false,
         pendingImports: [],
+        pendingRemoteOpen: null,
         error: null,
       });
     } catch (error) {
@@ -260,6 +329,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
         content: "",
         activeFile: null,
         pendingImports: [],
+        pendingRemoteOpen: null,
         error: null,
       };
     }),
