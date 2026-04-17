@@ -151,7 +151,7 @@ export const DetachedWindowPortal = ({
     };
   }, [onBlocked, onCloseAction, open, title]);
 
-  if (!portalContainer) {
+  if (!open || !portalContainer) {
     return null;
   }
 
