@@ -19,7 +19,20 @@ const safeDecode = (value: string) => {
 
 const normalizeTarget = (value: string | null | undefined) => {
   const decodedValue = safeDecode(value ?? "").trim();
-  return decodedValue === "" ? null : decodedValue;
+
+  if (decodedValue === "") {
+    return null;
+  }
+
+  if (decodedValue.startsWith("https:/") && !decodedValue.startsWith("https://")) {
+    return decodedValue.replace("https:/", "https://");
+  }
+
+  if (decodedValue.startsWith("http:/") && !decodedValue.startsWith("http://")) {
+    return decodedValue.replace("http:/", "http://");
+  }
+
+  return decodedValue;
 };
 
 const hasHttpProtocol = (value: string) =>
