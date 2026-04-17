@@ -1,5 +1,7 @@
 # MD
 
+[![Open this file](./public/open-this-file.svg)](https://better-md.vercel.app/open/https://raw.githubusercontent.com/Steellgold/md/stable/README.md)
+
 Focused Markdown editor built with Next.js.
 
 MD lets you write, preview, reopen, and import Markdown files quickly from local storage or remote URLs such as GitHub and Gist.
