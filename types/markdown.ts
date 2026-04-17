@@ -2,7 +2,7 @@
 
 export type PermissionMode = "read" | "readwrite";
 
-export type RecentMarkdownFileSource = "picker" | "drop";
+export type RecentMarkdownFileSource = "picker" | "drop" | "url";
 
 export type MarkdownDocumentStats = {
   characterCount: number;
@@ -14,10 +14,24 @@ export type RecentMarkdownFile = {
   id: string;
   name: string;
   path: string | null;
+  url: string | null;
+  urlFileName: string | null;
   lastOpenedAt: string;
   source: RecentMarkdownFileSource;
   stats?: MarkdownDocumentStats;
 };
+
+export type MarkdownOpenFromUrlActionResult =
+  | {
+      status: "opened";
+    }
+  | {
+      status: "selection-required";
+      files: string[];
+    }
+  | {
+      status: "error";
+    };
 
 export type OpenMarkdownResult = {
   entry: RecentMarkdownFile;
@@ -80,6 +94,10 @@ export type MarkdownStore = {
   clearError: () => void;
   setContent: (content: string) => void;
   openWithPicker: () => Promise<void>;
+  openFromUrl: (
+    url: string,
+    fileName?: string
+  ) => Promise<MarkdownOpenFromUrlActionResult>;
   openDroppedFile: (
     file: File,
     items?: DataTransferItemList | null

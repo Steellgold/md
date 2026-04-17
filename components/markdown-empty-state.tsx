@@ -1,8 +1,23 @@
 "use client";
 
-import { FilePlusIcon, FolderOpenIcon, UploadIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  FilePlusIcon,
+  FolderOpenIcon,
+  LinkIcon,
+  UploadIcon,
+} from "lucide-react";
+import * as React from "react";
 
+import { MarkdownOpenUrlDialog } from "@/components/markdown-open-url-dialog";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Empty,
   EmptyContent,
@@ -11,12 +26,17 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { type MarkdownOpenFromUrlActionResult } from "@/types/markdown";
 
 type MarkdownEmptyStateProps = {
   isDragActive: boolean;
   isBusy: boolean;
   canPersistFiles: boolean;
   openFileAction: () => void;
+  openUrlAction: (
+    url: string,
+    fileName?: string
+  ) => Promise<MarkdownOpenFromUrlActionResult>;
   createNewAction: () => void;
 };
 
@@ -25,8 +45,11 @@ export const MarkdownEmptyState = ({
   isBusy,
   canPersistFiles,
   openFileAction,
+  openUrlAction,
   createNewAction,
 }: MarkdownEmptyStateProps) => {
+  const [isOpenUrlDialogOpen, setIsOpenUrlDialogOpen] = React.useState(false);
+
   return (
     <Empty
       className={
@@ -48,13 +71,53 @@ export const MarkdownEmptyState = ({
 
       <EmptyContent className="max-w-md">
         <div className="flex flex-wrap items-center justify-center gap-2">
-          <Button
-            onClick={openFileAction}
-            disabled={isBusy || !canPersistFiles}
-          >
-            <FolderOpenIcon data-icon="inline-start" />
-            Open file
-          </Button>
+          <MarkdownOpenUrlDialog
+            isBusy={isBusy}
+            openUrlAction={openUrlAction}
+            open={isOpenUrlDialogOpen}
+            onOpenChange={setIsOpenUrlDialogOpen}
+          />
+
+          <ButtonGroup>
+            <Button
+              onClick={openFileAction}
+              disabled={isBusy || !canPersistFiles}
+            >
+              <FolderOpenIcon data-icon="inline-start" />
+              Open file
+            </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="icon"
+                  disabled={isBusy}
+                  aria-label="Open options"
+                >
+                  <ChevronDownIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="center" className="w-44">
+                <DropdownMenuItem
+                  onSelect={() => {
+                    if (!canPersistFiles) {
+                      return;
+                    }
+
+                    openFileAction();
+                  }}
+                  disabled={!canPersistFiles}
+                >
+                  <FolderOpenIcon />
+                  Open file
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setIsOpenUrlDialogOpen(true)}>
+                  <LinkIcon />
+                  Open URL
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </ButtonGroup>
 
           <Button
             onClick={createNewAction}

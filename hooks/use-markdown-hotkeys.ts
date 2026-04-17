@@ -11,12 +11,14 @@ import {
 
 type UseMarkdownHotkeysParams = {
   enabled: boolean;
+  saveEnabled: boolean;
   onSave: () => Promise<void> | void;
   editorRef: React.RefObject<HTMLTextAreaElement | null>;
 };
 
 export const useMarkdownHotkeys = ({
   enabled,
+  saveEnabled,
   onSave,
   editorRef,
 }: UseMarkdownHotkeysParams) => {
@@ -77,6 +79,10 @@ export const useMarkdownHotkeys = ({
           return;
         }
         case "s": {
+          if (!saveEnabled) {
+            return;
+          }
+
           event.preventDefault();
           void onSave();
           return;
@@ -102,5 +108,5 @@ export const useMarkdownHotkeys = ({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [editorRef, enabled, onSave]);
+  }, [editorRef, enabled, onSave, saveEnabled]);
 };

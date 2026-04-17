@@ -32,6 +32,7 @@ type MarkdownEditorPanelProps = {
   activeFile: RecentMarkdownFile;
   content: string;
   editorRef: React.RefObject<HTMLTextAreaElement | null>;
+  onTopbarHeightChange?: (height: number) => void;
   onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onScroll: () => void;
   undoAction: () => void;
@@ -88,6 +89,7 @@ export const MarkdownEditorPanel = ({
   activeFile,
   content,
   editorRef,
+  onTopbarHeightChange,
   onChange,
   onScroll,
   undoAction,
@@ -99,6 +101,7 @@ export const MarkdownEditorPanel = ({
   codeBlockAction,
   bulletListAction,
 }: MarkdownEditorPanelProps) => {
+  const topbarRef = React.useRef<HTMLDivElement | null>(null);
   const actionMap = {
     undoAction,
     redoAction,
@@ -108,6 +111,30 @@ export const MarkdownEditorPanel = ({
     codeBlockAction,
     bulletListAction,
   };
+
+  React.useEffect(() => {
+    const topbarElement = topbarRef.current;
+
+    if (!topbarElement || !onTopbarHeightChange) {
+      return;
+    }
+
+    const updateHeight = () => {
+      onTopbarHeightChange(topbarElement.getBoundingClientRect().height);
+    };
+
+    updateHeight();
+
+    const observer = new ResizeObserver(() => {
+      updateHeight();
+    });
+
+    observer.observe(topbarElement);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [onTopbarHeightChange]);
 
   return (
     <Card className="flex h-full min-h-0 flex-col gap-0 rounded-none border-0 bg-transparent py-0 ring-0">
@@ -124,6 +151,7 @@ export const MarkdownEditorPanel = ({
       <CardContent className="relative flex-1 min-h-0 p-0">
         <InputGroup className="!h-full flex-1 min-h-0 flex-col items-stretch overflow-hidden rounded-none border-0 bg-transparent">
           <InputGroupAddon
+            ref={topbarRef}
             align="block-start"
             className="cursor-default border-b px-6 py-3"
           >

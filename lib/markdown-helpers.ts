@@ -72,16 +72,28 @@ export const buildActiveDocumentMeta = (
     return statsLabel;
   }
 
-  return `${statsLabel} • opened ${new Date(file.lastOpenedAt).toLocaleString()}`;
+  const metadata = [statsLabel];
+
+  if (file.url) {
+    metadata.push("remote");
+  }
+
+  metadata.push(`opened ${new Date(file.lastOpenedAt).toLocaleString()}`);
+
+  return metadata.join(" • ");
 };
 
 export const buildRecentFileMeta = (file: RecentMarkdownFile) => {
+  const locationLabel = file.url ?? file.path;
+
   if (file.stats) {
-    return formatMarkdownDocumentStats(file.stats);
+    return locationLabel
+      ? `${formatMarkdownDocumentStats(file.stats)} • ${locationLabel}`
+      : formatMarkdownDocumentStats(file.stats);
   }
 
-  if (file.path) {
-    return file.path;
+  if (locationLabel) {
+    return locationLabel;
   }
 
   return `Opened ${new Date(file.lastOpenedAt).toLocaleString()}`;

@@ -1,10 +1,12 @@
 "use client";
 
+import * as React from "react";
 import {
   EllipsisIcon,
   FolderOpenIcon,
   HistoryIcon,
   HouseIcon,
+  LinkIcon,
   MonitorUpIcon,
   PanelLeftIcon,
   PanelRightIcon,
@@ -17,6 +19,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
+import { MarkdownOpenUrlDialog } from "@/components/markdown-open-url-dialog";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -31,7 +34,10 @@ import {
   buildActiveDocumentMeta,
   buildRecentFileMeta,
 } from "@/lib/markdown-helpers";
-import { type RecentMarkdownFile } from "@/types/markdown";
+import {
+  type MarkdownOpenFromUrlActionResult,
+  type RecentMarkdownFile,
+} from "@/types/markdown";
 
 type MarkdownToolbarProps = {
   activeFile: RecentMarkdownFile | null;
@@ -39,6 +45,10 @@ type MarkdownToolbarProps = {
   recentFiles: RecentMarkdownFile[];
   isBusy: boolean;
   openFileAction: () => void;
+  openUrlAction: (
+    url: string,
+    fileName?: string
+  ) => Promise<MarkdownOpenFromUrlActionResult>;
   goHomeAction: () => void;
   saveFileAction: () => void;
   refreshFileAction: () => void;
@@ -46,12 +56,6 @@ type MarkdownToolbarProps = {
   openRecentAction: (id: string) => void;
   removeRecentAction: (id: string) => void;
   clearRecentAction: () => void;
-  cutAction: () => void;
-  copyAction: () => void;
-  pasteAction: () => void;
-  selectAllAction: () => void;
-  focusEditorAction: () => void;
-  focusPreviewAction: () => void;
   viewMode: "split" | "editor" | "preview";
   setViewModeAction: (value: "split" | "editor" | "preview") => void;
   syncScrollEnabled: boolean;
@@ -82,6 +86,7 @@ export const MarkdownToolbar = ({
   recentFiles,
   isBusy,
   openFileAction,
+  openUrlAction,
   goHomeAction,
   saveFileAction,
   refreshFileAction,
@@ -89,18 +94,14 @@ export const MarkdownToolbar = ({
   openRecentAction,
   removeRecentAction,
   clearRecentAction,
-  cutAction,
-  copyAction,
-  pasteAction,
-  selectAllAction,
-  focusEditorAction,
-  focusPreviewAction,
   viewMode,
   setViewModeAction,
   syncScrollEnabled,
   toggleSyncScrollAction,
 }: MarkdownToolbarProps) => {
   const secondaryLabel = buildActiveDocumentMeta(content, activeFile);
+  const canSaveFile = activeFile?.source !== "url";
+  const refreshLabel = activeFile?.source === "url" ? "Reload URL" : "Reopen file";
 
   return (
     <div className="border-b bg-background/80 px-4 py-3 backdrop-blur">
@@ -213,7 +214,14 @@ export const MarkdownToolbar = ({
             Open
           </Button>
 
-          <Button onClick={saveFileAction} disabled={!activeFile || isBusy}>
+          <MarkdownOpenUrlDialog isBusy={isBusy} openUrlAction={openUrlAction}>
+            <Button variant="outline" disabled={isBusy}>
+              <LinkIcon data-icon="inline-start" />
+              Open URL
+            </Button>
+          </MarkdownOpenUrlDialog>
+
+          <Button onClick={saveFileAction} disabled={!activeFile || !canSaveFile || isBusy}>
             <SaveIcon data-icon="inline-start" />
             Save
           </Button>
@@ -232,15 +240,7 @@ export const MarkdownToolbar = ({
                 disabled={!activeFile || isBusy}
               >
                 <RefreshCcwIcon />
-                Reopen file
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={focusEditorAction} disabled={!activeFile}>
-                <TypeIcon />
-                Focus editor
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={focusPreviewAction} disabled={!activeFile}>
-                <PanelRightIcon />
-                Focus preview
+                {refreshLabel}
               </DropdownMenuItem>
               <DropdownMenuCheckboxItem
                 checked={syncScrollEnabled}
@@ -249,19 +249,6 @@ export const MarkdownToolbar = ({
                 <MonitorUpIcon />
                 Sync scrolling
               </DropdownMenuCheckboxItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={cutAction} disabled={!activeFile}>
-                Cut
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={copyAction} disabled={!activeFile}>
-                Copy
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={pasteAction} disabled={!activeFile}>
-                Paste
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={selectAllAction} disabled={!activeFile}>
-                Select all
-              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onSelect={clearDocumentAction}

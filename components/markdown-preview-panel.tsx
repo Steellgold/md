@@ -7,12 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 type MarkdownPreviewPanelProps = {
   content: string;
   previewRef: React.RefObject<HTMLDivElement | null>;
+  topOverlayHeight?: number;
   onScroll: () => void;
 };
 
 export const MarkdownPreviewPanel = ({
   content,
   previewRef,
+  topOverlayHeight,
   onScroll,
 }: MarkdownPreviewPanelProps) => {
   return (
@@ -27,13 +29,22 @@ export const MarkdownPreviewPanel = ({
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 min-h-0 px-0">
+      <CardContent className="relative flex-1 min-h-0 px-0">
         <div
           ref={previewRef}
           onScroll={onScroll}
           tabIndex={0}
           className="h-full overflow-y-auto outline-none"
         >
+          <div
+            className="sticky top-0 z-10 border-b bg-background/75 backdrop-blur-xl"
+            style={
+              topOverlayHeight && topOverlayHeight > 0
+                ? { height: `${topOverlayHeight}px` }
+                : undefined
+            }
+          />
+
           {content.trim() ? (
             <MarkdownPreview content={content} />
           ) : (

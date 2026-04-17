@@ -7,6 +7,7 @@ import {
   clearRecentMarkdownFiles,
   createNewMarkdownFile,
   getRecentMarkdownFiles,
+  openMarkdownFromUrl,
   openDroppedMarkdownFile,
   openMarkdownWithPicker,
   removeRecentMarkdownFile,
@@ -85,6 +86,28 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       set(getResolvedState(entry, content, recentFiles));
     } catch (error) {
       set(getErrorState(error));
+    }
+  },
+  openFromUrl: async (url, fileName) => {
+    set(getBusyState());
+
+    try {
+      const result = await openMarkdownFromUrl(url, { fileName });
+
+      if (result.status === "selection-required") {
+        set({
+          isBusy: false,
+          error: null,
+        });
+
+        return result;
+      }
+
+      set(getResolvedState(result.entry, result.content, result.recentFiles));
+      return { status: "opened" };
+    } catch (error) {
+      set(getErrorState(error));
+      return { status: "error" };
     }
   },
   openDroppedFile: async (file, items) => {

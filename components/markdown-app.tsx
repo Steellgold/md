@@ -15,9 +15,9 @@ import {
   runEditorCommandAction,
   wrapSelectionAction,
 } from "@/lib/markdown-editor";
+import { useMarkdownUiStore } from "@/lib/markdown-ui-store";
 import { useMarkdownStore } from "@/lib/markdown-store";
 import { cn } from "@/lib/utils";
-import { type ViewMode } from "@/types/view-mode";
 import { Button } from "./ui/button";
 
 export const MarkdownApp = () => {
@@ -33,6 +33,7 @@ export const MarkdownApp = () => {
     clearError,
     setContent,
     openWithPicker,
+    openFromUrl,
     openDroppedFile,
     reopenRecentFile,
     createNewFile,
@@ -42,9 +43,15 @@ export const MarkdownApp = () => {
     clearDocument,
   } = useMarkdownStore();
 
+  const viewMode = useMarkdownUiStore((state) => state.viewMode);
+  const syncScrollEnabled = useMarkdownUiStore(
+    (state) => state.syncScrollEnabled
+  );
+  const setViewMode = useMarkdownUiStore((state) => state.setViewMode);
+  const toggleSyncScroll = useMarkdownUiStore(
+    (state) => state.toggleSyncScroll
+  );
   const [isDragActive, setIsDragActive] = React.useState(false);
-  const [viewMode, setViewMode] = React.useState<ViewMode>("split");
-  const [syncScrollEnabled, setSyncScrollEnabled] = React.useState(true);
   const editorRef = React.useRef<HTMLTextAreaElement | null>(null);
   const previewRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -54,6 +61,7 @@ export const MarkdownApp = () => {
 
   useMarkdownHotkeys({
     enabled: Boolean(activeFile),
+    saveEnabled: activeFile?.source !== "url",
     onSave: saveActiveFile,
     editorRef,
   });
@@ -116,36 +124,12 @@ export const MarkdownApp = () => {
     await reopenRecentFile(activeFile.id);
   }, [activeFile, reopenRecentFile]);
 
-  const focusEditorAction = React.useCallback(() => {
-    editorRef.current?.focus();
-  }, []);
-
-  const focusPreviewAction = React.useCallback(() => {
-    previewRef.current?.focus();
-  }, []);
-
   const undoAction = React.useCallback(() => {
     void runEditorCommandAction("undo", editorRef.current);
   }, []);
 
   const redoAction = React.useCallback(() => {
     void runEditorCommandAction("redo", editorRef.current);
-  }, []);
-
-  const cutAction = React.useCallback(() => {
-    void runEditorCommandAction("cut", editorRef.current);
-  }, []);
-
-  const copyAction = React.useCallback(() => {
-    void runEditorCommandAction("copy", editorRef.current);
-  }, []);
-
-  const pasteAction = React.useCallback(() => {
-    void runEditorCommandAction("paste", editorRef.current);
-  }, []);
-
-  const selectAllAction = React.useCallback(() => {
-    void runEditorCommandAction("selectAll", editorRef.current);
   }, []);
 
   const boldAction = React.useCallback(() => {
@@ -225,10 +209,9 @@ export const MarkdownApp = () => {
           viewMode={viewMode}
           setViewModeAction={setViewMode}
           syncScrollEnabled={syncScrollEnabled}
-          toggleSyncScrollAction={() =>
-            setSyncScrollEnabled((current) => !current)
-          }
+          toggleSyncScrollAction={toggleSyncScroll}
           openFileAction={openWithPicker}
+          openUrlAction={openFromUrl}
           goHomeAction={clearDocument}
           saveFileAction={saveActiveFile}
           refreshFileAction={handleRefresh}
@@ -238,18 +221,12 @@ export const MarkdownApp = () => {
           clearRecentAction={clearRecentFiles}
           undoAction={undoAction}
           redoAction={redoAction}
-          cutAction={cutAction}
-          copyAction={copyAction}
-          pasteAction={pasteAction}
-          selectAllAction={selectAllAction}
           boldAction={boldAction}
           italicAction={italicAction}
           headingAction={headingAction}
           inlineCodeAction={inlineCodeAction}
           codeBlockAction={codeBlockAction}
           bulletListAction={bulletListAction}
-          focusEditorAction={focusEditorAction}
-          focusPreviewAction={focusPreviewAction}
         />
       ) : (
         <div className="flex flex-1 items-center justify-center">
@@ -259,6 +236,7 @@ export const MarkdownApp = () => {
               isBusy={isBusy}
               canPersistFiles={canPersistFiles}
               openFileAction={openWithPicker}
+              openUrlAction={openFromUrl}
               createNewAction={createNewFile}
             />
 

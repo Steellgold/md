@@ -155,11 +155,89 @@ const createEntryFromHandle = async (
     id,
     name: handle.name,
     path: null,
+    url: null,
+    urlFileName: null,
     lastOpenedAt: new Date().toISOString(),
     source,
     stats: getMarkdownDocumentStats(content),
   } satisfies RecentMarkdownFile;
 };
+
+const requestMarkdownFromUrl = async (
+  url: string,
+  fileName?: string
+): Promise<
+  | {
+      status: "opened";
+      content: string;
+      name: string;
+      selectedFileName: string | null;
+      url: string;
+    }
+  | {
+      status: "selection-required";
+      files: string[];
+    }
+> => {
+  const response = await fetch("/api/open-from-url", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ url, fileName }),
+  });
+
+  const payload = (await response.json()) as {
+    content?: string;
+    error?: string;
+    files?: string[];
+    name?: string;
+    selectedFileName?: string | null;
+    url?: string;
+  };
+
+  if (
+    response.status === 409 &&
+    Array.isArray(payload.files) &&
+    payload.files.every((item) => typeof item === "string")
+  ) {
+    return {
+      status: "selection-required",
+      files: payload.files,
+    };
+  }
+
+  if (!response.ok) {
+    throw new Error(payload.error ?? "Unable to open the remote URL.");
+  }
+
+  if (
+    typeof payload.content !== "string" ||
+    typeof payload.name !== "string" ||
+    typeof payload.url !== "string"
+  ) {
+    throw new Error("The remote URL returned an invalid response.");
+  }
+
+  return {
+    status: "opened",
+    content: payload.content,
+    name: payload.name,
+    selectedFileName:
+      typeof payload.selectedFileName === "string"
+        ? payload.selectedFileName
+        : null,
+    url: payload.url,
+  };
+};
+
+const findMatchingRemoteFile = (url: string, fileName: string | null) =>
+  readRecentFilesFromStorage().find(
+    (file) =>
+      file.source === "url" &&
+      file.url === url &&
+      file.urlFileName === fileName
+  ) ?? null;
 
 const findMatchingRecentFile = async (handle: FileSystemFileHandle) => {
   const recentFiles = readRecentFilesFromStorage();
@@ -229,6 +307,50 @@ export const openMarkdownWithPicker = async (options: PickerOptions = {}) => {
   return { entry, content, recentFiles };
 };
 
+export const openMarkdownFromUrl = async (
+  url: string,
+  options: {
+    fileName?: string;
+    id?: string;
+  } = {}
+) => {
+  const normalizedUrl = url.trim();
+
+  if (!normalizedUrl) {
+    throw new Error("Enter a URL to open.");
+  }
+
+  const result = await requestMarkdownFromUrl(normalizedUrl, options.fileName);
+
+  if (result.status === "selection-required") {
+    return result;
+  }
+
+  const existingEntry =
+    readRecentFilesFromStorage().find((file) => file.id === options.id) ??
+    findMatchingRemoteFile(result.url, result.selectedFileName);
+
+  const entry = {
+    id: existingEntry?.id ?? options.id ?? crypto.randomUUID(),
+    name: result.name,
+    path: null,
+    url: result.url,
+    urlFileName: result.selectedFileName,
+    lastOpenedAt: new Date().toISOString(),
+    source: "url",
+    stats: getMarkdownDocumentStats(result.content),
+  } satisfies RecentMarkdownFile;
+
+  const recentFiles = persistRecentEntry(entry);
+
+  return {
+    status: "opened" as const,
+    entry,
+    content: result.content,
+    recentFiles,
+  };
+};
+
 export const openDroppedMarkdownFile = async (
   file: File,
   items?: DataTransferItemList | null
@@ -257,6 +379,8 @@ export const openDroppedMarkdownFile = async (
         id: crypto.randomUUID(),
         name: file.name,
         path: file.webkitRelativePath || null,
+        url: null,
+        urlFileName: null,
         lastOpenedAt: new Date().toISOString(),
         source: "drop",
         stats: getMarkdownDocumentStats(content),
@@ -285,6 +409,31 @@ export const openDroppedMarkdownFile = async (
 };
 
 export const reopenRecentMarkdownFile = async (id: string) => {
+  const knownEntry = readRecentFilesFromStorage().find((file) => file.id === id);
+
+  if (!knownEntry) {
+    throw new Error("The recent file entry could not be found.");
+  }
+
+  if (knownEntry.source === "url") {
+    if (!knownEntry.url) {
+      throw new Error("This remote document is missing its source URL.");
+    }
+
+    const result = await openMarkdownFromUrl(knownEntry.url, {
+      id: knownEntry.id,
+      fileName: knownEntry.urlFileName ?? undefined,
+    });
+
+    if (result.status === "selection-required") {
+      throw new Error(
+        "This remote document needs a file selection again. Open it from URL to choose the file."
+      );
+    }
+
+    return result;
+  }
+
   const handle = await getHandle(id);
 
   if (!handle) {
@@ -295,14 +444,6 @@ export const reopenRecentMarkdownFile = async (id: string) => {
 
   if (!hasPermission) {
     throw new Error("Permission is required to reopen this file.");
-  }
-
-  const knownEntry = readRecentFilesFromStorage().find(
-    (file) => file.id === id
-  );
-
-  if (!knownEntry) {
-    throw new Error("The recent file entry could not be found.");
   }
 
   const content = await readContent(handle);
@@ -319,6 +460,14 @@ export const reopenRecentMarkdownFile = async (id: string) => {
 };
 
 export const saveRecentMarkdownFile = async (id: string, content: string) => {
+  const knownEntry = readRecentFilesFromStorage().find((file) => file.id === id);
+
+  if (knownEntry?.source === "url") {
+    throw new Error(
+      "Remote documents are read-only. Save the content to a local file instead."
+    );
+  }
+
   const handle = await getHandle(id);
 
   if (!handle) {
@@ -341,10 +490,6 @@ export const saveRecentMarkdownFile = async (id: string, content: string) => {
   const writable = await markdownHandle.createWritable();
   await writable.write(content);
   await writable.close();
-
-  const knownEntry = readRecentFilesFromStorage().find(
-    (file) => file.id === id
-  );
 
   if (!knownEntry) {
     throw new Error("The recent file entry could not be found.");

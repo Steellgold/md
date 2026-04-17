@@ -7,7 +7,10 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { type RecentMarkdownFile } from "@/types/markdown";
+import {
+  type MarkdownOpenFromUrlActionResult,
+  type RecentMarkdownFile,
+} from "@/types/markdown";
 
 import { type ViewMode } from "../types/view-mode";
 import { MarkdownEditorPanel } from "./markdown-editor-panel";
@@ -28,6 +31,10 @@ type MarkdownActiveDocumentProps = {
   syncScrollEnabled: boolean;
   toggleSyncScrollAction: () => void;
   openFileAction: () => void;
+  openUrlAction: (
+    url: string,
+    fileName?: string
+  ) => Promise<MarkdownOpenFromUrlActionResult>;
   goHomeAction: () => void;
   saveFileAction: () => void;
   refreshFileAction: () => void;
@@ -37,18 +44,12 @@ type MarkdownActiveDocumentProps = {
   clearRecentAction: () => void;
   undoAction: () => void;
   redoAction: () => void;
-  cutAction: () => void;
-  copyAction: () => void;
-  pasteAction: () => void;
-  selectAllAction: () => void;
   boldAction: () => void;
   italicAction: () => void;
   headingAction: (level: 1 | 2 | 3 | 4 | 5 | 6) => void;
   inlineCodeAction: () => void;
   codeBlockAction: () => void;
   bulletListAction: () => void;
-  focusEditorAction: () => void;
-  focusPreviewAction: () => void;
 };
 
 export const MarkdownActiveDocument = ({
@@ -66,6 +67,7 @@ export const MarkdownActiveDocument = ({
   syncScrollEnabled,
   toggleSyncScrollAction,
   openFileAction,
+  openUrlAction,
   goHomeAction,
   saveFileAction,
   refreshFileAction,
@@ -75,19 +77,15 @@ export const MarkdownActiveDocument = ({
   clearRecentAction,
   undoAction,
   redoAction,
-  cutAction,
-  copyAction,
-  pasteAction,
-  selectAllAction,
   boldAction,
   italicAction,
   headingAction,
   inlineCodeAction,
   codeBlockAction,
   bulletListAction,
-  focusEditorAction,
-  focusPreviewAction,
 }: MarkdownActiveDocumentProps) => {
+  const [editorTopbarHeight, setEditorTopbarHeight] = React.useState(0);
+
   return (
     <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
       <MarkdownToolbar
@@ -96,6 +94,7 @@ export const MarkdownActiveDocument = ({
         recentFiles={recentFiles}
         isBusy={isBusy}
         openFileAction={openFileAction}
+        openUrlAction={openUrlAction}
         goHomeAction={goHomeAction}
         saveFileAction={saveFileAction}
         refreshFileAction={refreshFileAction}
@@ -103,12 +102,6 @@ export const MarkdownActiveDocument = ({
         openRecentAction={openRecentAction}
         removeRecentAction={removeRecentAction}
         clearRecentAction={clearRecentAction}
-        cutAction={cutAction}
-        copyAction={copyAction}
-        pasteAction={pasteAction}
-        selectAllAction={selectAllAction}
-        focusEditorAction={focusEditorAction}
-        focusPreviewAction={focusPreviewAction}
         viewMode={viewMode}
         setViewModeAction={setViewModeAction}
         syncScrollEnabled={syncScrollEnabled}
@@ -128,6 +121,7 @@ export const MarkdownActiveDocument = ({
               activeFile={activeFile}
               content={content}
               editorRef={editorRef}
+              onTopbarHeightChange={setEditorTopbarHeight}
               onChange={onEditorChange}
               onScroll={onEditorScroll}
               undoAction={undoAction}
@@ -156,6 +150,7 @@ export const MarkdownActiveDocument = ({
             <MarkdownPreviewPanel
               content={content}
               previewRef={previewRef}
+              topOverlayHeight={editorTopbarHeight}
               onScroll={onPreviewScroll}
             />
           </ResizablePanel>
