@@ -1,6 +1,3 @@
-import { GripVerticalIcon } from "lucide-react";
-import * as React from "react";
-
 import { DetachedWindowPortal } from "@/components/detached-window-portal";
 import { MarkdownToolbar } from "@/components/markdown-toolbar";
 import {
@@ -13,7 +10,8 @@ import {
   type RecentMarkdownFile,
 } from "@/types/markdown";
 import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection";
-
+import { GripVerticalIcon } from "lucide-react";
+import { ChangeEvent, RefObject, useState } from "react";
 import { type ViewMode } from "../types/view-mode";
 import { MarkdownEditorPanel } from "./markdown-editor-panel";
 import { MarkdownPreviewPanel } from "./markdown-preview-panel";
@@ -23,9 +21,9 @@ type MarkdownActiveDocumentProps = {
   recentFiles: RecentMarkdownFile[];
   isBusy: boolean;
   content: string;
-  editorRef: React.RefObject<HTMLTextAreaElement | null>;
-  previewRef: React.RefObject<HTMLDivElement | null>;
-  onEditorChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  editorRef: RefObject<HTMLTextAreaElement | null>;
+  previewRef: RefObject<HTMLDivElement | null>;
+  onEditorChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
   onEditorBlur: () => void;
   onEditorSelectionChange: (editor: HTMLTextAreaElement) => void;
   onEditorScroll: () => void;
@@ -49,7 +47,6 @@ type MarkdownActiveDocumentProps = {
   refreshFileAction: () => void;
   clearDocumentAction: () => void;
   openRecentAction: (id: string) => void;
-  removeRecentAction: (id: string) => void;
   clearRecentAction: () => void;
   undoAction: () => void;
   redoAction: () => void;
@@ -89,7 +86,6 @@ export const MarkdownActiveDocument = ({
   refreshFileAction,
   clearDocumentAction,
   openRecentAction,
-  removeRecentAction,
   clearRecentAction,
   undoAction,
   redoAction,
@@ -100,7 +96,7 @@ export const MarkdownActiveDocument = ({
   codeBlockAction,
   bulletListAction,
 }: MarkdownActiveDocumentProps) => {
-  const [editorTopbarHeight, setEditorTopbarHeight] = React.useState(0);
+  const [editorTopbarHeight, setEditorTopbarHeight] = useState(0);
   const displayedViewMode = previewDetached ? "editor" : viewMode;
 
   return (
@@ -117,12 +113,9 @@ export const MarkdownActiveDocument = ({
         refreshFileAction={refreshFileAction}
         clearDocumentAction={clearDocumentAction}
         openRecentAction={openRecentAction}
-        removeRecentAction={removeRecentAction}
         clearRecentAction={clearRecentAction}
         viewMode={viewMode}
         setViewModeAction={setViewModeAction}
-        previewDetached={previewDetached}
-        togglePreviewDetachedAction={togglePreviewDetachedAction}
         syncScrollEnabled={syncScrollEnabled}
         toggleSyncScrollAction={toggleSyncScrollAction}
       />
@@ -174,6 +167,8 @@ export const MarkdownActiveDocument = ({
               editorSelection={editorSelection}
               topOverlayHeight={editorTopbarHeight}
               onScroll={onPreviewScroll}
+              previewDetached={previewDetached}
+              togglePreviewDetachedAction={togglePreviewDetachedAction}
             />
           </ResizablePanel>
         ) : null}
@@ -182,7 +177,7 @@ export const MarkdownActiveDocument = ({
       <DetachedWindowPortal
         open={previewDetached}
         title={`${activeFile.name} Preview | .MD`}
-        onClose={closePreviewDetachedAction}
+        onCloseAction={closePreviewDetachedAction}
         onBlocked={onDetachedPreviewBlocked}
       >
         <MarkdownPreviewPanel
@@ -190,6 +185,8 @@ export const MarkdownActiveDocument = ({
           previewRef={previewRef}
           editorSelection={editorSelection}
           onScroll={onPreviewScroll}
+          previewDetached={previewDetached}
+          togglePreviewDetachedAction={togglePreviewDetachedAction}
         />
       </DetachedWindowPortal>
     </div>

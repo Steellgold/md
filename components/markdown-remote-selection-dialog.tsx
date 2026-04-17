@@ -1,8 +1,5 @@
 "use client";
 
-import * as React from "react";
-import { LinkIcon } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { LinkIcon } from "lucide-react";
 
 type MarkdownRemoteSelectionDialogProps = {
   isBusy: boolean;

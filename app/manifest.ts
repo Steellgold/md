@@ -1,8 +1,7 @@
 import type { MetadataRoute } from "next";
 
 const appName = "MD";
-const appDescription =
-  "A focused Markdown editor with split preview, local file access, recent files, and remote GitHub or Gist opening.";
+const appDescription = "A focused Markdown editor with split preview, local file access, recent files, and remote GitHub or Gist opening.";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {

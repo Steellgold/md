@@ -1,15 +1,14 @@
 declare module "react-syntax-highlighter" {
-  import type * as React from "react";
-
-  export type SyntaxHighlighterProps = React.PropsWithChildren<{
+  
+  export type SyntaxHighlighterProps = PropsWithChildren<{
     language?: string;
     style?: Record<string, unknown>;
-    customStyle?: React.CSSProperties;
-    codeTagProps?: React.HTMLAttributes<HTMLElement>;
-    PreTag?: keyof React.JSX.IntrinsicElements | React.ComponentType<unknown>;
+    customStyle?: CSSProperties;
+    codeTagProps?: HTMLAttributes<HTMLElement>;
+    PreTag?: keyof JSX.IntrinsicElements | ComponentType<unknown>;
   }>;
 
-  export const Prism: React.ComponentType<SyntaxHighlighterProps>;
+  export const Prism: ComponentType<SyntaxHighlighterProps>;
 }
 
 declare module "react-syntax-highlighter/dist/esm/styles/prism" {

@@ -1,16 +1,24 @@
-import { EyeIcon } from "lucide-react";
-import * as React from "react";
+import { ArrowUpRightIcon, EyeIcon } from "lucide-react";
+
 
 import { MarkdownPreview } from "@/components/markdown-preview";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Card, CardContent,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
 import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection";
+import { RefObject } from "react";
 
 type MarkdownPreviewPanelProps = {
   content: string;
-  previewRef: React.RefObject<HTMLDivElement | null>;
+  previewRef: RefObject<HTMLDivElement | null>;
   editorSelection: MarkdownViewerSelection | null;
   topOverlayHeight?: number;
   onScroll: () => void;
+  previewDetached: boolean;
+  togglePreviewDetachedAction: () => void;
 };
 
 export const MarkdownPreviewPanel = ({
@@ -19,16 +27,34 @@ export const MarkdownPreviewPanel = ({
   editorSelection,
   topOverlayHeight,
   onScroll,
+  previewDetached,
+  togglePreviewDetachedAction,
 }: MarkdownPreviewPanelProps) => {
   return (
     <Card className="flex h-full min-h-0 flex-col gap-0 rounded-none border-0 bg-transparent py-0 ring-0">
-      <CardHeader className="border-b px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="rounded-md bg-primary/5 p-2">
-            <EyeIcon className="size-4" />
+      <CardHeader className="border-b px-4 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="rounded-md bg-primary/10 p-2">
+              <EyeIcon className="size-4" />
+            </div>
+
+            <CardTitle>Viewer</CardTitle>
           </div>
 
-          <CardTitle>Viewer</CardTitle>
+          <Button
+            variant={previewDetached ? "secondary" : "outline"}
+            size="sm"
+            onClick={togglePreviewDetachedAction}
+            title={
+              previewDetached
+                ? "Move the preview back into the main window"
+                : "Open the preview in a separate window"
+            }
+          >
+            <ArrowUpRightIcon data-icon="inline-start" />
+            {previewDetached ? "Attach preview" : "Detach preview"}
+          </Button>
         </div>
       </CardHeader>
 
