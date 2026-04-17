@@ -8,8 +8,10 @@ import { type ViewMode } from "@/types/view-mode";
 type MarkdownUiStore = {
   viewMode: ViewMode;
   syncScrollEnabled: boolean;
+  recentFilesExpanded: boolean;
   setViewMode: (value: ViewMode) => void;
   toggleSyncScroll: () => void;
+  setRecentFilesExpanded: (value: boolean) => void;
 };
 
 export const useMarkdownUiStore = create<MarkdownUiStore>()(
@@ -17,11 +19,13 @@ export const useMarkdownUiStore = create<MarkdownUiStore>()(
     (set) => ({
       viewMode: "split",
       syncScrollEnabled: true,
+      recentFilesExpanded: true,
       setViewMode: (value) => set({ viewMode: value }),
       toggleSyncScroll: () =>
         set((state) => ({
           syncScrollEnabled: !state.syncScrollEnabled,
         })),
+      setRecentFilesExpanded: (value) => set({ recentFilesExpanded: value }),
     }),
     {
       name: "markdown-app:user-settings",
@@ -29,6 +33,7 @@ export const useMarkdownUiStore = create<MarkdownUiStore>()(
       partialize: (state) => ({
         viewMode: state.viewMode,
         syncScrollEnabled: state.syncScrollEnabled,
+        recentFilesExpanded: state.recentFilesExpanded,
       }),
     }
   )
