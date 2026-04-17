@@ -741,6 +741,18 @@ export const MarkdownApp = () => {
     prefixLinesAction(editorRef.current, "- ", "List item");
   }, []);
 
+  const orderedListAction = useCallback(() => {
+    prefixLinesAction(
+      editorRef.current,
+      (index) => `${index + 1}. `,
+      "List item"
+    );
+  }, []);
+
+  const taskListAction = useCallback(() => {
+    prefixLinesAction(editorRef.current, "- [ ] ", "Task item");
+  }, []);
+
   const togglePreviewDetached = useCallback(() => {
     setUiError(null);
     setPreviewDetached((currentValue) => !currentValue);
@@ -887,6 +899,8 @@ export const MarkdownApp = () => {
           inlineCodeAction={inlineCodeAction}
           codeBlockAction={codeBlockAction}
           bulletListAction={bulletListAction}
+          orderedListAction={orderedListAction}
+          taskListAction={taskListAction}
         />
       ) : (
         <div className="flex flex-1 flex-col">

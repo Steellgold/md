@@ -1,3 +1,4 @@
+import { continueListOnEnterAction } from "@/lib/markdown-editor";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,12 +25,15 @@ import {
   Heading1Icon,
   ItalicIcon,
   ListIcon,
+  ListOrderedIcon,
+  ListTodoIcon,
   PencilIcon,
   Redo2Icon,
   Undo2Icon,
 } from "lucide-react";
 import {
   ChangeEvent,
+  KeyboardEvent,
   RefObject,
   SyntheticEvent,
   useCallback,
@@ -55,6 +59,8 @@ type MarkdownEditorPanelProps = {
   inlineCodeAction: () => void;
   codeBlockAction: () => void;
   bulletListAction: () => void;
+  orderedListAction: () => void;
+  taskListAction: () => void;
 };
 
 const quickActions = [
@@ -88,10 +94,23 @@ const quickActions = [
     icon: FileCode2Icon,
     actionKey: "codeBlockAction",
   },
+] as const;
+
+const listActions = [
   {
-    label: "List",
+    label: "Bullet list",
     icon: ListIcon,
     actionKey: "bulletListAction",
+  },
+  {
+    label: "Numbered list",
+    icon: ListOrderedIcon,
+    actionKey: "orderedListAction",
+  },
+  {
+    label: "Checklist",
+    icon: ListTodoIcon,
+    actionKey: "taskListAction",
   },
 ] as const;
 
@@ -115,6 +134,8 @@ export const MarkdownEditorPanel = ({
   inlineCodeAction,
   codeBlockAction,
   bulletListAction,
+  orderedListAction,
+  taskListAction,
 }: MarkdownEditorPanelProps) => {
   const topbarRef = useRef<HTMLDivElement | null>(null);
   const actionMap = {
@@ -125,6 +146,8 @@ export const MarkdownEditorPanel = ({
     inlineCodeAction,
     codeBlockAction,
     bulletListAction,
+    orderedListAction,
+    taskListAction,
   };
 
   useEffect(() => {
@@ -171,6 +194,28 @@ export const MarkdownEditorPanel = ({
 
   const handleEditorSelectionChange = useCallback(
     (event: SyntheticEvent<HTMLTextAreaElement>) => {
+      onSelectionChange(event.currentTarget);
+    },
+    [onSelectionChange]
+  );
+
+  const handleEditorKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (
+        event.key !== "Enter" ||
+        event.shiftKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey
+      ) {
+        return;
+      }
+
+      if (!continueListOnEnterAction(event.currentTarget)) {
+        return;
+      }
+
+      event.preventDefault();
       onSelectionChange(event.currentTarget);
     },
     [onSelectionChange]
@@ -230,6 +275,34 @@ export const MarkdownEditorPanel = ({
                   </DropdownMenuContent>
                 </DropdownMenu>
 
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      title="List type"
+                      aria-label="List type"
+                    >
+                      <ListIcon />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-44">
+                    {listActions.map((item) => {
+                      const Icon = item.icon;
+
+                      return (
+                        <DropdownMenuItem
+                          key={item.label}
+                          onSelect={actionMap[item.actionKey]}
+                        >
+                          <Icon />
+                          {item.label}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
                 {quickActions.map((item) => {
                   const Icon = item.icon;
 
@@ -257,6 +330,7 @@ export const MarkdownEditorPanel = ({
             onScroll={onScroll}
             onFocus={handleEditorSelectionChange}
             onMouseUp={handleEditorSelectionChange}
+            onKeyDown={handleEditorKeyDown}
             onSelect={handleEditorSelectionChange}
             placeholder="Write or paste your markdown here..."
             className="h-full min-h-0 flex-1 basis-0 px-6 py-5 font-mono text-sm"
