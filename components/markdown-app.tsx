@@ -136,6 +136,10 @@ export const MarkdownApp = () => {
     [setContent]
   );
 
+  const clearEditorSelection = React.useCallback(() => {
+    setEditorSelection(null);
+  }, []);
+
   const syncEditorSelection = React.useCallback(
     (editor: HTMLTextAreaElement | null) => {
       if (!editor) {
@@ -175,6 +179,28 @@ export const MarkdownApp = () => {
 
     syncEditorSelection(editorRef.current);
   }, [activeFile, content, editorSelection, syncEditorSelection]);
+
+  React.useEffect(() => {
+    if (!activeFile) {
+      return;
+    }
+
+    const handleSelectionChange = () => {
+      const editorElement = editorRef.current;
+
+      if (!editorElement || document.activeElement !== editorElement) {
+        return;
+      }
+
+      syncEditorSelection(editorElement);
+    };
+
+    document.addEventListener("selectionchange", handleSelectionChange);
+
+    return () => {
+      document.removeEventListener("selectionchange", handleSelectionChange);
+    };
+  }, [activeFile, syncEditorSelection]);
 
   const handleDragOver = React.useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
@@ -326,6 +352,7 @@ export const MarkdownApp = () => {
           editorRef={editorRef}
           previewRef={previewRef}
           onEditorChange={handleEditorChange}
+          onEditorBlur={clearEditorSelection}
           onEditorSelectionChange={syncEditorSelection}
           onEditorScroll={handleEditorScroll}
           onPreviewScroll={handlePreviewScroll}

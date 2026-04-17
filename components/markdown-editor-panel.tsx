@@ -34,6 +34,7 @@ type MarkdownEditorPanelProps = {
   editorRef: React.RefObject<HTMLTextAreaElement | null>;
   onTopbarHeightChange?: (height: number) => void;
   onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  onBlur: () => void;
   onSelectionChange: (editor: HTMLTextAreaElement) => void;
   onScroll: () => void;
   undoAction: () => void;
@@ -92,6 +93,7 @@ export const MarkdownEditorPanel = ({
   editorRef,
   onTopbarHeightChange,
   onChange,
+  onBlur,
   onSelectionChange,
   onScroll,
   undoAction,
@@ -231,6 +233,7 @@ export const MarkdownEditorPanel = ({
             ref={editorRef}
             value={content}
             onChange={handleEditorChange}
+            onBlur={onBlur}
             onScroll={onScroll}
             onFocus={handleEditorSelectionChange}
             onKeyUp={handleEditorSelectionChange}

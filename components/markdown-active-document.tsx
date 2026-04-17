@@ -26,6 +26,7 @@ type MarkdownActiveDocumentProps = {
   editorRef: React.RefObject<HTMLTextAreaElement | null>;
   previewRef: React.RefObject<HTMLDivElement | null>;
   onEditorChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  onEditorBlur: () => void;
   onEditorSelectionChange: (editor: HTMLTextAreaElement) => void;
   onEditorScroll: () => void;
   onPreviewScroll: () => void;
@@ -68,6 +69,7 @@ export const MarkdownActiveDocument = ({
   editorRef,
   previewRef,
   onEditorChange,
+  onEditorBlur,
   onEditorSelectionChange,
   onEditorScroll,
   onPreviewScroll,
@@ -140,6 +142,7 @@ export const MarkdownActiveDocument = ({
               editorRef={editorRef}
               onTopbarHeightChange={setEditorTopbarHeight}
               onChange={onEditorChange}
+              onBlur={onEditorBlur}
               onSelectionChange={onEditorSelectionChange}
               onScroll={onEditorScroll}
               undoAction={undoAction}
