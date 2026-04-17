@@ -431,7 +431,6 @@ export const openDroppedMarkdownFiles = async (
   }
 
   const documents: PendingMarkdownImport[] = [];
-  const persistentEntries: RecentMarkdownFile[] = [];
 
   for (const [index, file] of files.entries()) {
     const handle = handles[index] ?? null;
@@ -459,13 +458,11 @@ export const openDroppedMarkdownFiles = async (
 
     await saveHandle(entry.id, handle);
     documents.push({ entry, content });
-    persistentEntries.push(entry);
   }
 
-  const recentFiles =
-    persistentEntries.length > 0
-      ? persistRecentEntries(persistentEntries)
-      : readRecentFilesFromStorage();
+  const recentFiles = persistRecentEntries(
+    documents.map((document) => document.entry)
+  );
 
   if (documents.length === 1) {
     const [document] = documents;

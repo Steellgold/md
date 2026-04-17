@@ -89,7 +89,7 @@ export const MarkdownRecentFiles = ({
       <CardContent className="px-3">
         {hasRecentFiles ? (
           <ItemGroup className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
-            {recentFiles.slice(0, 5).map((file) => (
+            {recentFiles.map((file) => (
               <Item
                 key={file.id}
                 variant="muted"

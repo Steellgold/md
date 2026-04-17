@@ -21,6 +21,8 @@ import { useMarkdownStore } from "@/lib/markdown-store";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 
+const defaultDocumentTitle = ".MD";
+
 export const MarkdownApp = () => {
   const {
     content,
@@ -62,6 +64,12 @@ export const MarkdownApp = () => {
   React.useEffect(() => {
     hydrate();
   }, [hydrate]);
+
+  React.useEffect(() => {
+    document.title = activeFile
+      ? `${activeFile.name} | ${defaultDocumentTitle}`
+      : defaultDocumentTitle;
+  }, [activeFile]);
 
   useMarkdownHotkeys({
     enabled: Boolean(activeFile),
