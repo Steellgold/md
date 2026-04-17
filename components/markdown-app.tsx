@@ -168,11 +168,36 @@ export const MarkdownApp = () => {
     []
   );
 
-  const { handleEditorScroll, handlePreviewScroll } = useScrollSync({
+  const { handleEditorScroll, handlePreviewScroll, syncPreviewToEditor } =
+    useScrollSync({
+      syncScrollEnabled,
+      editorRef,
+      previewRef,
+    });
+
+  useEffect(() => {
+    if (!activeFile || !syncScrollEnabled) {
+      return;
+    }
+
+    if (previewDetached || viewMode === "editor") {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      syncPreviewToEditor();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [
+    activeFile,
+    previewDetached,
+    syncPreviewToEditor,
     syncScrollEnabled,
-    editorRef,
-    previewRef,
-  });
+    viewMode,
+  ]);
 
   useEffect(() => {
     if (!activeFile) {

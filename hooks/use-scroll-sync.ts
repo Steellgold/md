@@ -56,8 +56,13 @@ export const useScrollSync = ({
     syncScroll("preview");
   }, [syncScroll]);
 
+  const syncPreviewToEditor = useCallback(() => {
+    syncScroll("editor");
+  }, [syncScroll]);
+
   return {
     handleEditorScroll,
     handlePreviewScroll,
+    syncPreviewToEditor,
   };
 };
