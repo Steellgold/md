@@ -1,16 +1,3 @@
-import {
-  BoldIcon,
-  Code2Icon,
-  FileCode2Icon,
-  Heading1Icon,
-  ItalicIcon,
-  ListIcon,
-  PencilIcon,
-  Redo2Icon,
-  Undo2Icon,
-} from "lucide-react";
-import * as React from "react";
-
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,13 +14,25 @@ import {
 } from "@/components/ui/input-group";
 import { buildActiveDocumentMeta } from "@/lib/markdown-helpers";
 import { type RecentMarkdownFile } from "@/types/markdown";
+import {
+  BoldIcon,
+  Code2Icon,
+  FileCode2Icon,
+  Heading1Icon,
+  ItalicIcon,
+  ListIcon,
+  PencilIcon,
+  Redo2Icon,
+  Undo2Icon,
+} from "lucide-react";
+import { ChangeEvent, RefObject, SyntheticEvent, useCallback, useEffect, useRef } from "react";
 
 type MarkdownEditorPanelProps = {
   activeFile: RecentMarkdownFile;
   content: string;
-  editorRef: React.RefObject<HTMLTextAreaElement | null>;
+  editorRef: RefObject<HTMLTextAreaElement | null>;
   onTopbarHeightChange?: (height: number) => void;
-  onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  onChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
   onBlur: () => void;
   onSelectionChange: (editor: HTMLTextAreaElement) => void;
   onScroll: () => void;
@@ -105,7 +104,7 @@ export const MarkdownEditorPanel = ({
   codeBlockAction,
   bulletListAction,
 }: MarkdownEditorPanelProps) => {
-  const topbarRef = React.useRef<HTMLDivElement | null>(null);
+  const topbarRef = useRef<HTMLDivElement | null>(null);
   const actionMap = {
     undoAction,
     redoAction,
@@ -116,7 +115,7 @@ export const MarkdownEditorPanel = ({
     bulletListAction,
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     const topbarElement = topbarRef.current;
 
     if (!topbarElement || !onTopbarHeightChange) {
@@ -140,16 +139,16 @@ export const MarkdownEditorPanel = ({
     };
   }, [onTopbarHeightChange]);
 
-  const handleEditorChange = React.useCallback(
-    (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleEditorChange = useCallback(
+    (event: ChangeEvent<HTMLTextAreaElement>) => {
       onChange(event);
       onSelectionChange(event.currentTarget);
     },
     [onChange, onSelectionChange]
   );
 
-  const handleEditorSelectionChange = React.useCallback(
-    (event: React.SyntheticEvent<HTMLTextAreaElement>) => {
+  const handleEditorSelectionChange = useCallback(
+    (event: SyntheticEvent<HTMLTextAreaElement>) => {
       onSelectionChange(event.currentTarget);
     },
     [onSelectionChange]
@@ -157,9 +156,9 @@ export const MarkdownEditorPanel = ({
 
   return (
     <Card className="flex h-full min-h-0 flex-col gap-0 rounded-none border-0 bg-transparent py-0 ring-0">
-      <CardHeader className="border-b px-4 py-3">
+      <CardHeader className="border-b px-4 py-4">
         <div className="flex items-center gap-2">
-          <div className="rounded-md bg-primary/5 p-2">
+          <div className="rounded-md bg-primary/10 p-2">
             <PencilIcon className="size-4" />
           </div>
 
@@ -168,7 +167,7 @@ export const MarkdownEditorPanel = ({
       </CardHeader>
 
       <CardContent className="relative flex-1 min-h-0 p-0">
-        <InputGroup className="!h-full flex-1 min-h-0 flex-col items-stretch overflow-hidden rounded-none border-0 bg-transparent">
+        <InputGroup className="h-full! flex-1 min-h-0 flex-col items-stretch overflow-hidden rounded-none border-0 bg-transparent">
           <InputGroupAddon
             ref={topbarRef}
             align="block-start"

@@ -1,8 +1,5 @@
 "use client";
 
-import { LinkIcon } from "lucide-react";
-import * as React from "react";
-
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,6 +25,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { type MarkdownOpenFromUrlActionResult } from "@/types/markdown";
+import { LinkIcon } from "lucide-react";
+import { ReactNode, SyntheticEvent, useState } from "react";
 
 type MarkdownOpenUrlDialogProps = {
   isBusy: boolean;
@@ -35,7 +34,7 @@ type MarkdownOpenUrlDialogProps = {
     url: string,
     fileName?: string
   ) => Promise<MarkdownOpenFromUrlActionResult>;
-  children?: React.ReactNode;
+  children?: ReactNode;
   onOpenChange?: (open: boolean) => void;
   open?: boolean;
 };
@@ -47,10 +46,10 @@ export const MarkdownOpenUrlDialog = ({
   onOpenChange,
   open: controlledOpen,
 }: MarkdownOpenUrlDialogProps) => {
-  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(false);
-  const [url, setUrl] = React.useState("");
-  const [fileOptions, setFileOptions] = React.useState<string[]>([]);
-  const [selectedFileName, setSelectedFileName] = React.useState("");
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const [url, setUrl] = useState("");
+  const [fileOptions, setFileOptions] = useState<string[]>([]);
+  const [selectedFileName, setSelectedFileName] = useState("");
   const open = controlledOpen ?? uncontrolledOpen;
 
   const resetState = () => {
@@ -72,7 +71,7 @@ export const MarkdownOpenUrlDialog = ({
   };
 
   const handleSubmit = async (
-    event: React.SyntheticEvent<HTMLFormElement, SubmitEvent>
+    event: SyntheticEvent<HTMLFormElement, SubmitEvent>
   ) => {
     event.preventDefault();
 

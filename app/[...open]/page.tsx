@@ -1,6 +1,5 @@
-import { Suspense } from "react";
-
 import { MarkdownApp } from "@/components/markdown-app";
+import { Suspense } from "react";
 
 export default function CatchAllPage() {
   return (

@@ -1,8 +1,33 @@
 "use client";
 
-import * as React from "react";
+
+import { MarkdownOpenUrlDialog } from "@/components/markdown-open-url-dialog";
+import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
-  ArrowUpRightIcon,
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  buildActiveDocumentMeta,
+  buildRecentFileMeta,
+} from "@/lib/markdown-helpers";
+import {
+  type MarkdownOpenFromUrlActionResult,
+  type RecentMarkdownFile,
+} from "@/types/markdown";
+import {
+  ChevronDownIcon,
   EllipsisIcon,
   FolderOpenIcon,
   HistoryIcon,
@@ -17,29 +42,7 @@ import {
   TypeIcon,
   XIcon,
 } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
-import { ButtonGroup } from "@/components/ui/button-group";
-import { MarkdownOpenUrlDialog } from "@/components/markdown-open-url-dialog";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  buildActiveDocumentMeta,
-  buildRecentFileMeta,
-} from "@/lib/markdown-helpers";
-import {
-  type MarkdownOpenFromUrlActionResult,
-  type RecentMarkdownFile,
-} from "@/types/markdown";
+import { useState } from "react";
 
 type MarkdownToolbarProps = {
   activeFile: RecentMarkdownFile | null;
@@ -56,12 +59,9 @@ type MarkdownToolbarProps = {
   refreshFileAction: () => void;
   clearDocumentAction: () => void;
   openRecentAction: (id: string) => void;
-  removeRecentAction: (id: string) => void;
   clearRecentAction: () => void;
   viewMode: "split" | "editor" | "preview";
   setViewModeAction: (value: "split" | "editor" | "preview") => void;
-  previewDetached: boolean;
-  togglePreviewDetachedAction: () => void;
   syncScrollEnabled: boolean;
   toggleSyncScrollAction: () => void;
 };
@@ -96,20 +96,19 @@ export const MarkdownToolbar = ({
   refreshFileAction,
   clearDocumentAction,
   openRecentAction,
-  removeRecentAction,
   clearRecentAction,
   viewMode,
   setViewModeAction,
-  previewDetached,
-  togglePreviewDetachedAction,
   syncScrollEnabled,
   toggleSyncScrollAction,
 }: MarkdownToolbarProps) => {
   const secondaryLabel = buildActiveDocumentMeta(content, activeFile);
   const canSaveFile = activeFile?.source !== "url";
   const refreshLabel = activeFile?.source === "url" ? "Reload URL" : "Reopen file";
-  const [isClearHistoryConfirmOpen, setIsClearHistoryConfirmOpen] =
-    React.useState(false);
+  const [isClearHistoryConfirmOpen, setIsClearHistoryConfirmOpen] = useState(false);
+  const [isOpenUrlDialogOpen, setIsOpenUrlDialogOpen] = useState(false);
+  const visibleRecentFiles = recentFiles.slice(0, 6);
+  const overflowRecentFiles = recentFiles.slice(6);
 
   return (
     <div className="border-b bg-background/80 px-4 py-3 backdrop-blur">
@@ -153,84 +152,6 @@ export const MarkdownToolbar = ({
             })}
           </ButtonGroup>
 
-          <Button
-            variant={previewDetached ? "secondary" : "outline"}
-            size="sm"
-            onClick={togglePreviewDetachedAction}
-            title={
-              previewDetached
-                ? "Move the preview back into the main window"
-                : "Open the preview in a separate window"
-            }
-          >
-            <ArrowUpRightIcon data-icon="inline-start" />
-            {previewDetached ? "Attach preview" : "Detach preview"}
-          </Button>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" disabled={recentFiles.length === 0}>
-                <HistoryIcon data-icon="inline-start" />
-                Recent
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-72">
-              <DropdownMenuLabel>Reopen a file</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {recentFiles.length > 0 ? (
-                <DropdownMenuGroup>
-                  {recentFiles.map((file) => {
-                    const itemLabel = buildRecentFileMeta(file);
-
-                    return (
-                      <DropdownMenuItem
-                        key={file.id}
-                        className="justify-between gap-3"
-                        onSelect={() => openRecentAction(file.id)}
-                      >
-                        <div className="flex min-w-0 items-start gap-2">
-                          <FolderOpenIcon />
-                          <div className="flex min-w-0 flex-col">
-                            <span className="truncate">{file.name}</span>
-                            <span className="truncate text-xs text-muted-foreground">
-                              {itemLabel}
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          className="rounded-sm p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            void removeRecentAction(file.id);
-                          }}
-                          aria-label={`Remove ${file.name} from recent files`}
-                        >
-                          <Trash2Icon className="size-4" />
-                        </button>
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuGroup>
-              ) : (
-                <DropdownMenuItem disabled>No recent files</DropdownMenuItem>
-              )}
-              {recentFiles.length > 0 ? (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onSelect={() => setIsClearHistoryConfirmOpen(true)}
-                    variant="destructive"
-                  >
-                    <Trash2Icon />
-                    Clear history
-                  </DropdownMenuItem>
-                </>
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
           <ConfirmDialog
             open={isClearHistoryConfirmOpen}
             onOpenChange={setIsClearHistoryConfirmOpen}
@@ -240,17 +161,114 @@ export const MarkdownToolbar = ({
             onConfirm={clearRecentAction}
           />
 
-          <Button variant="outline" onClick={openFileAction} disabled={isBusy}>
-            <FolderOpenIcon data-icon="inline-start" />
-            Open
-          </Button>
+          <MarkdownOpenUrlDialog
+            isBusy={isBusy}
+            openUrlAction={openUrlAction}
+            open={isOpenUrlDialogOpen}
+            onOpenChange={setIsOpenUrlDialogOpen}
+          />
 
-          <MarkdownOpenUrlDialog isBusy={isBusy} openUrlAction={openUrlAction}>
-            <Button variant="outline" disabled={isBusy}>
-              <LinkIcon data-icon="inline-start" />
-              Open URL
+          <ButtonGroup>
+            <Button variant="outline" onClick={openFileAction} disabled={isBusy}>
+              <FolderOpenIcon data-icon="inline-start" />
+              Open file
             </Button>
-          </MarkdownOpenUrlDialog>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  disabled={isBusy}
+                  aria-label="Open options"
+                >
+                  <ChevronDownIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72">
+                <DropdownMenuItem onSelect={openFileAction}>
+                  <FolderOpenIcon />
+                  Open file
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setIsOpenUrlDialogOpen(true)}>
+                  <LinkIcon />
+                  Open URL
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Recent</DropdownMenuLabel>
+                {visibleRecentFiles.length > 0 ? (
+                  <DropdownMenuGroup>
+                    {visibleRecentFiles.map((file) => {
+                      const itemLabel = buildRecentFileMeta(file);
+
+                      return (
+                        <DropdownMenuItem
+                          key={file.id}
+                          className="justify-between gap-3"
+                          onSelect={() => openRecentAction(file.id)}
+                        >
+                          <div className="flex min-w-0 items-start gap-2">
+                            <HistoryIcon />
+                            <div className="flex min-w-0 flex-col">
+                              <span className="truncate">{file.name}</span>
+                              <span className="truncate text-xs text-muted-foreground">
+                                {itemLabel}
+                              </span>
+                            </div>
+                          </div>
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuGroup>
+                ) : (
+                  <DropdownMenuItem disabled>No recent files</DropdownMenuItem>
+                )}
+                {overflowRecentFiles.length > 0 ? (
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      <HistoryIcon />
+                      See more
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="w-72">
+                      {overflowRecentFiles.map((file) => {
+                        const itemLabel = buildRecentFileMeta(file);
+
+                        return (
+                          <DropdownMenuItem
+                            key={file.id}
+                            className="justify-between gap-3"
+                            onSelect={() => openRecentAction(file.id)}
+                          >
+                            <div className="flex min-w-0 items-start gap-2">
+                              <HistoryIcon />
+                              <div className="flex min-w-0 flex-col">
+                                <span className="truncate">{file.name}</span>
+                                <span className="truncate text-xs text-muted-foreground">
+                                  {itemLabel}
+                                </span>
+                              </div>
+                            </div>
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                ) : null}
+                {recentFiles.length > 0 ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={() => setIsClearHistoryConfirmOpen(true)}
+                      variant="destructive"
+                    >
+                      <Trash2Icon />
+                      Clear history
+                    </DropdownMenuItem>
+                  </>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </ButtonGroup>
 
           <Button onClick={saveFileAction} disabled={!activeFile || !canSaveFile || isBusy}>
             <SaveIcon data-icon="inline-start" />

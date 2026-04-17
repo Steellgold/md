@@ -1,14 +1,5 @@
 "use client";
 
-import {
-  ChevronDownIcon,
-  FilePlusIcon,
-  FolderOpenIcon,
-  LinkIcon,
-  UploadIcon,
-} from "lucide-react";
-import * as React from "react";
-
 import { MarkdownOpenUrlDialog } from "@/components/markdown-open-url-dialog";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -27,6 +18,14 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { type MarkdownOpenFromUrlActionResult } from "@/types/markdown";
+import {
+  ChevronDownIcon,
+  FilePlusIcon,
+  FolderOpenIcon,
+  LinkIcon,
+  UploadIcon,
+} from "lucide-react";
+import { useState } from "react";
 
 type MarkdownEmptyStateProps = {
   isDragActive: boolean;
@@ -48,7 +47,7 @@ export const MarkdownEmptyState = ({
   openUrlAction,
   createNewAction,
 }: MarkdownEmptyStateProps) => {
-  const [isOpenUrlDialogOpen, setIsOpenUrlDialogOpen] = React.useState(false);
+  const [isOpenUrlDialogOpen, setIsOpenUrlDialogOpen] = useState(false);
 
   return (
     <Empty

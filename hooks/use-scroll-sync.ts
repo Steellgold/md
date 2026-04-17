@@ -1,13 +1,12 @@
 "use client";
 
-import * as React from "react";
-
 import { getScrollRatio, setScrollRatio } from "@/lib/markdown-helpers";
+import { RefObject, useCallback, useRef } from "react";
 
 type UseScrollSyncParams = {
   syncScrollEnabled: boolean;
-  editorRef: React.RefObject<HTMLTextAreaElement | null>;
-  previewRef: React.RefObject<HTMLDivElement | null>;
+  editorRef: RefObject<HTMLTextAreaElement | null>;
+  previewRef: RefObject<HTMLDivElement | null>;
 };
 
 export const useScrollSync = ({
@@ -15,9 +14,9 @@ export const useScrollSync = ({
   editorRef,
   previewRef,
 }: UseScrollSyncParams) => {
-  const syncingSourceRef = React.useRef<"editor" | "preview" | null>(null);
+  const syncingSourceRef = useRef<"editor" | "preview" | null>(null);
 
-  const syncScroll = React.useCallback(
+  const syncScroll = useCallback(
     (source: "editor" | "preview") => {
       const editorElement = editorRef.current;
       const previewElement = previewRef.current;
@@ -41,7 +40,7 @@ export const useScrollSync = ({
     [editorRef, previewRef, syncScrollEnabled]
   );
 
-  const handleEditorScroll = React.useCallback(() => {
+  const handleEditorScroll = useCallback(() => {
     if (syncingSourceRef.current === "preview") {
       return;
     }
@@ -49,7 +48,7 @@ export const useScrollSync = ({
     syncScroll("editor");
   }, [syncScroll]);
 
-  const handlePreviewScroll = React.useCallback(() => {
+  const handlePreviewScroll = useCallback(() => {
     if (syncingSourceRef.current === "editor") {
       return;
     }

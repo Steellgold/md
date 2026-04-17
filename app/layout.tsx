@@ -1,8 +1,7 @@
-import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-
 import { ThemeProvider } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
+import type { Metadata, Viewport } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
 import { FC, PropsWithChildren } from "react";
 import "./globals.css";
 

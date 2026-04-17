@@ -1,7 +1,5 @@
 "use client";
 
-import * as React from "react";
-import { FileStackIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { type PendingMarkdownImport } from "@/types/markdown";
+import { FileStackIcon } from "lucide-react";
 
 type MarkdownImportSelectionDialogProps = {
   pendingImports: PendingMarkdownImport[];
