@@ -1,7 +1,9 @@
 "use client";
 
 import { MarkdownActiveDocument } from "@/components/markdown-active-document";
+import { MarkdownCommandPalette } from "@/components/markdown-command-palette";
 import { MarkdownEmptyState } from "@/components/markdown-empty-state";
+import { MarkdownOpenUrlDialog } from "@/components/markdown-open-url-dialog";
 import { MarkdownRecentFiles } from "@/components/markdown-recent-files";
 import { MarkdownRemoteSelectionDialog } from "@/components/markdown-remote-selection-dialog";
 import { Spinner } from "@/components/ui/spinner";
@@ -11,9 +13,13 @@ import { extractMarkdownDeepLink } from "@/lib/markdown-deep-link";
 import {
   insertBlockAction,
   prefixLinesAction,
-  runEditorCommandAction,
   wrapSelectionAction,
 } from "@/lib/markdown-editor";
+import {
+  buildMarkdownExportFileName,
+  buildMarkdownExportHtml,
+  downloadTextFile,
+} from "@/lib/markdown-export";
 import { useMarkdownStore } from "@/lib/markdown-store";
 import { useMarkdownUiStore } from "@/lib/markdown-ui-store";
 import { cn } from "@/lib/utils";
@@ -25,6 +31,7 @@ import {
   type DragEvent as ReactDragEvent,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -32,6 +39,16 @@ import {
 import { Button } from "./ui/button";
 
 const defaultDocumentTitle = ".MD";
+
+type EditorHistoryEntry = {
+  content: string;
+  selection: MarkdownViewerSelection;
+};
+
+type EditorHistoryState = {
+  entries: EditorHistoryEntry[];
+  index: number;
+};
 
 export const MarkdownApp = () => {
   const {
@@ -80,12 +97,17 @@ export const MarkdownApp = () => {
   );
 
   const [isDragActive, setIsDragActive] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isOpenUrlDialogOpen, setIsOpenUrlDialogOpen] = useState(false);
   const [previewDetached, setPreviewDetached] = useState(false);
   const [uiError, setUiError] = useState<string | null>(null);
-  const [editorSelection, setEditorSelection] = useState<MarkdownViewerSelection | null>(null);
+  const [editorSelection, setEditorSelection] =
+    useState<MarkdownViewerSelection | null>(null);
 
   const attemptedDeepLinkRef = useRef<string | null>(null);
+  const historyRef = useRef<Map<string, EditorHistoryState>>(new Map());
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
+  const pendingSelectionRef = useRef<MarkdownViewerSelection | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const searchParamsKey = searchParams.toString();
 
@@ -135,18 +157,108 @@ export const MarkdownApp = () => {
     }
   }, [activeFile]);
 
-  useMarkdownHotkeys({
-    enabled: Boolean(activeFile),
-    saveEnabled: activeFile?.source !== "url",
-    onSaveAction: saveActiveFile,
-    editorRef,
-  });
+  useEffect(() => {
+    const nextHistory = new Map<string, EditorHistoryState>();
+
+    openDocuments.forEach((document) => {
+      const existingHistory = historyRef.current.get(document.id);
+      const initialSelection = {
+        start: document.content.length,
+        end: document.content.length,
+      };
+
+      if (!existingHistory) {
+        nextHistory.set(document.id, {
+          entries: [
+            {
+              content: document.content,
+              selection: initialSelection,
+            },
+          ],
+          index: 0,
+        });
+        return;
+      }
+
+      const activeEntry = existingHistory.entries[existingHistory.index];
+
+      if (!document.isDirty && activeEntry?.content !== document.content) {
+        nextHistory.set(document.id, {
+          entries: [
+            {
+              content: document.content,
+              selection: initialSelection,
+            },
+          ],
+          index: 0,
+        });
+        return;
+      }
+
+      nextHistory.set(document.id, existingHistory);
+    });
+
+    historyRef.current = nextHistory;
+  }, [openDocuments]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) {
+        return;
+      }
+
+      if (event.shiftKey) {
+        return;
+      }
+
+      if (event.key.toLowerCase() !== "k") {
+        return;
+      }
+
+      event.preventDefault();
+      setIsCommandPaletteOpen(true);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   const handleEditorChange = useCallback(
     (event: ChangeEvent<HTMLTextAreaElement>) => {
-      setContent(event.target.value);
+      const nextValue = event.target.value;
+      const nextSelection = {
+        start: event.target.selectionStart,
+        end: event.target.selectionEnd,
+      };
+
+      if (activeDocumentId) {
+        const currentHistory = historyRef.current.get(activeDocumentId) ?? {
+          entries: [],
+          index: -1,
+        };
+        const activeEntry = currentHistory.entries[currentHistory.index];
+
+        if (activeEntry?.content !== nextValue) {
+          const nextEntries = currentHistory.entries
+            .slice(0, currentHistory.index + 1)
+            .concat({
+              content: nextValue,
+              selection: nextSelection,
+            });
+
+          historyRef.current.set(activeDocumentId, {
+            entries: nextEntries,
+            index: nextEntries.length - 1,
+          });
+        }
+      }
+
+      setContent(nextValue);
     },
-    [setContent]
+    [activeDocumentId, setContent]
   );
 
   const clearEditorSelection = useCallback(() => {
@@ -164,6 +276,26 @@ export const MarkdownApp = () => {
         end: editor.selectionEnd,
       };
 
+      if (activeDocumentId) {
+        const currentHistory = historyRef.current.get(activeDocumentId);
+
+        if (currentHistory && currentHistory.index >= 0) {
+          const nextEntries = currentHistory.entries.map((entry, index) =>
+            index === currentHistory.index
+              ? {
+                  ...entry,
+                  selection: nextSelection,
+                }
+              : entry
+          );
+
+          historyRef.current.set(activeDocumentId, {
+            entries: nextEntries,
+            index: currentHistory.index,
+          });
+        }
+      }
+
       setEditorSelection((currentValue) =>
         currentValue?.start === nextSelection.start &&
         currentValue?.end === nextSelection.end
@@ -171,7 +303,7 @@ export const MarkdownApp = () => {
           : nextSelection
       );
     },
-    []
+    [activeDocumentId]
   );
 
   const { handleEditorScroll, handlePreviewScroll, syncPreviewToEditor } =
@@ -211,12 +343,33 @@ export const MarkdownApp = () => {
       return;
     }
 
+    if (pendingSelectionRef.current) {
+      return;
+    }
+
     if (!editorSelection) {
       return;
     }
 
     syncEditorSelection(editorRef.current);
   }, [activeFile, content, editorSelection, syncEditorSelection]);
+
+  useLayoutEffect(() => {
+    const pendingSelection = pendingSelectionRef.current;
+    const editorElement = editorRef.current;
+
+    if (!pendingSelection || !editorElement) {
+      return;
+    }
+
+    editorElement.focus();
+    editorElement.setSelectionRange(
+      pendingSelection.start,
+      pendingSelection.end
+    );
+    setEditorSelection(pendingSelection);
+    pendingSelectionRef.current = null;
+  }, [activeDocumentId, content]);
 
   useEffect(() => {
     if (!activeFile) {
@@ -289,12 +442,61 @@ export const MarkdownApp = () => {
   }, [activeFile, reopenRecentFile]);
 
   const undoAction = useCallback(() => {
-    void runEditorCommandAction("undo", editorRef.current);
-  }, []);
+    if (!activeDocumentId) {
+      return;
+    }
+
+    const currentHistory = historyRef.current.get(activeDocumentId);
+
+    if (!currentHistory || currentHistory.index <= 0) {
+      return;
+    }
+
+    const nextIndex = currentHistory.index - 1;
+    const nextEntry = currentHistory.entries[nextIndex];
+
+    historyRef.current.set(activeDocumentId, {
+      entries: currentHistory.entries,
+      index: nextIndex,
+    });
+    pendingSelectionRef.current = nextEntry.selection;
+    setContent(nextEntry.content);
+  }, [activeDocumentId, setContent]);
 
   const redoAction = useCallback(() => {
-    void runEditorCommandAction("redo", editorRef.current);
-  }, []);
+    if (!activeDocumentId) {
+      return;
+    }
+
+    const currentHistory = historyRef.current.get(activeDocumentId);
+
+    if (
+      !currentHistory ||
+      currentHistory.index >= currentHistory.entries.length - 1
+    ) {
+      return;
+    }
+
+    const nextIndex = currentHistory.index + 1;
+    const nextEntry = currentHistory.entries[nextIndex];
+
+    historyRef.current.set(activeDocumentId, {
+      entries: currentHistory.entries,
+      index: nextIndex,
+    });
+    pendingSelectionRef.current = nextEntry.selection;
+    setContent(nextEntry.content);
+  }, [activeDocumentId, setContent]);
+
+  useMarkdownHotkeys({
+    enabled: Boolean(activeFile),
+    saveEnabled: activeFile?.source !== "url",
+    onSaveAction: saveActiveFile,
+    onOpenSwitcherAction: () => setIsCommandPaletteOpen(true),
+    onUndoAction: undoAction,
+    onRedoAction: redoAction,
+    editorRef,
+  });
 
   const boldAction = useCallback(() => {
     wrapSelectionAction(editorRef.current, "**", "**", "bold text");
@@ -337,6 +539,39 @@ export const MarkdownApp = () => {
   const clearUiError = useCallback(() => {
     setUiError(null);
   }, []);
+
+  const showCommandPalette = useCallback(() => {
+    setIsCommandPaletteOpen(true);
+  }, []);
+
+  const showOpenUrlDialog = useCallback(() => {
+    setIsCommandPaletteOpen(false);
+    setIsOpenUrlDialogOpen(true);
+  }, []);
+
+  const exportMarkdownFile = useCallback(() => {
+    if (!activeFile) {
+      return;
+    }
+
+    downloadTextFile(
+      buildMarkdownExportFileName(activeFile.name, "md"),
+      content,
+      "text/markdown;charset=utf-8"
+    );
+  }, [activeFile, content]);
+
+  const exportHtmlFile = useCallback(() => {
+    if (!activeFile) {
+      return;
+    }
+
+    downloadTextFile(
+      buildMarkdownExportFileName(activeFile.name, "html"),
+      buildMarkdownExportHtml(activeFile.name, content),
+      "text/html;charset=utf-8"
+    );
+  }, [activeFile, content]);
 
   if (!hydrated) {
     return (
@@ -414,7 +649,8 @@ export const MarkdownApp = () => {
           syncScrollEnabled={syncScrollEnabled}
           toggleSyncScrollAction={toggleSyncScroll}
           openFileAction={openWithPicker}
-          openUrlAction={openFromUrl}
+          showCommandPaletteAction={showCommandPalette}
+          showOpenUrlDialogAction={showOpenUrlDialog}
           goHomeAction={goHome}
           saveFileAction={saveActiveFile}
           refreshFileAction={handleRefresh}
@@ -434,6 +670,18 @@ export const MarkdownApp = () => {
         />
       ) : (
         <div className="flex flex-1 flex-col">
+          <div className="pt-3 text-center text-xs text-muted-foreground">
+            <span className="font-semibold text-foreground">Tip:</span> press{" "}
+            <button
+              type="button"
+              onClick={showCommandPalette}
+              className="font-medium text-foreground underline underline-offset-4"
+            >
+              Ctrl/Cmd + K
+            </button>{" "}
+            for quick actions.
+          </div>
+
           <div className="flex flex-1 items-center justify-center">
             <div className="flex w-full max-w-3xl flex-col gap-4">
               <MarkdownEmptyState
@@ -441,7 +689,7 @@ export const MarkdownApp = () => {
                 isBusy={isBusy}
                 canPersistFiles={canPersistFiles}
                 openFileAction={openWithPicker}
-                openUrlAction={openFromUrl}
+                showOpenUrlDialogAction={showOpenUrlDialog}
                 createNewAction={createNewFile}
               />
 
@@ -493,6 +741,46 @@ export const MarkdownApp = () => {
           void openPendingRemoteFile(fileName);
         }}
         clearRemoteSelectionAction={clearPendingRemoteOpen}
+      />
+      <MarkdownOpenUrlDialog
+        isBusy={isBusy}
+        openUrlAction={openFromUrl}
+        open={isOpenUrlDialogOpen}
+        onOpenChange={setIsOpenUrlDialogOpen}
+      />
+      <MarkdownCommandPalette
+        open={isCommandPaletteOpen}
+        onOpenChange={setIsCommandPaletteOpen}
+        activeDocumentId={activeDocumentId}
+        activeFileName={activeFile?.name ?? null}
+        openDocuments={openDocuments}
+        recentFiles={recentFiles}
+        viewMode={viewMode}
+        canSaveActiveFile={activeFile?.source !== "url"}
+        hasActiveFile={Boolean(activeFile)}
+        isBusy={isBusy}
+        openFileAction={() => {
+          void openWithPicker();
+        }}
+        openUrlDialogAction={showOpenUrlDialog}
+        createNewAction={() => {
+          void createNewFile();
+        }}
+        saveFileAction={() => {
+          void saveActiveFile();
+        }}
+        refreshFileAction={() => {
+          void handleRefresh();
+        }}
+        exportMarkdownAction={exportMarkdownFile}
+        exportHtmlAction={exportHtmlFile}
+        goHomeAction={goHome}
+        closeDocumentAction={clearDocument}
+        openRecentAction={(id) => {
+          void reopenRecentFile(id);
+        }}
+        setActiveDocumentAction={setActiveDocument}
+        setViewModeAction={setViewMode}
       />
     </div>
   );

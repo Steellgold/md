@@ -1,6 +1,5 @@
 "use client";
 
-import { MarkdownOpenUrlDialog } from "@/components/markdown-open-url-dialog";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import {
@@ -17,25 +16,18 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { type MarkdownOpenFromUrlActionResult } from "@/types/markdown";
 import {
-  ChevronDownIcon,
-  FilePlusIcon,
+  ChevronDownIcon, FilePlusIcon,
   FolderOpenIcon,
-  LinkIcon,
-  UploadIcon,
+  LinkIcon, UploadIcon
 } from "lucide-react";
-import { useState } from "react";
 
 type MarkdownEmptyStateProps = {
   isDragActive: boolean;
   isBusy: boolean;
   canPersistFiles: boolean;
   openFileAction: () => void;
-  openUrlAction: (
-    url: string,
-    fileName?: string
-  ) => Promise<MarkdownOpenFromUrlActionResult>;
+  showOpenUrlDialogAction: () => void;
   createNewAction: () => void;
 };
 
@@ -44,11 +36,9 @@ export const MarkdownEmptyState = ({
   isBusy,
   canPersistFiles,
   openFileAction,
-  openUrlAction,
+  showOpenUrlDialogAction,
   createNewAction,
 }: MarkdownEmptyStateProps) => {
-  const [isOpenUrlDialogOpen, setIsOpenUrlDialogOpen] = useState(false);
-
   return (
     <Empty
       className={
@@ -70,13 +60,6 @@ export const MarkdownEmptyState = ({
 
       <EmptyContent className="max-w-md">
         <div className="flex flex-wrap items-center justify-center gap-2">
-          <MarkdownOpenUrlDialog
-            isBusy={isBusy}
-            openUrlAction={openUrlAction}
-            open={isOpenUrlDialogOpen}
-            onOpenChange={setIsOpenUrlDialogOpen}
-          />
-
           <ButtonGroup>
             <Button
               onClick={openFileAction}
@@ -88,11 +71,7 @@ export const MarkdownEmptyState = ({
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
-                  size="icon"
-                  disabled={isBusy}
-                  aria-label="Open options"
-                >
+                <Button size="icon" disabled={isBusy} aria-label="Open options">
                   <ChevronDownIcon />
                 </Button>
               </DropdownMenuTrigger>
@@ -110,7 +89,7 @@ export const MarkdownEmptyState = ({
                   <FolderOpenIcon />
                   Open file
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setIsOpenUrlDialogOpen(true)}>
+                <DropdownMenuItem onSelect={showOpenUrlDialogAction}>
                   <LinkIcon />
                   Open URL
                 </DropdownMenuItem>
@@ -118,11 +97,7 @@ export const MarkdownEmptyState = ({
             </DropdownMenu>
           </ButtonGroup>
 
-          <Button
-            onClick={createNewAction}
-            disabled={isBusy}
-            variant="outline"
-          >
+          <Button onClick={createNewAction} disabled={isBusy} variant="outline">
             <FilePlusIcon data-icon="inline-start" />
             Create new file
           </Button>

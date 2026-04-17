@@ -3,7 +3,6 @@
 import {
   insertBlockAction,
   prefixLinesAction,
-  runEditorCommandAction,
   wrapSelectionAction,
 } from "@/lib/markdown-editor";
 import { RefObject, useEffect } from "react";
@@ -12,6 +11,9 @@ type UseMarkdownHotkeysParams = {
   enabled: boolean;
   saveEnabled: boolean;
   onSaveAction: () => Promise<void> | void;
+  onOpenSwitcherAction: () => void;
+  onUndoAction: () => void;
+  onRedoAction: () => void;
   editorRef: RefObject<HTMLTextAreaElement | null>;
 };
 
@@ -19,6 +21,9 @@ export const useMarkdownHotkeys = ({
   enabled,
   saveEnabled,
   onSaveAction,
+  onOpenSwitcherAction,
+  onUndoAction,
+  onRedoAction,
   editorRef,
 }: UseMarkdownHotkeysParams) => {
   useEffect(() => {
@@ -37,7 +42,7 @@ export const useMarkdownHotkeys = ({
 
       if (key === "z" && event.shiftKey) {
         event.preventDefault();
-        void runEditorCommandAction("redo", editorRef.current);
+        onRedoAction();
         return;
       }
 
@@ -54,12 +59,17 @@ export const useMarkdownHotkeys = ({
         }
         case "k": {
           event.preventDefault();
-          wrapSelectionAction(
-            editorRef.current,
-            "[",
-            "](https://example.com)",
-            "link text"
-          );
+          if (event.shiftKey) {
+            wrapSelectionAction(
+              editorRef.current,
+              "[",
+              "](https://example.com)",
+              "link text"
+            );
+            return;
+          }
+
+          onOpenSwitcherAction();
           return;
         }
         case "e": {
@@ -88,12 +98,12 @@ export const useMarkdownHotkeys = ({
         }
         case "y": {
           event.preventDefault();
-          void runEditorCommandAction("redo", editorRef.current);
+          onRedoAction();
           return;
         }
         case "z": {
           event.preventDefault();
-          void runEditorCommandAction("undo", editorRef.current);
+          onUndoAction();
           return;
         }
         default: {
@@ -107,5 +117,13 @@ export const useMarkdownHotkeys = ({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [editorRef, enabled, onSaveAction, saveEnabled]);
+  }, [
+    editorRef,
+    enabled,
+    onOpenSwitcherAction,
+    onRedoAction,
+    onSaveAction,
+    onUndoAction,
+    saveEnabled,
+  ]);
 };

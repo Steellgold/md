@@ -7,7 +7,6 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import {
-  type MarkdownOpenFromUrlActionResult,
   type OpenMarkdownDocument,
   type RecentMarkdownFile,
 } from "@/types/markdown";
@@ -42,10 +41,8 @@ type MarkdownActiveDocumentProps = {
   syncScrollEnabled: boolean;
   toggleSyncScrollAction: () => void;
   openFileAction: () => void;
-  openUrlAction: (
-    url: string,
-    fileName?: string
-  ) => Promise<MarkdownOpenFromUrlActionResult>;
+  showCommandPaletteAction: () => void;
+  showOpenUrlDialogAction: () => void;
   goHomeAction: () => void;
   saveFileAction: () => void;
   refreshFileAction: () => void;
@@ -88,7 +85,8 @@ export const MarkdownActiveDocument = ({
   syncScrollEnabled,
   toggleSyncScrollAction,
   openFileAction,
-  openUrlAction,
+  showCommandPaletteAction,
+  showOpenUrlDialogAction,
   goHomeAction,
   saveFileAction,
   refreshFileAction,
@@ -118,7 +116,8 @@ export const MarkdownActiveDocument = ({
         recentFiles={recentFiles}
         isBusy={isBusy}
         openFileAction={openFileAction}
-        openUrlAction={openUrlAction}
+        showCommandPaletteAction={showCommandPaletteAction}
+        showOpenUrlDialogAction={showOpenUrlDialogAction}
         goHomeAction={goHomeAction}
         saveFileAction={saveFileAction}
         refreshFileAction={refreshFileAction}

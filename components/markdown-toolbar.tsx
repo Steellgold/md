@@ -1,6 +1,5 @@
 "use client";
 
-import { MarkdownOpenUrlDialog } from "@/components/markdown-open-url-dialog";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -21,12 +20,10 @@ import {
   buildActiveDocumentMeta,
   buildRecentFileMeta,
 } from "@/lib/markdown-helpers";
-import {
-  type MarkdownOpenFromUrlActionResult,
-  type RecentMarkdownFile,
-} from "@/types/markdown";
+import { type RecentMarkdownFile } from "@/types/markdown";
 import {
   ChevronDownIcon,
+  CommandIcon,
   EllipsisIcon,
   FolderOpenIcon,
   HistoryIcon,
@@ -50,10 +47,8 @@ type MarkdownToolbarProps = {
   recentFiles: RecentMarkdownFile[];
   isBusy: boolean;
   openFileAction: () => void;
-  openUrlAction: (
-    url: string,
-    fileName?: string
-  ) => Promise<MarkdownOpenFromUrlActionResult>;
+  showCommandPaletteAction: () => void;
+  showOpenUrlDialogAction: () => void;
   goHomeAction: () => void;
   saveFileAction: () => void;
   refreshFileAction: () => void;
@@ -91,7 +86,8 @@ export const MarkdownToolbar = ({
   recentFiles,
   isBusy,
   openFileAction,
-  openUrlAction,
+  showCommandPaletteAction,
+  showOpenUrlDialogAction,
   goHomeAction,
   saveFileAction,
   refreshFileAction,
@@ -110,7 +106,6 @@ export const MarkdownToolbar = ({
   const closeLabel = openDocumentsCount > 1 ? "Close tab" : "Close document";
   const [isClearHistoryConfirmOpen, setIsClearHistoryConfirmOpen] =
     useState(false);
-  const [isOpenUrlDialogOpen, setIsOpenUrlDialogOpen] = useState(false);
   const visibleRecentFiles = recentFiles.slice(0, 6);
   const overflowRecentFiles = recentFiles.slice(6);
 
@@ -165,13 +160,6 @@ export const MarkdownToolbar = ({
             onConfirm={clearRecentAction}
           />
 
-          <MarkdownOpenUrlDialog
-            isBusy={isBusy}
-            openUrlAction={openUrlAction}
-            open={isOpenUrlDialogOpen}
-            onOpenChange={setIsOpenUrlDialogOpen}
-          />
-
           <ButtonGroup>
             <Button
               variant="outline"
@@ -198,7 +186,7 @@ export const MarkdownToolbar = ({
                   <FolderOpenIcon />
                   Open file
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setIsOpenUrlDialogOpen(true)}>
+                <DropdownMenuItem onSelect={showOpenUrlDialogAction}>
                   <LinkIcon />
                   Open URL
                 </DropdownMenuItem>
@@ -284,6 +272,11 @@ export const MarkdownToolbar = ({
           >
             <SaveIcon data-icon="inline-start" />
             Save
+          </Button>
+
+          <Button variant="outline" onClick={showCommandPaletteAction}>
+            <CommandIcon data-icon="inline-start" />
+            Quick switcher
           </Button>
 
           <DropdownMenu>
