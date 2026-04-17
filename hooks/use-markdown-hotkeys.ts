@@ -1,28 +1,27 @@
 "use client";
 
-import * as React from "react";
-
 import {
   insertBlockAction,
   prefixLinesAction,
   runEditorCommandAction,
   wrapSelectionAction,
 } from "@/lib/markdown-editor";
+import { RefObject, useEffect } from "react";
 
 type UseMarkdownHotkeysParams = {
   enabled: boolean;
   saveEnabled: boolean;
-  onSave: () => Promise<void> | void;
-  editorRef: React.RefObject<HTMLTextAreaElement | null>;
+  onSaveAction: () => Promise<void> | void;
+  editorRef: RefObject<HTMLTextAreaElement | null>;
 };
 
 export const useMarkdownHotkeys = ({
   enabled,
   saveEnabled,
-  onSave,
+  onSaveAction,
   editorRef,
 }: UseMarkdownHotkeysParams) => {
-  React.useEffect(() => {
+  useEffect(() => {
     if (!enabled) {
       return;
     }
@@ -84,7 +83,7 @@ export const useMarkdownHotkeys = ({
           }
 
           event.preventDefault();
-          void onSave();
+          void onSaveAction();
           return;
         }
         case "y": {
@@ -108,5 +107,5 @@ export const useMarkdownHotkeys = ({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [editorRef, enabled, onSave, saveEnabled]);
+  }, [editorRef, enabled, onSaveAction, saveEnabled]);
 };

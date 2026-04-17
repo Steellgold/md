@@ -1,18 +1,14 @@
 "use client";
 
-import { ArrowUpRightIcon, TriangleAlertIcon } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import * as React from "react";
-
 import { MarkdownActiveDocument } from "@/components/markdown-active-document";
 import { MarkdownEmptyState } from "@/components/markdown-empty-state";
 import { MarkdownImportSelectionDialog } from "@/components/markdown-import-selection-dialog";
-import { MarkdownRemoteSelectionDialog } from "@/components/markdown-remote-selection-dialog";
 import { MarkdownRecentFiles } from "@/components/markdown-recent-files";
+import { MarkdownRemoteSelectionDialog } from "@/components/markdown-remote-selection-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import { useMarkdownHotkeys } from "@/hooks/use-markdown-hotkeys";
-import { extractMarkdownDeepLink } from "@/lib/markdown-deep-link";
 import { useScrollSync } from "@/hooks/use-scroll-sync";
+import { extractMarkdownDeepLink } from "@/lib/markdown-deep-link";
 import {
   insertBlockAction,
   prefixLinesAction,
@@ -23,6 +19,17 @@ import { useMarkdownStore } from "@/lib/markdown-store";
 import { useMarkdownUiStore } from "@/lib/markdown-ui-store";
 import { cn } from "@/lib/utils";
 import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection";
+import { ArrowUpRightIcon, TriangleAlertIcon } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  type ChangeEvent,
+  type DragEvent as ReactDragEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "./ui/button";
 
 const defaultDocumentTitle = ".MD";
@@ -68,25 +75,25 @@ export const MarkdownApp = () => {
   const toggleSyncScroll = useMarkdownUiStore(
     (state) => state.toggleSyncScroll
   );
-  const [isDragActive, setIsDragActive] = React.useState(false);
-  const [previewDetached, setPreviewDetached] = React.useState(false);
-  const [uiError, setUiError] = React.useState<string | null>(null);
+  const [isDragActive, setIsDragActive] = useState(false);
+  const [previewDetached, setPreviewDetached] = useState(false);
+  const [uiError, setUiError] = useState<string | null>(null);
   const [editorSelection, setEditorSelection] =
-    React.useState<MarkdownViewerSelection | null>(null);
-  const attemptedDeepLinkRef = React.useRef<string | null>(null);
-  const editorRef = React.useRef<HTMLTextAreaElement | null>(null);
-  const previewRef = React.useRef<HTMLDivElement | null>(null);
+    useState<MarkdownViewerSelection | null>(null);
+  const attemptedDeepLinkRef = useRef<string | null>(null);
+  const editorRef = useRef<HTMLTextAreaElement | null>(null);
+  const previewRef = useRef<HTMLDivElement | null>(null);
   const searchParamsKey = searchParams.toString();
-  const parsedDeepLink = React.useMemo(
+  const parsedDeepLink = useMemo(
     () => extractMarkdownDeepLink(pathname, new URLSearchParams(searchParamsKey)),
     [pathname, searchParamsKey]
   );
 
-  React.useEffect(() => {
+  useEffect(() => {
     hydrate();
   }, [hydrate]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!parsedDeepLink) {
       attemptedDeepLinkRef.current = null;
       return;
@@ -110,37 +117,37 @@ export const MarkdownApp = () => {
     })();
   }, [activeFile, hydrated, openDeepLinkUrl, parsedDeepLink, router]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     document.title = activeFile
       ? `${activeFile.name} | ${defaultDocumentTitle}`
       : defaultDocumentTitle;
   }, [activeFile]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!activeFile) {
-      setPreviewDetached(false);
+      setTimeout(() => setPreviewDetached(false), 0);
     }
   }, [activeFile]);
 
   useMarkdownHotkeys({
     enabled: Boolean(activeFile),
     saveEnabled: activeFile?.source !== "url",
-    onSave: saveActiveFile,
+    onSaveAction: saveActiveFile,
     editorRef,
   });
 
-  const handleEditorChange = React.useCallback(
-    (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleEditorChange = useCallback(
+    (event: ChangeEvent<HTMLTextAreaElement>) => {
       setContent(event.target.value);
     },
     [setContent]
   );
 
-  const clearEditorSelection = React.useCallback(() => {
+  const clearEditorSelection = useCallback(() => {
     setEditorSelection(null);
   }, []);
 
-  const syncEditorSelection = React.useCallback(
+  const syncEditorSelection = useCallback(
     (editor: HTMLTextAreaElement | null) => {
       if (!editor) {
         return;
@@ -167,9 +174,9 @@ export const MarkdownApp = () => {
     previewRef,
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!activeFile) {
-      setEditorSelection(null);
+      setTimeout(() => setEditorSelection(null), 0);
       return;
     }
 
@@ -180,7 +187,7 @@ export const MarkdownApp = () => {
     syncEditorSelection(editorRef.current);
   }, [activeFile, content, editorSelection, syncEditorSelection]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!activeFile) {
       return;
     }
@@ -202,19 +209,19 @@ export const MarkdownApp = () => {
     };
   }, [activeFile, syncEditorSelection]);
 
-  const handleDragOver = React.useCallback(
-    (event: React.DragEvent<HTMLDivElement>) => {
+  const handleDragOver = useCallback(
+    (event: ReactDragEvent<HTMLDivElement>) => {
       event.preventDefault();
       setIsDragActive(true);
     },
     []
   );
 
-  const handleDragLeave = React.useCallback(
-    (event: React.DragEvent<HTMLDivElement>) => {
+  const handleDragLeave = useCallback(
+    (event: ReactDragEvent<HTMLDivElement>) => {
       event.preventDefault();
 
-      if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      if (event.currentTarget instanceof HTMLElement && event.currentTarget.contains(event.relatedTarget as Node | null)) {
         return;
       }
 
@@ -223,23 +230,23 @@ export const MarkdownApp = () => {
     []
   );
 
-  const handleDrop = React.useCallback(
-    async (event: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = useCallback(
+    async (event: ReactDragEvent<HTMLDivElement>) => {
       event.preventDefault();
       setIsDragActive(false);
 
-      const files = Array.from(event.dataTransfer.files);
+      const files = Array.from(event.dataTransfer?.files ?? []);
 
       if (files.length === 0) {
         return;
       }
 
-      await openDroppedFiles(files, event.dataTransfer.items);
+      await openDroppedFiles(files, event.dataTransfer?.items ?? null);
     },
     [openDroppedFiles]
   );
 
-  const handleRefresh = React.useCallback(async () => {
+  const handleRefresh = useCallback(async () => {
     if (!activeFile) {
       return;
     }
@@ -247,48 +254,48 @@ export const MarkdownApp = () => {
     await reopenRecentFile(activeFile.id);
   }, [activeFile, reopenRecentFile]);
 
-  const undoAction = React.useCallback(() => {
+  const undoAction = useCallback(() => {
     void runEditorCommandAction("undo", editorRef.current);
   }, []);
 
-  const redoAction = React.useCallback(() => {
+  const redoAction = useCallback(() => {
     void runEditorCommandAction("redo", editorRef.current);
   }, []);
 
-  const boldAction = React.useCallback(() => {
+  const boldAction = useCallback(() => {
     wrapSelectionAction(editorRef.current, "**", "**", "bold text");
   }, []);
 
-  const italicAction = React.useCallback(() => {
+  const italicAction = useCallback(() => {
     wrapSelectionAction(editorRef.current, "_", "_", "italic text");
   }, []);
 
-  const headingAction = React.useCallback((level: 1 | 2 | 3 | 4 | 5 | 6) => {
+  const headingAction = useCallback((level: 1 | 2 | 3 | 4 | 5 | 6) => {
     insertBlockAction(editorRef.current, `${"#".repeat(level)} `, "", "Heading");
   }, []);
 
-  const inlineCodeAction = React.useCallback(() => {
+  const inlineCodeAction = useCallback(() => {
     wrapSelectionAction(editorRef.current, "`", "`", "inline code");
   }, []);
 
-  const codeBlockAction = React.useCallback(() => {
+  const codeBlockAction = useCallback(() => {
     insertBlockAction(editorRef.current, "```md\n", "\n```", "code block");
   }, []);
 
-  const bulletListAction = React.useCallback(() => {
+  const bulletListAction = useCallback(() => {
     prefixLinesAction(editorRef.current, "- ", "List item");
   }, []);
 
-  const togglePreviewDetached = React.useCallback(() => {
+  const togglePreviewDetached = useCallback(() => {
     setUiError(null);
     setPreviewDetached((currentValue) => !currentValue);
   }, []);
 
-  const closePreviewDetached = React.useCallback(() => {
+  const closePreviewDetached = useCallback(() => {
     setPreviewDetached(false);
   }, []);
 
-  const clearUiError = React.useCallback(() => {
+  const clearUiError = useCallback(() => {
     setUiError(null);
   }, []);
 
@@ -372,7 +379,6 @@ export const MarkdownApp = () => {
           refreshFileAction={handleRefresh}
           clearDocumentAction={clearDocument}
           openRecentAction={reopenRecentFile}
-          removeRecentAction={removeRecentFile}
           clearRecentAction={clearRecentFiles}
           undoAction={undoAction}
           redoAction={redoAction}

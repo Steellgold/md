@@ -1,14 +1,14 @@
 "use client";
 
-import * as React from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 type DetachedWindowPortalProps = {
   open: boolean;
   title: string;
-  onClose: () => void;
+  onCloseAction: () => void;
   onBlocked?: (message: string) => void;
-  children: React.ReactNode;
+  children: ReactNode;
 };
 
 const popupWindowName = "md-preview-detached";
@@ -60,17 +60,17 @@ const syncDocumentRoot = (sourceDocument: Document, targetDocument: Document) =>
 export const DetachedWindowPortal = ({
   open,
   title,
-  onClose,
+  onCloseAction,
   onBlocked,
   children,
 }: DetachedWindowPortalProps) => {
-  const [portalContainer, setPortalContainer] = React.useState<HTMLElement | null>(
+  const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(
     null
   );
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!open) {
-      setPortalContainer(null);
+      setTimeout(() => setPortalContainer(null), 0);
       return;
     }
 
@@ -84,7 +84,7 @@ export const DetachedWindowPortal = ({
       onBlocked?.(
         "Unable to open the preview window. Allow pop-ups for this site and try again."
       );
-      onClose();
+      onCloseAction();
       return;
     }
 
@@ -98,7 +98,8 @@ export const DetachedWindowPortal = ({
     syncDocumentHead(sourceDocument, targetDocument);
     syncDocumentRoot(sourceDocument, targetDocument);
     detachedWindow.focus();
-    setPortalContainer(container);
+
+    setTimeout(() => setPortalContainer(container), 0);
 
     const syncTitle = () => {
       targetDocument.title = title;
@@ -113,7 +114,7 @@ export const DetachedWindowPortal = ({
     };
 
     const handleBeforeUnload = () => {
-      onClose();
+      onCloseAction();
     };
 
     const headObserver = new MutationObserver(syncHead);
@@ -148,7 +149,7 @@ export const DetachedWindowPortal = ({
         detachedWindow.close();
       }
     };
-  }, [onBlocked, onClose, open, title]);
+  }, [onBlocked, onCloseAction, open, title]);
 
   if (!portalContainer) {
     return null;
