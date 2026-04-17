@@ -60,7 +60,7 @@ export const MarkdownRecentFiles = ({
               <div>
                 <CardTitle>Recent files</CardTitle>
                 <CardDescription>
-                  Reopen one of your last Markdown documents.
+                  Up to 9 items stay visible here. Beyond that, the list scrolls.
                 </CardDescription>
               </div>
             </div>
@@ -88,60 +88,62 @@ export const MarkdownRecentFiles = ({
 
       <CardContent className="px-3">
         {hasRecentFiles ? (
-          <ItemGroup className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
-            {recentFiles.map((file) => (
-              <Item
-                key={file.id}
-                variant="muted"
-                className="items-start border border-transparent bg-muted/40 hover:border-border hover:bg-muted"
-              >
-                <button
-                  type="button"
-                  className="flex min-w-0 flex-1 items-start gap-2 overflow-hidden text-left"
-                  onClick={() => openRecentAction(file.id)}
+          <div className="max-h-[30rem] overflow-y-auto pr-1">
+            <ItemGroup className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-3">
+              {recentFiles.map((file) => (
+                <Item
+                  key={file.id}
+                  variant="muted"
+                  className="items-start border border-transparent bg-muted/40 hover:border-border hover:bg-muted"
                 >
-                  <ItemContent className="min-w-0 overflow-hidden">
-                    <ItemHeader className="min-w-0">
-                      <ItemTitle className="block w-full min-w-0 truncate">
-                        {file.name}
-                      </ItemTitle>
-                    </ItemHeader>
-
-                    {file.stats ? (
-                      <div className="mt-1 flex flex-wrap gap-1 overflow-hidden">
-                        <Badge variant="outline">
-                          {compactNumberFormatter.format(
-                            file.stats.characterCount
-                          )}{" "}
-                          chars
-                        </Badge>
-
-                        <Badge variant="outline">
-                          {compactNumberFormatter.format(file.stats.wordCount)} words
-                        </Badge>
-
-                        <Badge variant="outline">
-                          {compactNumberFormatter.format(file.stats.lineCount)} lines
-                        </Badge>
-                      </div>
-                    ) : null}
-                  </ItemContent>
-                </button>
-
-                <ItemActions className="shrink-0 self-start">
-                  <Button
-                    variant="outline"
-                    size="icon-xs"
-                    aria-label={`Remove ${file.name} from recent files`}
-                    title={`Remove ${file.name}`}
-                    onClick={() => removeRecentAction(file.id)}
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-start gap-2 overflow-hidden text-left"
+                    onClick={() => openRecentAction(file.id)}
                   >
-                    <XIcon />
-                  </Button>
-                </ItemActions>
-              </Item>
-            ))}
-          </ItemGroup>
+                    <ItemContent className="min-w-0 overflow-hidden">
+                      <ItemHeader className="min-w-0">
+                        <ItemTitle className="block w-full min-w-0 truncate">
+                          {file.name}
+                        </ItemTitle>
+                      </ItemHeader>
+
+                      {file.stats ? (
+                        <div className="mt-1 flex flex-wrap gap-1 overflow-hidden">
+                          <Badge variant="outline">
+                            {compactNumberFormatter.format(
+                              file.stats.characterCount
+                            )}{" "}
+                            chars
+                          </Badge>
+
+                          <Badge variant="outline">
+                            {compactNumberFormatter.format(file.stats.wordCount)} words
+                          </Badge>
+
+                          <Badge variant="outline">
+                            {compactNumberFormatter.format(file.stats.lineCount)} lines
+                          </Badge>
+                        </div>
+                      ) : null}
+                    </ItemContent>
+                  </button>
+
+                  <ItemActions className="shrink-0 self-start">
+                    <Button
+                      variant="outline"
+                      size="icon-xs"
+                      aria-label={`Remove ${file.name} from recent files`}
+                      title={`Remove ${file.name}`}
+                      onClick={() => removeRecentAction(file.id)}
+                    >
+                      <XIcon />
+                    </Button>
+                  </ItemActions>
+                </Item>
+              ))}
+            </ItemGroup>
+          </div>
         ) : (
           <div className="flex min-h-32 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-muted/20 px-4 py-8 text-center">
             <div className="rounded-md bg-primary/5 p-2">
