@@ -1,6 +1,7 @@
 import { GripVerticalIcon } from "lucide-react";
 import * as React from "react";
 
+import { DetachedWindowPortal } from "@/components/detached-window-portal";
 import { MarkdownToolbar } from "@/components/markdown-toolbar";
 import {
   ResizableHandle,
@@ -28,6 +29,10 @@ type MarkdownActiveDocumentProps = {
   onPreviewScroll: () => void;
   viewMode: ViewMode;
   setViewModeAction: (value: ViewMode) => void;
+  previewDetached: boolean;
+  togglePreviewDetachedAction: () => void;
+  closePreviewDetachedAction: () => void;
+  onDetachedPreviewBlocked: (message: string) => void;
   syncScrollEnabled: boolean;
   toggleSyncScrollAction: () => void;
   openFileAction: () => void;
@@ -64,6 +69,10 @@ export const MarkdownActiveDocument = ({
   onPreviewScroll,
   viewMode,
   setViewModeAction,
+  previewDetached,
+  togglePreviewDetachedAction,
+  closePreviewDetachedAction,
+  onDetachedPreviewBlocked,
   syncScrollEnabled,
   toggleSyncScrollAction,
   openFileAction,
@@ -85,6 +94,7 @@ export const MarkdownActiveDocument = ({
   bulletListAction,
 }: MarkdownActiveDocumentProps) => {
   const [editorTopbarHeight, setEditorTopbarHeight] = React.useState(0);
+  const displayedViewMode = previewDetached ? "editor" : viewMode;
 
   return (
     <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
@@ -104,6 +114,8 @@ export const MarkdownActiveDocument = ({
         clearRecentAction={clearRecentAction}
         viewMode={viewMode}
         setViewModeAction={setViewModeAction}
+        previewDetached={previewDetached}
+        togglePreviewDetachedAction={togglePreviewDetachedAction}
         syncScrollEnabled={syncScrollEnabled}
         toggleSyncScrollAction={toggleSyncScrollAction}
       />
@@ -112,9 +124,9 @@ export const MarkdownActiveDocument = ({
         orientation="horizontal"
         className="flex-1 min-h-0 bg-background"
       >
-        {viewMode !== "preview" ? (
+        {displayedViewMode !== "preview" ? (
           <ResizablePanel
-            defaultSize={viewMode === "editor" ? 100 : 50}
+            defaultSize={displayedViewMode === "editor" ? 100 : 50}
             minSize={30}
           >
             <MarkdownEditorPanel
@@ -136,15 +148,15 @@ export const MarkdownActiveDocument = ({
           </ResizablePanel>
         ) : null}
 
-        {viewMode === "split" ? (
+        {displayedViewMode === "split" ? (
           <ResizableHandle withHandle className="bg-border/80">
             <GripVerticalIcon />
           </ResizableHandle>
         ) : null}
 
-        {viewMode !== "editor" ? (
+        {displayedViewMode !== "editor" ? (
           <ResizablePanel
-            defaultSize={viewMode === "preview" ? 100 : 50}
+            defaultSize={displayedViewMode === "preview" ? 100 : 50}
             minSize={30}
           >
             <MarkdownPreviewPanel
@@ -156,6 +168,19 @@ export const MarkdownActiveDocument = ({
           </ResizablePanel>
         ) : null}
       </ResizablePanelGroup>
+
+      <DetachedWindowPortal
+        open={previewDetached}
+        title={`${activeFile.name} Preview | .MD`}
+        onClose={closePreviewDetachedAction}
+        onBlocked={onDetachedPreviewBlocked}
+      >
+        <MarkdownPreviewPanel
+          content={content}
+          previewRef={previewRef}
+          onScroll={onPreviewScroll}
+        />
+      </DetachedWindowPortal>
     </div>
   );
 };

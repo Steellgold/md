@@ -68,6 +68,8 @@ export const MarkdownApp = () => {
     (state) => state.toggleSyncScroll
   );
   const [isDragActive, setIsDragActive] = React.useState(false);
+  const [previewDetached, setPreviewDetached] = React.useState(false);
+  const [uiError, setUiError] = React.useState<string | null>(null);
   const attemptedDeepLinkRef = React.useRef<string | null>(null);
   const editorRef = React.useRef<HTMLTextAreaElement | null>(null);
   const previewRef = React.useRef<HTMLDivElement | null>(null);
@@ -109,6 +111,12 @@ export const MarkdownApp = () => {
     document.title = activeFile
       ? `${activeFile.name} | ${defaultDocumentTitle}`
       : defaultDocumentTitle;
+  }, [activeFile]);
+
+  React.useEffect(() => {
+    if (!activeFile) {
+      setPreviewDetached(false);
+    }
   }, [activeFile]);
 
   useMarkdownHotkeys({
@@ -208,6 +216,19 @@ export const MarkdownApp = () => {
     prefixLinesAction(editorRef.current, "- ", "List item");
   }, []);
 
+  const togglePreviewDetached = React.useCallback(() => {
+    setUiError(null);
+    setPreviewDetached((currentValue) => !currentValue);
+  }, []);
+
+  const closePreviewDetached = React.useCallback(() => {
+    setPreviewDetached(false);
+  }, []);
+
+  const clearUiError = React.useCallback(() => {
+    setUiError(null);
+  }, []);
+
   if (!hydrated) {
     return (
       <div className="flex min-h-svh items-center justify-center p-6">
@@ -229,21 +250,33 @@ export const MarkdownApp = () => {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {error ? (
-        <div className="absolute bottom-4 right-4 z-50">
-          <div className="flex mx-auto items-center gap-4 rounded-xl backdrop-blur-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            <div className="flex items-center gap-2">
-              <TriangleAlertIcon className="size-4" />
-              {error}
-            </div>
+      {error || uiError ? (
+        <div className="absolute right-4 bottom-4 z-50 flex flex-col gap-3">
+          {error ? (
+            <div className="flex mx-auto items-center gap-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive backdrop-blur-xl">
+              <div className="flex items-center gap-2">
+                <TriangleAlertIcon className="size-4" />
+                {error}
+              </div>
 
-            <Button
-              variant="destructive"
-              onClick={clearError}
-            >
-              Close
-            </Button>
-          </div>
+              <Button variant="destructive" onClick={clearError}>
+                Close
+              </Button>
+            </div>
+          ) : null}
+
+          {uiError ? (
+            <div className="flex mx-auto items-center gap-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive backdrop-blur-xl">
+              <div className="flex items-center gap-2">
+                <TriangleAlertIcon className="size-4" />
+                {uiError}
+              </div>
+
+              <Button variant="destructive" onClick={clearUiError}>
+                Close
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -260,6 +293,10 @@ export const MarkdownApp = () => {
           onPreviewScroll={handlePreviewScroll}
           viewMode={viewMode}
           setViewModeAction={setViewMode}
+          previewDetached={previewDetached}
+          togglePreviewDetachedAction={togglePreviewDetached}
+          closePreviewDetachedAction={closePreviewDetached}
+          onDetachedPreviewBlocked={setUiError}
           syncScrollEnabled={syncScrollEnabled}
           toggleSyncScrollAction={toggleSyncScroll}
           openFileAction={openWithPicker}

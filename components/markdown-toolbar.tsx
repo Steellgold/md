@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import {
+  ArrowUpRightIcon,
   EllipsisIcon,
   FolderOpenIcon,
   HistoryIcon,
@@ -59,6 +60,8 @@ type MarkdownToolbarProps = {
   clearRecentAction: () => void;
   viewMode: "split" | "editor" | "preview";
   setViewModeAction: (value: "split" | "editor" | "preview") => void;
+  previewDetached: boolean;
+  togglePreviewDetachedAction: () => void;
   syncScrollEnabled: boolean;
   toggleSyncScrollAction: () => void;
 };
@@ -97,6 +100,8 @@ export const MarkdownToolbar = ({
   clearRecentAction,
   viewMode,
   setViewModeAction,
+  previewDetached,
+  togglePreviewDetachedAction,
   syncScrollEnabled,
   toggleSyncScrollAction,
 }: MarkdownToolbarProps) => {
@@ -147,6 +152,20 @@ export const MarkdownToolbar = ({
               );
             })}
           </ButtonGroup>
+
+          <Button
+            variant={previewDetached ? "secondary" : "outline"}
+            size="sm"
+            onClick={togglePreviewDetachedAction}
+            title={
+              previewDetached
+                ? "Move the preview back into the main window"
+                : "Open the preview in a separate window"
+            }
+          >
+            <ArrowUpRightIcon data-icon="inline-start" />
+            {previewDetached ? "Attach preview" : "Detach preview"}
+          </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
