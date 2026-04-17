@@ -3,10 +3,12 @@ import * as React from "react";
 
 import { MarkdownPreview } from "@/components/markdown-preview";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection";
 
 type MarkdownPreviewPanelProps = {
   content: string;
   previewRef: React.RefObject<HTMLDivElement | null>;
+  editorSelection: MarkdownViewerSelection;
   topOverlayHeight?: number;
   onScroll: () => void;
 };
@@ -14,6 +16,7 @@ type MarkdownPreviewPanelProps = {
 export const MarkdownPreviewPanel = ({
   content,
   previewRef,
+  editorSelection,
   topOverlayHeight,
   onScroll,
 }: MarkdownPreviewPanelProps) => {
@@ -46,7 +49,7 @@ export const MarkdownPreviewPanel = ({
           />
 
           {content.trim() ? (
-            <MarkdownPreview content={content} />
+            <MarkdownPreview content={content} editorSelection={editorSelection} />
           ) : (
             <div className="flex h-full items-center justify-center px-6 py-8 text-sm text-muted-foreground">
               The preview will appear here as soon as markdown is present.

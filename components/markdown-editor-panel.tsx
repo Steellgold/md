@@ -28,30 +28,13 @@ import {
 import { buildActiveDocumentMeta } from "@/lib/markdown-helpers";
 import { type RecentMarkdownFile } from "@/types/markdown";
 
-type TextLocation = {
-  index: number;
-  line: number;
-  column: number;
-};
-
-type EditorInspectorState = {
-  cursor: TextLocation;
-  selectionStart: TextLocation;
-  selectionEnd: TextLocation;
-  selectionPreview: string | null;
-};
-
-type MousePosition = {
-  x: number;
-  y: number;
-};
-
 type MarkdownEditorPanelProps = {
   activeFile: RecentMarkdownFile;
   content: string;
   editorRef: React.RefObject<HTMLTextAreaElement | null>;
   onTopbarHeightChange?: (height: number) => void;
   onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  onSelectionChange: (editor: HTMLTextAreaElement) => void;
   onScroll: () => void;
   undoAction: () => void;
   redoAction: () => void;
@@ -103,64 +86,13 @@ const quickActions = [
 
 const headingLevels = [1, 2, 3, 4, 5, 6] as const;
 
-const getTextLocation = (value: string, index: number): TextLocation => {
-  const safeIndex = Math.max(0, Math.min(index, value.length));
-  const textBeforeIndex = value.slice(0, safeIndex);
-  const lines = textBeforeIndex.split("\n");
-
-  return {
-    index: safeIndex,
-    line: lines.length,
-    column: (lines.at(-1) ?? "").length + 1,
-  };
-};
-
-const buildSelectionPreview = (value: string, maxLength = 72) => {
-  const preview = value.replace(/\r?\n/gu, "\\n").replace(/\t/gu, "\\t");
-
-  if (preview.length <= maxLength) {
-    return preview;
-  }
-
-  return `${preview.slice(0, maxLength - 3).trimEnd()}...`;
-};
-
-const buildEditorInspectorState = (
-  value: string,
-  selectionStart: number,
-  selectionEnd: number
-): EditorInspectorState => {
-  const safeSelectionStart = Math.max(0, Math.min(selectionStart, value.length));
-  const safeSelectionEnd = Math.max(
-    safeSelectionStart,
-    Math.min(selectionEnd, value.length)
-  );
-  const selectedText = value.slice(safeSelectionStart, safeSelectionEnd);
-
-  return {
-    cursor: getTextLocation(value, safeSelectionEnd),
-    selectionStart: getTextLocation(value, safeSelectionStart),
-    selectionEnd: getTextLocation(value, safeSelectionEnd),
-    selectionPreview: selectedText ? buildSelectionPreview(selectedText) : null,
-  };
-};
-
-const getEditorInspectorState = (editor: HTMLTextAreaElement) =>
-  buildEditorInspectorState(
-    editor.value,
-    editor.selectionStart,
-    editor.selectionEnd
-  );
-
-const formatTextLocation = ({ line, column }: TextLocation) =>
-  `L${line}:C${column}`;
-
 export const MarkdownEditorPanel = ({
   activeFile,
   content,
   editorRef,
   onTopbarHeightChange,
   onChange,
+  onSelectionChange,
   onScroll,
   undoAction,
   redoAction,
@@ -172,13 +104,6 @@ export const MarkdownEditorPanel = ({
   bulletListAction,
 }: MarkdownEditorPanelProps) => {
   const topbarRef = React.useRef<HTMLDivElement | null>(null);
-  const [mousePosition, setMousePosition] = React.useState<MousePosition | null>(
-    null
-  );
-  const [editorInspectorState, setEditorInspectorState] =
-    React.useState<EditorInspectorState>(() =>
-      buildEditorInspectorState(content, 0, 0)
-    );
   const actionMap = {
     undoAction,
     redoAction,
@@ -213,64 +138,20 @@ export const MarkdownEditorPanel = ({
     };
   }, [onTopbarHeightChange]);
 
-  React.useEffect(() => {
-    const editor = editorRef.current;
-
-    if (!editor) {
-      setEditorInspectorState(buildEditorInspectorState(content, 0, 0));
-      return;
-    }
-
-    setEditorInspectorState(getEditorInspectorState(editor));
-  }, [content, editorRef]);
-
   const handleEditorChange = React.useCallback(
     (event: React.ChangeEvent<HTMLTextAreaElement>) => {
       onChange(event);
-      setEditorInspectorState(getEditorInspectorState(event.currentTarget));
+      onSelectionChange(event.currentTarget);
     },
-    [onChange]
+    [onChange, onSelectionChange]
   );
 
   const handleEditorSelectionChange = React.useCallback(
     (event: React.SyntheticEvent<HTMLTextAreaElement>) => {
-      setEditorInspectorState(getEditorInspectorState(event.currentTarget));
+      onSelectionChange(event.currentTarget);
     },
-    []
+    [onSelectionChange]
   );
-
-  const handleEditorMouseMove = React.useCallback(
-    (event: React.MouseEvent<HTMLTextAreaElement>) => {
-      const textarea = event.currentTarget;
-      const rect = textarea.getBoundingClientRect();
-      const nextMousePosition = {
-        x: Math.max(
-          0,
-          Math.round(event.clientX - rect.left + textarea.scrollLeft)
-        ),
-        y: Math.max(
-          0,
-          Math.round(event.clientY - rect.top + textarea.scrollTop)
-        ),
-      };
-
-      setMousePosition((currentValue) =>
-        currentValue?.x === nextMousePosition.x &&
-        currentValue?.y === nextMousePosition.y
-          ? currentValue
-          : nextMousePosition
-      );
-
-      if (event.buttons === 1) {
-        setEditorInspectorState(getEditorInspectorState(textarea));
-      }
-    },
-    []
-  );
-
-  const handleEditorMouseLeave = React.useCallback(() => {
-    setMousePosition(null);
-  }, []);
 
   return (
     <Card className="flex h-full min-h-0 flex-col gap-0 rounded-none border-0 bg-transparent py-0 ring-0">
@@ -291,54 +172,17 @@ export const MarkdownEditorPanel = ({
             align="block-start"
             className="cursor-default border-b px-6 py-3"
           >
-            <div className="flex w-full flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
+            <div className="flex w-full flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
                 <div className="truncate text-sm font-medium">
                   {activeFile.name}
                 </div>
                 <div className="truncate text-xs text-muted-foreground">
                   {buildActiveDocumentMeta(content, activeFile)}
                 </div>
-
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                  <div className="inline-flex items-center rounded-md border bg-background px-2 py-1 font-mono text-muted-foreground">
-                    Mouse{" "}
-                    {mousePosition
-                      ? `x:${mousePosition.x} y:${mousePosition.y}`
-                      : "x:- y:-"}
-                  </div>
-
-                  <div className="inline-flex items-center rounded-md border bg-background px-2 py-1 font-mono text-muted-foreground">
-                    Cursor {formatTextLocation(editorInspectorState.cursor)}
-                  </div>
-
-                  <div className="inline-flex items-center rounded-md border bg-background px-2 py-1 font-mono text-muted-foreground">
-                    Selection{" "}
-                    {editorInspectorState.selectionPreview
-                      ? `${formatTextLocation(editorInspectorState.selectionStart)} -> ${formatTextLocation(editorInspectorState.selectionEnd)}`
-                      : "none"}
-                  </div>
-
-                  <div className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border bg-background px-2 py-1">
-                    <span className="shrink-0 text-muted-foreground">
-                      Selected text
-                    </span>
-                    <span
-                      className={
-                        editorInspectorState.selectionPreview
-                          ? "truncate text-foreground"
-                          : "truncate text-muted-foreground"
-                      }
-                    >
-                      {editorInspectorState.selectionPreview
-                        ? `"${editorInspectorState.selectionPreview}"`
-                        : "none"}
-                    </span>
-                  </div>
-                </div>
               </div>
 
-              <ButtonGroup className="max-w-full shrink-0 flex-wrap">
+              <ButtonGroup className="max-w-full flex-wrap">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -392,8 +236,6 @@ export const MarkdownEditorPanel = ({
             onKeyUp={handleEditorSelectionChange}
             onMouseUp={handleEditorSelectionChange}
             onSelect={handleEditorSelectionChange}
-            onMouseMove={handleEditorMouseMove}
-            onMouseLeave={handleEditorMouseLeave}
             placeholder="Write or paste your markdown here..."
             className="h-full min-h-0 flex-1 basis-0 px-6 py-5 font-mono text-sm"
           />
