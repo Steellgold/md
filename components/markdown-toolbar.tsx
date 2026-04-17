@@ -1,6 +1,5 @@
 "use client";
 
-
 import { MarkdownOpenUrlDialog } from "@/components/markdown-open-url-dialog";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -47,6 +46,7 @@ import { useState } from "react";
 type MarkdownToolbarProps = {
   activeFile: RecentMarkdownFile | null;
   content: string;
+  openDocumentsCount: number;
   recentFiles: RecentMarkdownFile[];
   isBusy: boolean;
   openFileAction: () => void;
@@ -87,6 +87,7 @@ const viewOptions = [
 export const MarkdownToolbar = ({
   activeFile,
   content,
+  openDocumentsCount,
   recentFiles,
   isBusy,
   openFileAction,
@@ -104,8 +105,11 @@ export const MarkdownToolbar = ({
 }: MarkdownToolbarProps) => {
   const secondaryLabel = buildActiveDocumentMeta(content, activeFile);
   const canSaveFile = activeFile?.source !== "url";
-  const refreshLabel = activeFile?.source === "url" ? "Reload URL" : "Reopen file";
-  const [isClearHistoryConfirmOpen, setIsClearHistoryConfirmOpen] = useState(false);
+  const refreshLabel =
+    activeFile?.source === "url" ? "Reload URL" : "Reopen file";
+  const closeLabel = openDocumentsCount > 1 ? "Close tab" : "Close document";
+  const [isClearHistoryConfirmOpen, setIsClearHistoryConfirmOpen] =
+    useState(false);
   const [isOpenUrlDialogOpen, setIsOpenUrlDialogOpen] = useState(false);
   const visibleRecentFiles = recentFiles.slice(0, 6);
   const overflowRecentFiles = recentFiles.slice(6);
@@ -115,10 +119,10 @@ export const MarkdownToolbar = ({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <Button
-            variant="ghost"
-            size="icon-sm"
+            variant="outline"
+            size="icon"
             onClick={goHomeAction}
-            title="Close document"
+            title={closeLabel}
           >
             <HouseIcon />
           </Button>
@@ -169,7 +173,11 @@ export const MarkdownToolbar = ({
           />
 
           <ButtonGroup>
-            <Button variant="outline" onClick={openFileAction} disabled={isBusy}>
+            <Button
+              variant="outline"
+              onClick={openFileAction}
+              disabled={isBusy}
+            >
               <FolderOpenIcon data-icon="inline-start" />
               Open file
             </Button>
@@ -270,7 +278,10 @@ export const MarkdownToolbar = ({
             </DropdownMenu>
           </ButtonGroup>
 
-          <Button onClick={saveFileAction} disabled={!activeFile || !canSaveFile || isBusy}>
+          <Button
+            onClick={saveFileAction}
+            disabled={!activeFile || !canSaveFile || isBusy}
+          >
             <SaveIcon data-icon="inline-start" />
             Save
           </Button>
@@ -305,7 +316,7 @@ export const MarkdownToolbar = ({
                 variant="destructive"
               >
                 <XIcon />
-                Close document
+                {closeLabel}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

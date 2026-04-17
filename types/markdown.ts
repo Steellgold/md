@@ -38,6 +38,14 @@ export type PendingMarkdownImport = {
   content: string;
 };
 
+export type OpenMarkdownDocument = {
+  id: string;
+  file: RecentMarkdownFile;
+  content: string;
+  savedContent: string;
+  isDirty: boolean;
+};
+
 export type PendingRemoteMarkdownOpen = {
   url: string;
   files: string[];
@@ -93,6 +101,8 @@ export type DataTransferItemWithHandle = DataTransferItem & {
 };
 
 export type MarkdownStore = {
+  openDocuments: OpenMarkdownDocument[];
+  activeDocumentId: string | null;
   content: string;
   activeFile: RecentMarkdownFile | null;
   pendingImports: PendingMarkdownImport[];
@@ -105,6 +115,7 @@ export type MarkdownStore = {
   hydrate: () => void;
   clearError: () => void;
   setContent: (content: string) => void;
+  setActiveDocument: (id: string) => void;
   openWithPicker: () => Promise<void>;
   openFromUrl: (
     url: string,
@@ -115,13 +126,13 @@ export type MarkdownStore = {
     files: File[],
     items?: DataTransferItemList | null
   ) => Promise<void>;
-  openPendingImport: (id: string) => void;
   clearPendingImports: () => void;
   openPendingRemoteFile: (fileName: string) => Promise<void>;
   clearPendingRemoteOpen: () => void;
   reopenRecentFile: (id: string) => Promise<void>;
   createNewFile: () => Promise<void>;
   saveActiveFile: () => Promise<void>;
+  closeDocument: (id: string) => void;
   removeRecentFile: (id: string) => Promise<void>;
   clearRecentFiles: () => Promise<void>;
   clearDocument: () => void;

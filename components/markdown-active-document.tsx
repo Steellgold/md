@@ -1,4 +1,5 @@
 import { DetachedWindowPortal } from "@/components/detached-window-portal";
+import { MarkdownDocumentTabs } from "@/components/markdown-document-tabs";
 import { MarkdownToolbar } from "@/components/markdown-toolbar";
 import {
   ResizableHandle,
@@ -7,6 +8,7 @@ import {
 } from "@/components/ui/resizable";
 import {
   type MarkdownOpenFromUrlActionResult,
+  type OpenMarkdownDocument,
   type RecentMarkdownFile,
 } from "@/types/markdown";
 import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection";
@@ -18,6 +20,8 @@ import { MarkdownPreviewPanel } from "./markdown-preview-panel";
 
 type MarkdownActiveDocumentProps = {
   activeFile: RecentMarkdownFile;
+  openDocuments: OpenMarkdownDocument[];
+  activeDocumentId: string | null;
   recentFiles: RecentMarkdownFile[];
   isBusy: boolean;
   content: string;
@@ -46,6 +50,8 @@ type MarkdownActiveDocumentProps = {
   saveFileAction: () => void;
   refreshFileAction: () => void;
   clearDocumentAction: () => void;
+  setActiveDocumentAction: (id: string) => void;
+  closeDocumentAction: (id: string) => void;
   openRecentAction: (id: string) => void;
   clearRecentAction: () => void;
   undoAction: () => void;
@@ -60,6 +66,8 @@ type MarkdownActiveDocumentProps = {
 
 export const MarkdownActiveDocument = ({
   activeFile,
+  openDocuments,
+  activeDocumentId,
   recentFiles,
   isBusy,
   content,
@@ -85,6 +93,8 @@ export const MarkdownActiveDocument = ({
   saveFileAction,
   refreshFileAction,
   clearDocumentAction,
+  setActiveDocumentAction,
+  closeDocumentAction,
   openRecentAction,
   clearRecentAction,
   undoAction,
@@ -100,10 +110,11 @@ export const MarkdownActiveDocument = ({
   const displayedViewMode = previewDetached ? "editor" : viewMode;
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <MarkdownToolbar
         activeFile={activeFile}
         content={content}
+        openDocumentsCount={openDocuments.length}
         recentFiles={recentFiles}
         isBusy={isBusy}
         openFileAction={openFileAction}
@@ -120,9 +131,16 @@ export const MarkdownActiveDocument = ({
         toggleSyncScrollAction={toggleSyncScrollAction}
       />
 
+      <MarkdownDocumentTabs
+        openDocuments={openDocuments}
+        activeDocumentId={activeDocumentId}
+        setActiveDocumentAction={setActiveDocumentAction}
+        closeDocumentAction={closeDocumentAction}
+      />
+
       <ResizablePanelGroup
         orientation="horizontal"
-        className="flex-1 min-h-0 bg-background"
+        className="min-h-0 flex-1 bg-background"
       >
         {displayedViewMode !== "preview" ? (
           <ResizablePanel

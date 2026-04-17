@@ -2,7 +2,6 @@
 
 import { MarkdownActiveDocument } from "@/components/markdown-active-document";
 import { MarkdownEmptyState } from "@/components/markdown-empty-state";
-import { MarkdownImportSelectionDialog } from "@/components/markdown-import-selection-dialog";
 import { MarkdownRecentFiles } from "@/components/markdown-recent-files";
 import { MarkdownRemoteSelectionDialog } from "@/components/markdown-remote-selection-dialog";
 import { Spinner } from "@/components/ui/spinner";
@@ -36,9 +35,10 @@ const defaultDocumentTitle = ".MD";
 
 export const MarkdownApp = () => {
   const {
+    openDocuments,
+    activeDocumentId,
     content,
     activeFile,
-    pendingImports,
     pendingRemoteOpen,
     recentFiles,
     hydrated,
@@ -52,14 +52,14 @@ export const MarkdownApp = () => {
     openFromUrl,
     openDeepLinkUrl,
     openDroppedFiles,
-    openPendingImport,
     openPendingRemoteFile,
     reopenRecentFile,
     createNewFile,
     saveActiveFile,
+    setActiveDocument,
+    closeDocument,
     removeRecentFile,
     clearRecentFiles,
-    clearPendingImports,
     clearPendingRemoteOpen,
     clearDocument,
   } = useMarkdownStore();
@@ -71,21 +71,26 @@ export const MarkdownApp = () => {
   const syncScrollEnabled = useMarkdownUiStore(
     (state) => state.syncScrollEnabled
   );
+
   const setViewMode = useMarkdownUiStore((state) => state.setViewMode);
+
   const toggleSyncScroll = useMarkdownUiStore(
     (state) => state.toggleSyncScroll
   );
+
   const [isDragActive, setIsDragActive] = useState(false);
   const [previewDetached, setPreviewDetached] = useState(false);
   const [uiError, setUiError] = useState<string | null>(null);
-  const [editorSelection, setEditorSelection] =
-    useState<MarkdownViewerSelection | null>(null);
+  const [editorSelection, setEditorSelection] = useState<MarkdownViewerSelection | null>(null);
+
   const attemptedDeepLinkRef = useRef<string | null>(null);
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const searchParamsKey = searchParams.toString();
+
   const parsedDeepLink = useMemo(
-    () => extractMarkdownDeepLink(pathname, new URLSearchParams(searchParamsKey)),
+    () =>
+      extractMarkdownDeepLink(pathname, new URLSearchParams(searchParamsKey)),
     [pathname, searchParamsKey]
   );
 
@@ -246,7 +251,10 @@ export const MarkdownApp = () => {
     (event: ReactDragEvent<HTMLDivElement>) => {
       event.preventDefault();
 
-      if (event.currentTarget instanceof HTMLElement && event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      if (
+        event.currentTarget instanceof HTMLElement &&
+        event.currentTarget.contains(event.relatedTarget as Node | null)
+      ) {
         return;
       }
 
@@ -296,7 +304,12 @@ export const MarkdownApp = () => {
   }, []);
 
   const headingAction = useCallback((level: 1 | 2 | 3 | 4 | 5 | 6) => {
-    insertBlockAction(editorRef.current, `${"#".repeat(level)} `, "", "Heading");
+    insertBlockAction(
+      editorRef.current,
+      `${"#".repeat(level)} `,
+      "",
+      "Heading"
+    );
   }, []);
 
   const inlineCodeAction = useCallback(() => {
@@ -338,7 +351,7 @@ export const MarkdownApp = () => {
   return (
     <div
       className={cn(
-        "flex min-h-svh flex-col relative",
+        "relative flex min-h-svh flex-col",
         activeFile ? "h-svh p-0" : "gap-4 p-4"
       )}
       onDragOver={handleDragOver}
@@ -348,7 +361,7 @@ export const MarkdownApp = () => {
       {error || uiError ? (
         <div className="absolute right-4 bottom-4 z-50 flex flex-col gap-3">
           {error ? (
-            <div className="flex mx-auto items-center gap-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive backdrop-blur-xl">
+            <div className="mx-auto flex items-center gap-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive backdrop-blur-xl">
               <div className="flex items-center gap-2">
                 <TriangleAlertIcon className="size-4" />
                 {error}
@@ -361,7 +374,7 @@ export const MarkdownApp = () => {
           ) : null}
 
           {uiError ? (
-            <div className="flex mx-auto items-center gap-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive backdrop-blur-xl">
+            <div className="mx-auto flex items-center gap-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive backdrop-blur-xl">
               <div className="flex items-center gap-2">
                 <TriangleAlertIcon className="size-4" />
                 {uiError}
@@ -378,6 +391,8 @@ export const MarkdownApp = () => {
       {activeFile ? (
         <MarkdownActiveDocument
           activeFile={activeFile}
+          openDocuments={openDocuments}
+          activeDocumentId={activeDocumentId}
           recentFiles={recentFiles}
           isBusy={isBusy}
           content={content}
@@ -403,6 +418,8 @@ export const MarkdownApp = () => {
           saveFileAction={saveActiveFile}
           refreshFileAction={handleRefresh}
           clearDocumentAction={clearDocument}
+          setActiveDocumentAction={setActiveDocument}
+          closeDocumentAction={closeDocument}
           openRecentAction={reopenRecentFile}
           clearRecentAction={clearRecentFiles}
           undoAction={undoAction}
@@ -468,11 +485,6 @@ export const MarkdownApp = () => {
         </div>
       )}
 
-      <MarkdownImportSelectionDialog
-        pendingImports={pendingImports}
-        openImportAction={openPendingImport}
-        clearPendingImportsAction={clearPendingImports}
-      />
       <MarkdownRemoteSelectionDialog
         isBusy={isBusy}
         files={pendingRemoteOpen?.files ?? []}
