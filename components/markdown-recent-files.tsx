@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import {
   FilePlusIcon,
   HistoryIcon,
@@ -7,6 +8,7 @@ import {
   XIcon
 } from "lucide-react";
 
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,9 +38,6 @@ const compactNumberFormatter = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 1,
 });
 
-const formatRecentFileSecondaryMeta = (file: RecentMarkdownFile) =>
-  file.path ?? `Opened ${new Date(file.lastOpenedAt).toLocaleDateString()}`;
-
 export const MarkdownRecentFiles = ({
   recentFiles,
   openRecentAction,
@@ -46,6 +45,7 @@ export const MarkdownRecentFiles = ({
   clearRecentAction,
 }: MarkdownRecentFilesProps) => {
   const hasRecentFiles = recentFiles.length > 0;
+  const [isConfirmOpen, setIsConfirmOpen] = React.useState(false);
 
   return (
     <Card className="w-full text-left" size="sm">
@@ -65,15 +65,23 @@ export const MarkdownRecentFiles = ({
               </div>
             </div>
 
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={clearRecentAction}
+            <ConfirmDialog
+              open={isConfirmOpen}
+              onOpenChange={setIsConfirmOpen}
+              title="Clear recent history?"
+              content="This removes every recent file entry from the list."
+              confirmButton="Clear history"
+              onConfirm={clearRecentAction}
             >
-              <Trash2Icon data-icon="inline-start" />
-              Clear history
-            </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+              >
+                <Trash2Icon data-icon="inline-start" />
+                Clear history
+              </Button>
+            </ConfirmDialog>
           </div>
         </CardHeader>
       ) : null}

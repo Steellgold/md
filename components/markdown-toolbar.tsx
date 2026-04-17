@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { MarkdownOpenUrlDialog } from "@/components/markdown-open-url-dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -102,6 +103,8 @@ export const MarkdownToolbar = ({
   const secondaryLabel = buildActiveDocumentMeta(content, activeFile);
   const canSaveFile = activeFile?.source !== "url";
   const refreshLabel = activeFile?.source === "url" ? "Reload URL" : "Reopen file";
+  const [isClearHistoryConfirmOpen, setIsClearHistoryConfirmOpen] =
+    React.useState(false);
 
   return (
     <div className="border-b bg-background/80 px-4 py-3 backdrop-blur">
@@ -198,7 +201,7 @@ export const MarkdownToolbar = ({
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    onSelect={clearRecentAction}
+                    onSelect={() => setIsClearHistoryConfirmOpen(true)}
                     variant="destructive"
                   >
                     <Trash2Icon />
@@ -208,6 +211,15 @@ export const MarkdownToolbar = ({
               ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <ConfirmDialog
+            open={isClearHistoryConfirmOpen}
+            onOpenChange={setIsClearHistoryConfirmOpen}
+            title="Clear recent history?"
+            content="This removes every recent file entry from the history menu."
+            confirmButton="Clear history"
+            onConfirm={clearRecentAction}
+          />
 
           <Button variant="outline" onClick={openFileAction} disabled={isBusy}>
             <FolderOpenIcon data-icon="inline-start" />
