@@ -33,6 +33,11 @@ export type MarkdownOpenFromUrlActionResult =
       status: "error";
     };
 
+export type PendingMarkdownImport = {
+  entry: RecentMarkdownFile;
+  content: string;
+};
+
 export type OpenMarkdownResult = {
   entry: RecentMarkdownFile;
   content: string;
@@ -85,6 +90,7 @@ export type DataTransferItemWithHandle = DataTransferItem & {
 export type MarkdownStore = {
   content: string;
   activeFile: RecentMarkdownFile | null;
+  pendingImports: PendingMarkdownImport[];
   recentFiles: RecentMarkdownFile[];
   hydrated: boolean;
   isBusy: boolean;
@@ -98,10 +104,12 @@ export type MarkdownStore = {
     url: string,
     fileName?: string
   ) => Promise<MarkdownOpenFromUrlActionResult>;
-  openDroppedFile: (
-    file: File,
+  openDroppedFiles: (
+    files: File[],
     items?: DataTransferItemList | null
   ) => Promise<void>;
+  openPendingImport: (id: string) => void;
+  clearPendingImports: () => void;
   reopenRecentFile: (id: string) => Promise<void>;
   createNewFile: () => Promise<void>;
   saveActiveFile: () => Promise<void>;

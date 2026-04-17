@@ -5,6 +5,7 @@ import * as React from "react";
 
 import { MarkdownActiveDocument } from "@/components/markdown-active-document";
 import { MarkdownEmptyState } from "@/components/markdown-empty-state";
+import { MarkdownImportSelectionDialog } from "@/components/markdown-import-selection-dialog";
 import { MarkdownRecentFiles } from "@/components/markdown-recent-files";
 import { Spinner } from "@/components/ui/spinner";
 import { useMarkdownHotkeys } from "@/hooks/use-markdown-hotkeys";
@@ -24,6 +25,7 @@ export const MarkdownApp = () => {
   const {
     content,
     activeFile,
+    pendingImports,
     recentFiles,
     hydrated,
     isBusy,
@@ -34,12 +36,14 @@ export const MarkdownApp = () => {
     setContent,
     openWithPicker,
     openFromUrl,
-    openDroppedFile,
+    openDroppedFiles,
+    openPendingImport,
     reopenRecentFile,
     createNewFile,
     saveActiveFile,
     removeRecentFile,
     clearRecentFiles,
+    clearPendingImports,
     clearDocument,
   } = useMarkdownStore();
 
@@ -105,15 +109,15 @@ export const MarkdownApp = () => {
       event.preventDefault();
       setIsDragActive(false);
 
-      const [file] = Array.from(event.dataTransfer.files);
+      const files = Array.from(event.dataTransfer.files);
 
-      if (!file) {
+      if (files.length === 0) {
         return;
       }
 
-      await openDroppedFile(file, event.dataTransfer.items);
+      await openDroppedFiles(files, event.dataTransfer.items);
     },
-    [openDroppedFile]
+    [openDroppedFiles]
   );
 
   const handleRefresh = React.useCallback(async () => {
@@ -249,6 +253,12 @@ export const MarkdownApp = () => {
           </div>
         </div>
       )}
+
+      <MarkdownImportSelectionDialog
+        pendingImports={pendingImports}
+        openImportAction={openPendingImport}
+        clearPendingImportsAction={clearPendingImports}
+      />
     </div>
   );
 };

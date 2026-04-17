@@ -8,7 +8,7 @@ import {
   createNewMarkdownFile,
   getRecentMarkdownFiles,
   openMarkdownFromUrl,
-  openDroppedMarkdownFile,
+  openDroppedMarkdownFiles,
   openMarkdownWithPicker,
   removeRecentMarkdownFile,
   reopenRecentMarkdownFile,
@@ -30,18 +30,22 @@ const getResolvedState = (
 ) => ({
   activeFile: entry,
   content,
+  pendingImports: [],
   recentFiles,
   isBusy: false,
+  error: null,
 });
 
 const getErrorState = (error: unknown) => ({
   error: getUnknownErrorMessage(error),
   isBusy: false,
+  pendingImports: [],
 });
 
 export const useMarkdownStore = create<MarkdownStore>((set) => ({
   content: "",
   activeFile: null,
+  pendingImports: [],
   recentFiles: [],
   hydrated: false,
   isBusy: false,
@@ -50,6 +54,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
   hydrate: () =>
     set({
       hydrated: true,
+      pendingImports: [],
       recentFiles: getRecentMarkdownFiles(),
       canPersistFiles: canUsePersistentLocalFiles(),
     }),
@@ -82,8 +87,22 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
     set(getBusyState());
 
     try {
-      const { entry, content, recentFiles } = await openMarkdownWithPicker();
-      set(getResolvedState(entry, content, recentFiles));
+      const result = await openMarkdownWithPicker();
+
+      if (result.status === "selection-required") {
+        set({
+          pendingImports: result.documents,
+          recentFiles: result.recentFiles,
+          isBusy: false,
+          error: null,
+        });
+        return;
+      }
+
+      set({
+        ...getResolvedState(result.entry, result.content, result.recentFiles),
+        pendingImports: [],
+      });
     } catch (error) {
       set(getErrorState(error));
     }
@@ -96,6 +115,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
 
       if (result.status === "selection-required") {
         set({
+          pendingImports: [],
           isBusy: false,
           error: null,
         });
@@ -110,19 +130,49 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       return { status: "error" };
     }
   },
-  openDroppedFile: async (file, items) => {
+  openDroppedFiles: async (files, items) => {
     set(getBusyState());
 
     try {
-      const { entry, content, recentFiles } = await openDroppedMarkdownFile(
-        file,
-        items
-      );
-      set(getResolvedState(entry, content, recentFiles));
+      const result = await openDroppedMarkdownFiles(files, items);
+
+      if (result.status === "selection-required") {
+        set({
+          pendingImports: result.documents,
+          recentFiles: result.recentFiles,
+          isBusy: false,
+          error: null,
+        });
+        return;
+      }
+
+      set({
+        ...getResolvedState(result.entry, result.content, result.recentFiles),
+        pendingImports: [],
+      });
     } catch (error) {
       set(getErrorState(error));
     }
   },
+  openPendingImport: (id) =>
+    set((state) => {
+      const selectedImport = state.pendingImports.find(
+        (pendingImport) => pendingImport.entry.id === id
+      );
+
+      if (!selectedImport) {
+        return state;
+      }
+
+      return {
+        activeFile: selectedImport.entry,
+        content: selectedImport.content,
+        isBusy: false,
+        pendingImports: [],
+        error: null,
+      };
+    }),
+  clearPendingImports: () => set({ pendingImports: [] }),
   reopenRecentFile: async (id) => {
     set(getBusyState());
 
@@ -178,6 +228,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       set({
         recentFiles,
         isBusy: false,
+        pendingImports: [],
         error: null,
       });
     } catch (error) {
@@ -192,6 +243,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       set({
         recentFiles: [],
         isBusy: false,
+        pendingImports: [],
         error: null,
       });
     } catch (error) {
@@ -207,6 +259,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       return {
         content: "",
         activeFile: null,
+        pendingImports: [],
         error: null,
       };
     }),

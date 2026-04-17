@@ -10,6 +10,7 @@ import {
   type DataTransferItemWithHandle,
   type MarkdownFileHandle,
   type OpenFilePickerOptions,
+  type PendingMarkdownImport,
   type PermissionMode,
   type PickerOptions,
   type RecentMarkdownFile,
@@ -269,6 +270,33 @@ const persistRecentEntry = (entry: RecentMarkdownFile) => {
   return nextFiles;
 };
 
+const persistRecentEntries = (entries: RecentMarkdownFile[]) => {
+  const nextFiles = entries.reduce(
+    (files, entry) => upsertRecentFile(files, entry),
+    readRecentFilesFromStorage()
+  );
+
+  writeRecentFilesToStorage(nextFiles);
+  return nextFiles;
+};
+
+const createEntryFromFile = (
+  file: File,
+  content: string,
+  source: RecentMarkdownFile["source"]
+) => {
+  return {
+    id: crypto.randomUUID(),
+    name: file.name,
+    path: file.webkitRelativePath || null,
+    url: null,
+    urlFileName: null,
+    lastOpenedAt: new Date().toISOString(),
+    source,
+    stats: getMarkdownDocumentStats(content),
+  } satisfies RecentMarkdownFile;
+};
+
 export const openMarkdownWithPicker = async (options: PickerOptions = {}) => {
   if (!supportsOpenFilePicker()) {
     throw new Error(
@@ -276,35 +304,63 @@ export const openMarkdownWithPicker = async (options: PickerOptions = {}) => {
     );
   }
 
-  const [handle] = await window.showOpenFilePicker!({
+  const handles = await window.showOpenFilePicker!({
     id: options.id ?? "markdown-open",
-    multiple: false,
+    multiple: true,
     excludeAcceptAllOption: true,
     types: MARKDOWN_FILE_TYPES,
   });
 
-  const hasPermission = await ensurePermission(handle as MarkdownFileHandle);
-
-  if (!hasPermission) {
-    throw new Error("Read permission was denied.");
+  if (handles.length === 0) {
+    throw new Error("No files were selected.");
   }
 
-  const content = await readContent(handle);
-  const existingEntry = await findMatchingRecentFile(handle);
-  const entry = await createEntryFromHandle(
-    handle,
-    options.source ?? "picker",
-    content,
-    existingEntry?.id ?? options.id
-  );
+  const documents: PendingMarkdownImport[] = [];
 
-  await saveHandle(entry.id, handle);
-  const recentFiles = persistRecentEntry({
-    ...entry,
-    path: existingEntry?.path ?? entry.path,
-  });
+  for (const handle of handles) {
+    const hasPermission = await ensurePermission(handle as MarkdownFileHandle);
 
-  return { entry, content, recentFiles };
+    if (!hasPermission) {
+      throw new Error("Read permission was denied.");
+    }
+
+    const content = await readContent(handle);
+    const existingEntry = await findMatchingRecentFile(handle);
+    const entry = await createEntryFromHandle(
+      handle,
+      options.source ?? "picker",
+      content,
+      existingEntry?.id ?? options.id
+    );
+
+    await saveHandle(entry.id, handle);
+    documents.push({
+      entry: {
+        ...entry,
+        path: existingEntry?.path ?? entry.path,
+      },
+      content,
+    });
+  }
+
+  const recentFiles = persistRecentEntries(documents.map((document) => document.entry));
+
+  if (documents.length === 1) {
+    const [document] = documents;
+
+    return {
+      status: "opened" as const,
+      entry: document.entry,
+      content: document.content,
+      recentFiles,
+    };
+  }
+
+  return {
+    status: "selection-required" as const,
+    documents,
+    recentFiles,
+  };
 };
 
 export const openMarkdownFromUrl = async (
@@ -351,11 +407,15 @@ export const openMarkdownFromUrl = async (
   };
 };
 
-export const openDroppedMarkdownFile = async (
-  file: File,
+export const openDroppedMarkdownFiles = async (
+  files: File[],
   items?: DataTransferItemList | null
 ) => {
-  let handle: FileSystemFileHandle | null = null;
+  if (files.length === 0) {
+    throw new Error("No files were provided.");
+  }
+
+  const handles: Array<FileSystemFileHandle | null> = [];
 
   if (items) {
     for (const item of Array.from(items)) {
@@ -365,47 +425,64 @@ export const openDroppedMarkdownFile = async (
         : null;
 
       if (maybeHandle?.kind === "file") {
-        handle = maybeHandle as FileSystemFileHandle;
-        break;
+        handles.push(maybeHandle as FileSystemFileHandle);
       }
     }
   }
 
-  const content = await file.text();
+  const documents: PendingMarkdownImport[] = [];
+  const persistentEntries: RecentMarkdownFile[] = [];
 
-  if (!handle) {
+  for (const [index, file] of files.entries()) {
+    const handle = handles[index] ?? null;
+    const content = await file.text();
+
+    if (!handle) {
+      documents.push({
+        entry: createEntryFromFile(file, content, "drop"),
+        content,
+      });
+      continue;
+    }
+
+    const hasPermission = await ensurePermission(handle as MarkdownFileHandle);
+
+    if (!hasPermission) {
+      throw new Error("Read permission for the dropped file was denied.");
+    }
+
+    const existingEntry = await findMatchingRecentFile(handle);
+    const entry = {
+      ...(await createEntryFromHandle(handle, "drop", content, existingEntry?.id)),
+      path: file.webkitRelativePath || existingEntry?.path || null,
+    } satisfies RecentMarkdownFile;
+
+    await saveHandle(entry.id, handle);
+    documents.push({ entry, content });
+    persistentEntries.push(entry);
+  }
+
+  const recentFiles =
+    persistentEntries.length > 0
+      ? persistRecentEntries(persistentEntries)
+      : readRecentFilesFromStorage();
+
+  if (documents.length === 1) {
+    const [document] = documents;
+
     return {
-      entry: {
-        id: crypto.randomUUID(),
-        name: file.name,
-        path: file.webkitRelativePath || null,
-        url: null,
-        urlFileName: null,
-        lastOpenedAt: new Date().toISOString(),
-        source: "drop",
-        stats: getMarkdownDocumentStats(content),
-      } satisfies RecentMarkdownFile,
-      content,
-      recentFiles: readRecentFilesFromStorage(),
+      status: "opened" as const,
+      entry: document.entry,
+      content: document.content,
+      recentFiles,
     };
   }
 
-  const hasPermission = await ensurePermission(handle as MarkdownFileHandle);
-
-  if (!hasPermission) {
-    throw new Error("Read permission for the dropped file was denied.");
-  }
-
-  const existingEntry = await findMatchingRecentFile(handle);
-  const entry = {
-    ...(await createEntryFromHandle(handle, "drop", content, existingEntry?.id)),
-    path: file.webkitRelativePath || existingEntry?.path || null,
-  } satisfies RecentMarkdownFile;
-
-  await saveHandle(entry.id, handle);
-  const recentFiles = persistRecentEntry(entry);
-
-  return { entry, content, recentFiles };
+  return {
+    status: "selection-required" as const,
+    documents,
+    recentFiles,
+  };
 };
 
 export const reopenRecentMarkdownFile = async (id: string) => {
