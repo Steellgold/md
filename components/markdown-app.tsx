@@ -1,6 +1,6 @@
 "use client";
 
-import { TriangleAlertIcon } from "lucide-react";
+import { ArrowUpRightIcon, TriangleAlertIcon } from "lucide-react";
 import * as React from "react";
 
 import { MarkdownActiveDocument } from "@/components/markdown-active-document";
@@ -16,8 +16,8 @@ import {
   runEditorCommandAction,
   wrapSelectionAction,
 } from "@/lib/markdown-editor";
-import { useMarkdownUiStore } from "@/lib/markdown-ui-store";
 import { useMarkdownStore } from "@/lib/markdown-store";
+import { useMarkdownUiStore } from "@/lib/markdown-ui-store";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 
@@ -241,24 +241,39 @@ export const MarkdownApp = () => {
           bulletListAction={bulletListAction}
         />
       ) : (
-        <div className="flex flex-1 items-center justify-center">
-          <div className="flex w-full max-w-3xl flex-col gap-4">
-            <MarkdownEmptyState
-              isDragActive={isDragActive}
-              isBusy={isBusy}
-              canPersistFiles={canPersistFiles}
-              openFileAction={openWithPicker}
-              openUrlAction={openFromUrl}
-              createNewAction={createNewFile}
-            />
+        <div className="flex flex-1 flex-col">
+          <div className="flex flex-1 items-center justify-center">
+            <div className="flex w-full max-w-3xl flex-col gap-4">
+              <MarkdownEmptyState
+                isDragActive={isDragActive}
+                isBusy={isBusy}
+                canPersistFiles={canPersistFiles}
+                openFileAction={openWithPicker}
+                openUrlAction={openFromUrl}
+                createNewAction={createNewFile}
+              />
 
-            <MarkdownRecentFiles
-              recentFiles={recentFiles}
-              openRecentAction={reopenRecentFile}
-              removeRecentAction={removeRecentFile}
-              clearRecentAction={clearRecentFiles}
-            />
+              <MarkdownRecentFiles
+                recentFiles={recentFiles}
+                openRecentAction={reopenRecentFile}
+                removeRecentAction={removeRecentFile}
+                clearRecentAction={clearRecentFiles}
+              />
+            </div>
           </div>
+
+          <footer className="pb-3 text-center text-xs text-muted-foreground">
+            Made by{" "}
+            <a
+              href="https://github.com/steellgold"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 font-medium text-foreground transition-colors hover:text-primary"
+            >
+              Gaëtan H
+              <ArrowUpRightIcon className="size-3" />
+            </a>
+          </footer>
         </div>
       )}
 
