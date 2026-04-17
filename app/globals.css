@@ -208,6 +208,25 @@
     font-weight: 700;
 }
 
+.markdown-preview .md-viewer-selection {
+    border-radius: 0.2rem;
+    background: color-mix(in oklab, var(--primary) 12%, transparent);
+    text-decoration-line: underline;
+    text-decoration-color: color-mix(in oklab, var(--primary) 70%, transparent);
+    text-decoration-thickness: 3px;
+    text-underline-offset: 0.22em;
+}
+
+.markdown-preview .md-viewer-caret {
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    margin-inline: 1px;
+    border-radius: 9999px;
+    vertical-align: -0.1em;
+    background: var(--primary);
+}
+
 .dark .markdown-preview .hljs {
     color: #e6edf3;
 }

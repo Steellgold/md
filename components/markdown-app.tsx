@@ -22,6 +22,7 @@ import {
 import { useMarkdownStore } from "@/lib/markdown-store";
 import { useMarkdownUiStore } from "@/lib/markdown-ui-store";
 import { cn } from "@/lib/utils";
+import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection";
 import { Button } from "./ui/button";
 
 const defaultDocumentTitle = ".MD";
@@ -70,6 +71,8 @@ export const MarkdownApp = () => {
   const [isDragActive, setIsDragActive] = React.useState(false);
   const [previewDetached, setPreviewDetached] = React.useState(false);
   const [uiError, setUiError] = React.useState<string | null>(null);
+  const [editorSelection, setEditorSelection] =
+    React.useState<MarkdownViewerSelection | null>(null);
   const attemptedDeepLinkRef = React.useRef<string | null>(null);
   const editorRef = React.useRef<HTMLTextAreaElement | null>(null);
   const previewRef = React.useRef<HTMLDivElement | null>(null);
@@ -133,11 +136,71 @@ export const MarkdownApp = () => {
     [setContent]
   );
 
+  const clearEditorSelection = React.useCallback(() => {
+    setEditorSelection(null);
+  }, []);
+
+  const syncEditorSelection = React.useCallback(
+    (editor: HTMLTextAreaElement | null) => {
+      if (!editor) {
+        return;
+      }
+
+      const nextSelection = {
+        start: editor.selectionStart,
+        end: editor.selectionEnd,
+      };
+
+      setEditorSelection((currentValue) =>
+        currentValue?.start === nextSelection.start &&
+        currentValue?.end === nextSelection.end
+          ? currentValue
+          : nextSelection
+      );
+    },
+    []
+  );
+
   const { handleEditorScroll, handlePreviewScroll } = useScrollSync({
     syncScrollEnabled,
     editorRef,
     previewRef,
   });
+
+  React.useEffect(() => {
+    if (!activeFile) {
+      setEditorSelection(null);
+      return;
+    }
+
+    if (!editorSelection) {
+      return;
+    }
+
+    syncEditorSelection(editorRef.current);
+  }, [activeFile, content, editorSelection, syncEditorSelection]);
+
+  React.useEffect(() => {
+    if (!activeFile) {
+      return;
+    }
+
+    const handleSelectionChange = () => {
+      const editorElement = editorRef.current;
+
+      if (!editorElement || document.activeElement !== editorElement) {
+        return;
+      }
+
+      syncEditorSelection(editorElement);
+    };
+
+    document.addEventListener("selectionchange", handleSelectionChange);
+
+    return () => {
+      document.removeEventListener("selectionchange", handleSelectionChange);
+    };
+  }, [activeFile, syncEditorSelection]);
 
   const handleDragOver = React.useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {
@@ -289,8 +352,11 @@ export const MarkdownApp = () => {
           editorRef={editorRef}
           previewRef={previewRef}
           onEditorChange={handleEditorChange}
+          onEditorBlur={clearEditorSelection}
+          onEditorSelectionChange={syncEditorSelection}
           onEditorScroll={handleEditorScroll}
           onPreviewScroll={handlePreviewScroll}
+          editorSelection={editorSelection}
           viewMode={viewMode}
           setViewModeAction={setViewMode}
           previewDetached={previewDetached}

@@ -12,6 +12,7 @@ import {
   type MarkdownOpenFromUrlActionResult,
   type RecentMarkdownFile,
 } from "@/types/markdown";
+import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection";
 
 import { type ViewMode } from "../types/view-mode";
 import { MarkdownEditorPanel } from "./markdown-editor-panel";
@@ -25,8 +26,11 @@ type MarkdownActiveDocumentProps = {
   editorRef: React.RefObject<HTMLTextAreaElement | null>;
   previewRef: React.RefObject<HTMLDivElement | null>;
   onEditorChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  onEditorBlur: () => void;
+  onEditorSelectionChange: (editor: HTMLTextAreaElement) => void;
   onEditorScroll: () => void;
   onPreviewScroll: () => void;
+  editorSelection: MarkdownViewerSelection | null;
   viewMode: ViewMode;
   setViewModeAction: (value: ViewMode) => void;
   previewDetached: boolean;
@@ -65,8 +69,11 @@ export const MarkdownActiveDocument = ({
   editorRef,
   previewRef,
   onEditorChange,
+  onEditorBlur,
+  onEditorSelectionChange,
   onEditorScroll,
   onPreviewScroll,
+  editorSelection,
   viewMode,
   setViewModeAction,
   previewDetached,
@@ -135,6 +142,8 @@ export const MarkdownActiveDocument = ({
               editorRef={editorRef}
               onTopbarHeightChange={setEditorTopbarHeight}
               onChange={onEditorChange}
+              onBlur={onEditorBlur}
+              onSelectionChange={onEditorSelectionChange}
               onScroll={onEditorScroll}
               undoAction={undoAction}
               redoAction={redoAction}
@@ -162,6 +171,7 @@ export const MarkdownActiveDocument = ({
             <MarkdownPreviewPanel
               content={content}
               previewRef={previewRef}
+              editorSelection={editorSelection}
               topOverlayHeight={editorTopbarHeight}
               onScroll={onPreviewScroll}
             />
@@ -178,6 +188,7 @@ export const MarkdownActiveDocument = ({
         <MarkdownPreviewPanel
           content={content}
           previewRef={previewRef}
+          editorSelection={editorSelection}
           onScroll={onPreviewScroll}
         />
       </DetachedWindowPortal>

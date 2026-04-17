@@ -34,6 +34,8 @@ type MarkdownEditorPanelProps = {
   editorRef: React.RefObject<HTMLTextAreaElement | null>;
   onTopbarHeightChange?: (height: number) => void;
   onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  onBlur: () => void;
+  onSelectionChange: (editor: HTMLTextAreaElement) => void;
   onScroll: () => void;
   undoAction: () => void;
   redoAction: () => void;
@@ -91,6 +93,8 @@ export const MarkdownEditorPanel = ({
   editorRef,
   onTopbarHeightChange,
   onChange,
+  onBlur,
+  onSelectionChange,
   onScroll,
   undoAction,
   redoAction,
@@ -135,6 +139,21 @@ export const MarkdownEditorPanel = ({
       observer.disconnect();
     };
   }, [onTopbarHeightChange]);
+
+  const handleEditorChange = React.useCallback(
+    (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+      onChange(event);
+      onSelectionChange(event.currentTarget);
+    },
+    [onChange, onSelectionChange]
+  );
+
+  const handleEditorSelectionChange = React.useCallback(
+    (event: React.SyntheticEvent<HTMLTextAreaElement>) => {
+      onSelectionChange(event.currentTarget);
+    },
+    [onSelectionChange]
+  );
 
   return (
     <Card className="flex h-full min-h-0 flex-col gap-0 rounded-none border-0 bg-transparent py-0 ring-0">
@@ -213,8 +232,13 @@ export const MarkdownEditorPanel = ({
           <InputGroupTextarea
             ref={editorRef}
             value={content}
-            onChange={onChange}
+            onChange={handleEditorChange}
+            onBlur={onBlur}
             onScroll={onScroll}
+            onFocus={handleEditorSelectionChange}
+            onKeyUp={handleEditorSelectionChange}
+            onMouseUp={handleEditorSelectionChange}
+            onSelect={handleEditorSelectionChange}
             placeholder="Write or paste your markdown here..."
             className="h-full min-h-0 flex-1 basis-0 px-6 py-5 font-mono text-sm"
           />
