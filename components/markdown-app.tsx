@@ -148,8 +148,8 @@ export const MarkdownApp = () => {
       };
 
       setEditorSelection((currentValue) =>
-        currentValue.start === nextSelection.start &&
-        currentValue.end === nextSelection.end
+        currentValue?.start === nextSelection.start &&
+        currentValue?.end === nextSelection.end
           ? currentValue
           : nextSelection
       );
