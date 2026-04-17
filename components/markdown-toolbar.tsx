@@ -122,7 +122,7 @@ export const MarkdownToolbar = ({
             variant="outline"
             size="icon"
             onClick={goHomeAction}
-            title={closeLabel}
+            title="Back to home"
           >
             <HouseIcon />
           </Button>

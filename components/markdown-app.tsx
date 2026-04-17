@@ -56,6 +56,7 @@ export const MarkdownApp = () => {
     reopenRecentFile,
     createNewFile,
     saveActiveFile,
+    goHome,
     setActiveDocument,
     closeDocument,
     removeRecentFile,
@@ -414,7 +415,7 @@ export const MarkdownApp = () => {
           toggleSyncScrollAction={toggleSyncScroll}
           openFileAction={openWithPicker}
           openUrlAction={openFromUrl}
-          goHomeAction={clearDocument}
+          goHomeAction={goHome}
           saveFileAction={saveActiveFile}
           refreshFileAction={handleRefresh}
           clearDocumentAction={clearDocument}

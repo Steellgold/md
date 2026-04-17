@@ -425,6 +425,14 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       set(getErrorState(error));
     }
   },
+  goHome: () =>
+    set((state) => {
+      state.openDocuments.forEach((document) => {
+        void syncRecentMarkdownFileSnapshot(document.id, document.content);
+      });
+
+      return buildDocumentState([], null, state.recentFiles);
+    }),
   closeDocument: (id) =>
     set((state) => {
       const documentToClose =

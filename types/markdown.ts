@@ -132,6 +132,7 @@ export type MarkdownStore = {
   reopenRecentFile: (id: string) => Promise<void>;
   createNewFile: () => Promise<void>;
   saveActiveFile: () => Promise<void>;
+  goHome: () => void;
   closeDocument: (id: string) => void;
   removeRecentFile: (id: string) => Promise<void>;
   clearRecentFiles: () => Promise<void>;

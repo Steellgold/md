@@ -23,8 +23,8 @@ export const MarkdownDocumentTabs = ({
   }
 
   return (
-    <div className="border-b bg-muted/30 px-3 py-2">
-      <div className="flex gap-2 overflow-x-auto pb-1">
+    <div className="border-b bg-muted/20">
+      <div className="flex h-11 overflow-x-auto">
         {openDocuments.map((document) => {
           const isActive = document.id === activeDocumentId;
           const isRemoteDocument = document.file.source === "url";
@@ -34,19 +34,19 @@ export const MarkdownDocumentTabs = ({
             <div
               key={document.id}
               className={cn(
-                "group flex min-w-0 shrink-0 items-center gap-2 rounded-lg border px-2 py-1.5",
+                "group -mb-px flex h-full min-w-0 shrink-0 items-center gap-2 border-r px-3 first:border-l",
                 isActive
-                  ? "border-border bg-background shadow-sm"
-                  : "border-transparent bg-transparent hover:border-border/70 hover:bg-background/70"
+                  ? "border-border border-b-background bg-background"
+                  : "border-transparent bg-transparent hover:bg-background/60"
               )}
             >
               <button
                 type="button"
-                className="flex min-w-0 items-center gap-2 text-left"
+                className="flex h-full min-w-0 flex-1 items-center gap-2 text-left"
                 onClick={() => setActiveDocumentAction(document.id)}
               >
                 <SourceIcon className="size-4 shrink-0 text-muted-foreground" />
-                <span className="max-w-52 truncate text-sm font-medium">
+                <span className="max-w-56 truncate text-sm font-medium">
                   {document.file.name}
                 </span>
                 {document.isDirty ? (
@@ -61,7 +61,7 @@ export const MarkdownDocumentTabs = ({
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className="shrink-0"
+                className="h-7 w-7 shrink-0 rounded-none"
                 aria-label={`Close ${document.file.name}`}
                 title={`Close ${document.file.name}`}
                 onClick={() => closeDocumentAction(document.id)}
