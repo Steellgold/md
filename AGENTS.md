@@ -1,36 +1,26 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-
-This repository is a Next.js 16 App Router app for editing and previewing Markdown. Keep route code in `app/`, including the catch-all opener route in `app/[...open]/` and the remote import API in `app/api/open-from-url/route.ts`. Put feature UI in `components/`, shared shadcn primitives in `components/ui/`, reusable hooks in `hooks/`, state and helper logic in `lib/`, and shared types in `types/`. Static assets and favicons live in `public/`.
-
-Follow the existing naming pattern: domain files use `markdown-*` (for example `components/markdown-preview.tsx`), hooks use `use-*`, and shared imports should prefer the configured aliases such as `@/components`, `@/lib`, and `@/hooks`.
+This repository is a Next.js 16 App Router app for editing and previewing Markdown. Keep route files in `app/`, including the remote-open API in `app/api/open-from-url/`. Put feature components in `components/`, shared shadcn primitives in `components/ui/`, reusable hooks in `hooks/`, and Markdown/file-state helpers in `lib/`. Shared TypeScript types live in `types/`, and static assets such as icons and social images live in `public/`.
 
 ## Build, Test, and Development Commands
+Use Bun first in this repo because `bun.lock` is committed. `pnpm` is acceptable if Bun is unavailable.
 
-Use Bun by default in this repo; pnpm is acceptable if needed.
-
-- `bun dev` starts the local dev server with Turbopack.
-- `bun build` creates the production build.
-- `bun start` serves the production build locally.
-- `bun lint` runs ESLint across the project.
-- `bun typecheck` runs TypeScript with `--noEmit`.
-- `bun format` formats `*.ts` and `*.tsx` files with Prettier.
+- `bun dev`: start the local dev server with Turbopack.
+- `bun build`: create the production build.
+- `bun start`: run the production build locally.
+- `bun lint`: run ESLint across the project.
+- `bun typecheck`: run `tsc --noEmit`.
+- `bun run format`: format `*.ts` and `*.tsx` with Prettier.
 
 ## Coding Style & Naming Conventions
-
-TypeScript and TSX use 2-space indentation, semicolons, double quotes, trailing commas (`es5`), and an 80-character print width. Prettier is configured in `.prettierrc`, and `prettier-plugin-tailwindcss` sorts Tailwind classes automatically. ESLint extends Next.js core web vitals and TypeScript rules; fix lint errors before opening a PR.
-
-Prefer small, focused React components, keep server/client boundaries explicit, and keep reusable logic in `lib/` or `hooks/` instead of route files.
+The codebase uses TypeScript, React 19, Tailwind CSS 4, ESLint, and Prettier. Follow the existing formatter rules: 2-space indentation, 80-character line width, semicolons, double quotes, and trailing commas where valid. Keep component and hook logic functional and typed. Use kebab-case for filenames like `markdown-preview-panel.tsx`, PascalCase for exported components and types, and `use...` prefixes for hooks.
 
 ## Testing Guidelines
-
-There is no dedicated automated test suite yet. For every change, run at least `bun lint` and `bun typecheck`. For UI or editor behavior changes, manually verify file open/import flows, split view, preview rendering, and remote read-only behavior.
-
-If you add tests, colocate them with the feature as `*.test.ts` or `*.test.tsx`.
+There is no dedicated automated test suite yet. Before opening a PR, run `bun lint` and `bun typecheck`, then manually verify the main flows: local file open/save, drag-and-drop import, remote URL open, and editor/preview layout switching. If you add tests, prefer `*.test.ts` or `*.test.tsx` near the feature they cover.
 
 ## Commit & Pull Request Guidelines
+Recent history follows Conventional Commit style, often with scopes, for example `feat(preview): add detach preview button` or `refactor: reorganize imports`. Keep commit subjects imperative and focused on one change. Pull requests should include a short summary, validation steps, linked issues when relevant, and screenshots or short recordings for UI changes. Do not add `Co-authored-by` trailers.
 
-Git history follows Conventional Commit style with scopes, for example `feat(markdown): ...` or `fix(README.md): ...`. Keep commits focused and descriptive.
-
-PRs should include a short summary, linked issue when applicable, and screenshots or recordings for visible UI changes. Call out any changes to remote URL handling, browser file access, or environment variables such as `NEXT_PUBLIC_APP_URL`.
+## Agent-Specific Instructions
+Always check the nearest `AGENTS.md` or `CLAUDE.md` before editing. Prefer `bun` commands over `npm`. Keep remote URL handling defensive and preserve the current read-only behavior for remotely opened documents unless the task explicitly changes that behavior.
