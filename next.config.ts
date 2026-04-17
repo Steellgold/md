@@ -1,9 +1,11 @@
-import { NextConfig } from "next";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { NextConfig } from "next";
 
-const rootDirectory = fileURLToPath(new URL(".", import.meta.url));
+const rootDirectory = dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: rootDirectory,
   turbopack: {
     root: rootDirectory,
   },
