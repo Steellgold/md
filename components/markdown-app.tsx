@@ -340,16 +340,33 @@ export const MarkdownApp = () => {
           </div>
 
           <footer className="pb-3 text-center text-xs text-muted-foreground">
-            Made by{" "}
-            <a
-              href="https://github.com/steellgold"
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 font-medium text-foreground transition-colors hover:text-primary"
-            >
-              Gaëtan H
-              <ArrowUpRightIcon className="size-3" />
-            </a>
+            <div className="flex flex-col items-center gap-1">
+              <div>
+                Made by{" "}
+                <a
+                  href="https://github.com/steellgold"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 font-medium text-foreground transition-colors hover:text-primary hover:underline"
+                >
+                  Gaëtan H
+                  <ArrowUpRightIcon className="size-3" />
+                </a>
+              </div>
+
+              <div>
+                Contribute on{" "}
+                <a
+                  href="https://github.com/Steellgold/md"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 font-medium text-foreground transition-colors hover:text-primary hover:underline"
+                >
+                  GitHub
+                  <ArrowUpRightIcon className="size-3" />
+                </a>
+              </div>
+            </div>
           </footer>
         </div>
       )}
