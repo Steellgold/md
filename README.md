@@ -1,6 +1,4 @@
-# MD
-
-[![Open this file](./public/open-this.svg)](https://better-md.vercel.app/open/https://raw.githubusercontent.com/Steellgold/md/stable/README.md)
+# MD [![Open this file](./public/open-this.svg)](https://better-md.vercel.app/open/https://raw.githubusercontent.com/Steellgold/md/stable/README.md)
 
 Focused Markdown editor built with Next.js.
 
