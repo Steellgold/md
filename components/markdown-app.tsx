@@ -72,10 +72,7 @@ export const MarkdownApp = () => {
   const [previewDetached, setPreviewDetached] = React.useState(false);
   const [uiError, setUiError] = React.useState<string | null>(null);
   const [editorSelection, setEditorSelection] =
-    React.useState<MarkdownViewerSelection>({
-      start: 0,
-      end: 0,
-    });
+    React.useState<MarkdownViewerSelection | null>(null);
   const attemptedDeepLinkRef = React.useRef<string | null>(null);
   const editorRef = React.useRef<HTMLTextAreaElement | null>(null);
   const previewRef = React.useRef<HTMLDivElement | null>(null);
@@ -168,15 +165,16 @@ export const MarkdownApp = () => {
 
   React.useEffect(() => {
     if (!activeFile) {
-      setEditorSelection({
-        start: 0,
-        end: 0,
-      });
+      setEditorSelection(null);
+      return;
+    }
+
+    if (!editorSelection) {
       return;
     }
 
     syncEditorSelection(editorRef.current);
-  }, [activeFile, content, syncEditorSelection]);
+  }, [activeFile, content, editorSelection, syncEditorSelection]);
 
   const handleDragOver = React.useCallback(
     (event: React.DragEvent<HTMLDivElement>) => {

@@ -8,7 +8,7 @@ import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection"
 type MarkdownPreviewPanelProps = {
   content: string;
   previewRef: React.RefObject<HTMLDivElement | null>;
-  editorSelection: MarkdownViewerSelection;
+  editorSelection: MarkdownViewerSelection | null;
   topOverlayHeight?: number;
   onScroll: () => void;
 };

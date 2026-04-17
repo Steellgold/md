@@ -29,7 +29,7 @@ type MarkdownActiveDocumentProps = {
   onEditorSelectionChange: (editor: HTMLTextAreaElement) => void;
   onEditorScroll: () => void;
   onPreviewScroll: () => void;
-  editorSelection: MarkdownViewerSelection;
+  editorSelection: MarkdownViewerSelection | null;
   viewMode: ViewMode;
   setViewModeAction: (value: ViewMode) => void;
   previewDetached: boolean;

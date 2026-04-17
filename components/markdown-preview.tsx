@@ -16,7 +16,7 @@ import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection"
 
 type MarkdownPreviewProps = {
   content: string;
-  editorSelection: MarkdownViewerSelection;
+  editorSelection: MarkdownViewerSelection | null;
   className?: string;
 };
 
@@ -55,7 +55,8 @@ export const MarkdownPreview = ({
 
   const syntaxTheme = mounted && resolvedTheme === "dark" ? oneDark : oneLight;
   const rehypePlugins = React.useMemo(
-    () => [[rehypeMarkdownViewerSelection, editorSelection]],
+    () =>
+      editorSelection ? [[rehypeMarkdownViewerSelection, editorSelection]] : [],
     [editorSelection]
   );
 
