@@ -7,6 +7,22 @@
   "vars": {
     "SHARE_TOKEN_BYTES": "24"
   },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "COLLAB_ROOMS",
+        "class_name": "CollaborationRoom"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1-collab-room",
+      "new_sqlite_classes": [
+        "CollaborationRoom"
+      ]
+    }
+  ],
   "kv_namespaces": [
     {
       "binding": "SHARE_INDEX",
