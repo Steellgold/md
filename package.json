@@ -9,7 +9,9 @@
     "start": "next start",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "share:dev": "wrangler dev --config cloudflare-share/wrangler.jsonc",
+    "share:deploy": "wrangler deploy --config cloudflare-share/wrangler.jsonc"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.0",
@@ -52,6 +54,7 @@
     "prettier": "^3.8.1",
     "prettier-plugin-tailwindcss": "^0.7.2",
     "tailwindcss": "^4.2.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "wrangler": "^4.83.0"
   }
 }
