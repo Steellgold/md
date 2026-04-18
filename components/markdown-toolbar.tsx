@@ -405,13 +405,15 @@ export const MarkdownToolbar = ({
             </DropdownMenu>
           </ButtonGroup>
 
-          <Button
-            onClick={saveFileAction}
-            disabled={!activeFile || !canSaveFile || isBusy}
-          >
-            <SaveIcon data-icon="inline-start" />
-            Save
-          </Button>
+          {canSaveFile || !collaborationActive ? (
+            <Button
+              onClick={saveFileAction}
+              disabled={!activeFile || !canSaveFile || isBusy}
+            >
+              <SaveIcon data-icon="inline-start" />
+              Save
+            </Button>
+          ) : null}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

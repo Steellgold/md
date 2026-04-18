@@ -175,7 +175,7 @@ export type MarkdownStore = {
   reopenRecentFile: (id: string) => Promise<void>;
   createNewFile: () => Promise<void>;
   createLocalCopyOfActiveFile: () => Promise<void>;
-  saveActiveFile: () => Promise<void>;
+  saveActiveFile: (options?: { silent?: boolean }) => Promise<void>;
   setDocumentShare: (id: string, share: MarkdownShare) => void;
   setDocumentCollaboration: (
     id: string,

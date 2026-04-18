@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -31,7 +32,10 @@ type MarkdownCollaborationDialogProps = {
   joinUrl: string | null;
   connected: boolean;
   participantsCount: number;
+  canEnableAutosave: boolean;
+  autosaveEnabled: boolean;
   onOpenChangeAction: (open: boolean) => void;
+  onAutosaveEnabledChangeAction: (enabled: boolean) => void;
   onAccessModeChangeAction: (value: CollaborativeAccessMode) => void;
   onInviteTokenChangeAction: (value: string) => void;
   onPasswordChangeAction: (value: string) => void;
@@ -50,7 +54,10 @@ export const MarkdownCollaborationDialog = ({
   joinUrl,
   connected,
   participantsCount,
+  canEnableAutosave,
+  autosaveEnabled,
   onOpenChangeAction,
+  onAutosaveEnabledChangeAction,
   onAccessModeChangeAction,
   onInviteTokenChangeAction,
   onPasswordChangeAction,
@@ -140,6 +147,27 @@ export const MarkdownCollaborationDialog = ({
               <FieldLabel htmlFor="collab-room-link">Join URL</FieldLabel>
               <FieldContent>
                 <Input id="collab-room-link" readOnly value={joinUrl} />
+              </FieldContent>
+            </Field>
+          ) : null}
+
+          {!joinUrl && canEnableAutosave ? (
+            <Field orientation="horizontal">
+              <Checkbox
+                id="collab-autosave"
+                checked={autosaveEnabled}
+                onCheckedChange={(checked) =>
+                  onAutosaveEnabledChangeAction(checked === true)
+                }
+              />
+              <FieldContent>
+                <FieldLabel htmlFor="collab-autosave">
+                  Autosave host local file
+                </FieldLabel>
+                <FieldDescription>
+                  While collaboration is active, updates are automatically saved
+                  to your local file.
+                </FieldDescription>
               </FieldContent>
             </Field>
           ) : null}

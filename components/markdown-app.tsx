@@ -69,6 +69,9 @@ const LARGE_FILE_SYNC_DELAY_MS = 180;
 const LARGE_FILE_PREVIEW_SYNC_DELAY_MS = 80;
 const LARGE_FILE_HISTORY_GROUP_WINDOW_MS = 800;
 const MAX_HISTORY_ENTRIES = 100;
+const COLLAB_AUTOSAVE_DEBOUNCE_MS = 1200;
+const COLLAB_SAVE_REMINDER_AFTER_MS = 2.5 * 60 * 1000;
+const COLLAB_SAVE_REMINDER_CHANGE_THRESHOLD = 100;
 const editPathPrefix = "/edit/";
 
 type EditorHistoryEntry = {
@@ -184,10 +187,15 @@ export const MarkdownApp = () => {
   const [collabJoinUrl, setCollabJoinUrl] = useState<string | null>(null);
   const [collabWsBaseUrl, setCollabWsBaseUrl] = useState<string | null>(null);
   const [collabAuthToken, setCollabAuthToken] = useState<string | null>(null);
+  const [collabAutosaveEnabled, setCollabAutosaveEnabled] = useState(false);
   const [collaborationStartedAt, setCollaborationStartedAt] = useState<string | null>(null);
   const [pendingJoinRoomId, setPendingJoinRoomId] = useState<string | null>(null);
   const [contentHash, setContentHash] = useState<string | null>(null);
   const [editorSelection, setEditorSelection] = useState<MarkdownViewerSelection | null>(null);
+  const [collabUnsavedChangeCount, setCollabUnsavedChangeCount] = useState(0);
+  const [collabUnsavedSince, setCollabUnsavedSince] = useState<string | null>(
+    null
+  );
 
   const attemptedDeepLinkRef = useRef<string | null>(null);
   const attemptedRouteDocumentIdRef = useRef<string | null>(null);
@@ -195,6 +203,10 @@ export const MarkdownApp = () => {
   const historyRef = useRef<Map<string, EditorHistoryState>>(new Map());
   const contentSyncTimeoutRef = useRef<number | null>(null);
   const previewSyncTimeoutRef = useRef<number | null>(null);
+  const collabAutosaveTimeoutRef = useRef<number | null>(null);
+  const collabAutosaveInFlightRef = useRef(false);
+  const collabAutosaveQueuedRef = useRef(false);
+  const collabSaveReminderShownRef = useRef(false);
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const pendingSelectionRef = useRef<MarkdownViewerSelection | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
@@ -216,6 +228,13 @@ export const MarkdownApp = () => {
   );
 
   const pendingRecentFile = recentFiles.find((file) => file.id === pendingRecentFileId) ?? null;
+  const activeOpenDocument = useMemo(
+    () =>
+      openDocuments.find((document) => document.id === activeDocumentId) ?? null,
+    [activeDocumentId, openDocuments]
+  );
+  const canSaveActiveFile =
+    activeFile?.source === "picker" || activeFile?.source === "drop";
   const isPageBusy = (isBusy && busyMessage !== null) || isCollabBusy;
   const effectiveBusyMessage = busyMessage ?? (isCollabBusy ? "Connecting..." : null);
 
@@ -284,8 +303,83 @@ export const MarkdownApp = () => {
       if (previewSyncTimeoutRef.current) {
         window.clearTimeout(previewSyncTimeoutRef.current);
       }
+
+      if (collabAutosaveTimeoutRef.current) {
+        window.clearTimeout(collabAutosaveTimeoutRef.current);
+      }
     };
   }, []);
+
+  const resetCollabUnsavedTracking = useCallback(() => {
+    setCollabUnsavedChangeCount(0);
+    setCollabUnsavedSince(null);
+    collabSaveReminderShownRef.current = false;
+  }, []);
+
+  const canCollaborativeAutosave =
+    Boolean(collabAuthToken) && collabAutosaveEnabled && canSaveActiveFile;
+
+  const runCollabAutosave = useCallback(async () => {
+    if (!canCollaborativeAutosave || !activeFile) {
+      return;
+    }
+
+    if (collabAutosaveInFlightRef.current) {
+      collabAutosaveQueuedRef.current = true;
+      return;
+    }
+
+    collabAutosaveInFlightRef.current = true;
+
+    try {
+      const nextContent = editorRef.current?.value ?? content;
+
+      if (nextContent !== content) {
+        if (activeDocumentId) {
+          setDocumentContent(activeDocumentId, nextContent);
+        } else {
+          setContent(nextContent);
+        }
+      }
+
+      await saveActiveFile({ silent: true });
+
+      if (!useMarkdownStore.getState().error) {
+        resetCollabUnsavedTracking();
+      }
+    } finally {
+      collabAutosaveInFlightRef.current = false;
+
+      if (collabAutosaveQueuedRef.current) {
+        collabAutosaveQueuedRef.current = false;
+        void runCollabAutosave();
+      }
+    }
+  }, [
+    activeDocumentId,
+    activeFile,
+    canCollaborativeAutosave,
+    content,
+    resetCollabUnsavedTracking,
+    saveActiveFile,
+    setContent,
+    setDocumentContent,
+  ]);
+
+  const scheduleCollabAutosave = useCallback(() => {
+    if (!canCollaborativeAutosave) {
+      return;
+    }
+
+    if (collabAutosaveTimeoutRef.current) {
+      window.clearTimeout(collabAutosaveTimeoutRef.current);
+    }
+
+    collabAutosaveTimeoutRef.current = window.setTimeout(() => {
+      collabAutosaveTimeoutRef.current = null;
+      void runCollabAutosave();
+    }, COLLAB_AUTOSAVE_DEBOUNCE_MS);
+  }, [canCollaborativeAutosave, runCollabAutosave]);
 
   const syncPreviewContent = useCallback(
     (nextValue: string, options?: { immediate?: boolean }) => {
@@ -333,6 +427,20 @@ export const MarkdownApp = () => {
         setContent(nextContent);
       });
       syncPreviewContent(nextContent, { immediate: true });
+
+      if (!canSaveActiveFile) {
+        return;
+      }
+
+      if (collabAutosaveEnabled) {
+        scheduleCollabAutosave();
+        return;
+      }
+
+      setCollabUnsavedChangeCount((currentValue) => currentValue + 1);
+      setCollabUnsavedSince((currentValue) =>
+        currentValue ?? new Date().toISOString()
+      );
     },
   });
 
@@ -497,11 +605,81 @@ export const MarkdownApp = () => {
   useEffect(() => {
     if (!collabAuthToken) {
       setCollaborationStartedAt(null);
+      if (collabAutosaveTimeoutRef.current) {
+        window.clearTimeout(collabAutosaveTimeoutRef.current);
+        collabAutosaveTimeoutRef.current = null;
+      }
+      collabAutosaveQueuedRef.current = false;
+      collabAutosaveInFlightRef.current = false;
+      resetCollabUnsavedTracking();
       return;
     }
 
     setCollaborationStartedAt((currentValue) => currentValue ?? new Date().toISOString());
-  }, [collabAuthToken]);
+  }, [collabAuthToken, resetCollabUnsavedTracking]);
+
+  useEffect(() => {
+    if (!canSaveActiveFile && collabAutosaveEnabled) {
+      setCollabAutosaveEnabled(false);
+    }
+  }, [canSaveActiveFile, collabAutosaveEnabled]);
+
+  useEffect(() => {
+    if (!canCollaborativeAutosave) {
+      if (collabAutosaveTimeoutRef.current) {
+        window.clearTimeout(collabAutosaveTimeoutRef.current);
+        collabAutosaveTimeoutRef.current = null;
+      }
+      return;
+    }
+
+    if (activeOpenDocument?.isDirty) {
+      scheduleCollabAutosave();
+    }
+  }, [activeOpenDocument?.isDirty, canCollaborativeAutosave, scheduleCollabAutosave]);
+
+  useEffect(() => {
+    if (
+      !collabAuthToken ||
+      !canSaveActiveFile ||
+      collabAutosaveEnabled ||
+      !collabUnsavedSince
+    ) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      if (collabSaveReminderShownRef.current) {
+        return;
+      }
+
+      const elapsed =
+        Date.now() - new Date(collabUnsavedSince).getTime();
+
+      if (
+        elapsed < COLLAB_SAVE_REMINDER_AFTER_MS ||
+        collabUnsavedChangeCount < COLLAB_SAVE_REMINDER_CHANGE_THRESHOLD
+      ) {
+        return;
+      }
+
+      collabSaveReminderShownRef.current = true;
+      toast.warning("Unsaved collaborative changes", {
+        description:
+          "You have many unsaved collaboration edits. Save now to persist your local file.",
+      });
+    }, 15_000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [
+    canSaveActiveFile,
+    collabAuthToken,
+    collabAutosaveEnabled,
+    collabUnsavedChangeCount,
+    collabUnsavedSince,
+  ]);
 
   useEffect(() => {
     if (!activeFile) {
@@ -1043,11 +1221,18 @@ export const MarkdownApp = () => {
     clearError();
     await saveActiveFile();
     if (!useMarkdownStore.getState().error && activeFile) {
+      resetCollabUnsavedTracking();
       toast.success("File saved.", {
         description: activeFile.name,
       });
     }
-  }, [activeFile, clearError, flushPendingEditorContent, saveActiveFile]);
+  }, [
+    activeFile,
+    clearError,
+    flushPendingEditorContent,
+    resetCollabUnsavedTracking,
+    saveActiveFile,
+  ]);
 
   const editSharedFileLocallyAction = useCallback(async () => {
     flushPendingEditorContent();
@@ -1164,13 +1349,15 @@ export const MarkdownApp = () => {
 
     setCollabWsBaseUrl(null);
     setCollabAuthToken(null);
+    setCollabAutosaveEnabled(false);
     setPendingJoinRoomId(null);
     setCollabJoinUrl(null);
     setCollabPassword("");
+    resetCollabUnsavedTracking();
     setDocumentCollaboration(activeFile.id, null);
     setIsCollabDialogOpen(false);
     toast.success("Collaboration stopped.");
-  }, [activeFile, setDocumentCollaboration]);
+  }, [activeFile, resetCollabUnsavedTracking, setDocumentCollaboration]);
 
   const copyCollaborationLinkAction = useCallback(async () => {
     if (!collabJoinUrl) {
@@ -1361,7 +1548,7 @@ export const MarkdownApp = () => {
 
   useMarkdownHotkeys({
     enabled: Boolean(activeFile) && !isSharedViewerMode,
-    saveEnabled: activeFile?.source === "picker" || activeFile?.source === "drop",
+    saveEnabled: canSaveActiveFile,
     onSaveAction: saveActiveFileAction,
     onOpenSwitcherAction: () => setIsCommandPaletteOpen(true),
     onUndoAction: undoAction,
@@ -1721,7 +1908,10 @@ export const MarkdownApp = () => {
         joinUrl={collabJoinUrl}
         connected={collaboration.isConnected}
         participantsCount={collaboration.participants.length}
+        canEnableAutosave={Boolean(!pendingJoinRoomId && canSaveActiveFile)}
+        autosaveEnabled={collabAutosaveEnabled}
         onOpenChangeAction={setIsCollabDialogOpen}
+        onAutosaveEnabledChangeAction={setCollabAutosaveEnabled}
         onAccessModeChangeAction={setCollabAccessMode}
         onInviteTokenChangeAction={setCollabInviteToken}
         onPasswordChangeAction={setCollabPassword}

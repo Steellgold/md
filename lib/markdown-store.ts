@@ -529,7 +529,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       set(getErrorState(error));
     }
   },
-  saveActiveFile: async () => {
+  saveActiveFile: async (options) => {
     const state = useMarkdownStore.getState();
     const activeDocument =
       state.openDocuments.find(
@@ -541,7 +541,9 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       return;
     }
 
-    set(getBusyState("Saving changes..."));
+    if (!options?.silent) {
+      set(getBusyState("Saving changes..."));
+    }
 
     try {
       const { entry, recentFiles } = await saveRecentMarkdownFile(
