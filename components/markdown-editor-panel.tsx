@@ -15,6 +15,12 @@ import {
 import { continueListOnEnterAction } from "@/lib/markdown-editor";
 import { buildActiveDocumentMeta } from "@/lib/markdown-helpers";
 import {
+  getTextareaCaretCoordinates,
+  getTextareaRangeCoordinates,
+  type TextareaRangeCoordinates,
+} from "@/lib/textarea-caret";
+import {
+  type CollaborationParticipant,
   type MarkdownDocumentStats,
   type RecentMarkdownFile,
 } from "@/types/markdown";
@@ -39,6 +45,7 @@ import {
   useCallback,
   useEffect,
   useRef,
+  useState,
 } from "react";
 
 type MarkdownEditorPanelProps = {
@@ -51,6 +58,7 @@ type MarkdownEditorPanelProps = {
   onBlur: () => void;
   onSelectionChange: (editor: HTMLTextAreaElement) => void;
   onScroll: () => void;
+  collaboratorSelections: CollaborationParticipant[];
   undoAction: () => void;
   redoAction: () => void;
   boldAction: () => void;
@@ -80,6 +88,16 @@ const listActions = [
 
 const headingLevels = [1, 2, 3, 4, 5, 6] as const;
 
+type RemoteMarker = {
+  id: string;
+  name: string;
+  color: string;
+  top: number;
+  left: number;
+  height: number;
+  selectionRects: TextareaRangeCoordinates[];
+};
+
 export const MarkdownEditorPanel = ({
   activeFile,
   content,
@@ -90,6 +108,7 @@ export const MarkdownEditorPanel = ({
   onBlur,
   onSelectionChange,
   onScroll,
+  collaboratorSelections,
   undoAction,
   redoAction,
   boldAction,
@@ -102,6 +121,8 @@ export const MarkdownEditorPanel = ({
   taskListAction,
 }: MarkdownEditorPanelProps) => {
   const topbarRef = useRef<HTMLDivElement | null>(null);
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  const [remoteMarkers, setRemoteMarkers] = useState<RemoteMarker[]>([]);
   const actionMap = {
     undoAction,
     redoAction,
@@ -163,6 +184,70 @@ export const MarkdownEditorPanel = ({
     [onSelectionChange]
   );
 
+  const recomputeRemoteMarkers = useCallback(() => {
+    const editorElement = editorRef.current;
+    const overlayElement = overlayRef.current;
+
+    if (!editorElement || !overlayElement) {
+      setRemoteMarkers([]);
+      return;
+    }
+
+    const editorRect = editorElement.getBoundingClientRect();
+    const overlayRect = overlayElement.getBoundingClientRect();
+    const editorTop = editorRect.top - overlayRect.top;
+    const editorLeft = editorRect.left - overlayRect.left;
+
+    const nextMarkers = collaboratorSelections
+      .filter(
+        (participant) =>
+          !participant.isLocal && participant.selection && participant.name
+      )
+      .map((participant) => {
+        const selection = participant.selection!;
+        const marker = getTextareaCaretCoordinates(editorElement, selection.end);
+
+        return {
+          id: participant.id,
+          name: participant.name,
+          color: participant.color,
+          top: editorTop + marker.top,
+          left: editorLeft + marker.left,
+          height: marker.height,
+          selectionRects:
+            selection.start !== selection.end
+              ? getTextareaRangeCoordinates(
+                  editorElement,
+                  selection.start,
+                  selection.end
+                ).map((selectionRect) => ({
+                  top: editorTop + selectionRect.top,
+                  left: editorLeft + selectionRect.left,
+                  width: Math.max(selectionRect.width, 2),
+                  height: Math.max(selectionRect.height, 14),
+                }))
+              : [],
+        };
+      });
+
+    setRemoteMarkers(nextMarkers);
+  }, [collaboratorSelections, editorRef]);
+
+  useEffect(() => {
+    const frameId = window.requestAnimationFrame(() => {
+      recomputeRemoteMarkers();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [content, recomputeRemoteMarkers]);
+
+  const handleEditorScroll = useCallback(() => {
+    onScroll();
+    recomputeRemoteMarkers();
+  }, [onScroll, recomputeRemoteMarkers]);
+
   const handleEditorKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
       if (
@@ -198,7 +283,10 @@ export const MarkdownEditorPanel = ({
       </CardHeader>
 
       <CardContent className="relative flex-1 min-h-0 p-0">
-        <InputGroup className="h-full! flex-1 min-h-0 flex-col items-stretch overflow-hidden rounded-none border-0 bg-transparent has-[[data-slot=input-group-control]:focus-visible]:border-input has-[[data-slot=input-group-control]:focus-visible]:ring-0">
+        <InputGroup
+          ref={overlayRef}
+          className="h-full! flex-1 min-h-0 flex-col items-stretch overflow-hidden rounded-none border-0 bg-transparent has-[[data-slot=input-group-control]:focus-visible]:border-input has-[[data-slot=input-group-control]:focus-visible]:ring-0"
+        >
           <InputGroupAddon
             ref={topbarRef}
             align="block-start"
@@ -291,7 +379,7 @@ export const MarkdownEditorPanel = ({
             ref={editorRef}
             onChange={handleEditorChange}
             onBlur={onBlur}
-            onScroll={onScroll}
+            onScroll={handleEditorScroll}
             onFocus={handleEditorSelectionChange}
             onMouseUp={handleEditorSelectionChange}
             onKeyDown={handleEditorKeyDown}
@@ -299,6 +387,47 @@ export const MarkdownEditorPanel = ({
             placeholder="Write or paste your markdown here..."
             className="h-full min-h-0 flex-1 basis-0 px-6 py-5 font-mono text-sm"
           />
+
+          {remoteMarkers.map((marker) => (
+            <div
+              key={marker.id}
+              className="pointer-events-none absolute z-10"
+              style={{
+                top: `${marker.top}px`,
+                left: `${marker.left}px`,
+              }}
+            >
+              <div
+                className="w-[2px] rounded-full"
+                style={{
+                  backgroundColor: marker.color,
+                  height: `${Math.max(marker.height, 14)}px`,
+                }}
+              />
+              <div
+                className="mt-1 w-max rounded px-1.5 py-0.5 text-[10px] font-medium text-white shadow"
+                style={{ backgroundColor: marker.color + "80" }}
+              >
+                {marker.name}
+              </div>
+            </div>
+          ))}
+
+          {remoteMarkers.flatMap((marker) =>
+            marker.selectionRects.map((selectionRect, index) => (
+              <div
+                key={`${marker.id}-selection-${index}`}
+                className="pointer-events-none absolute z-[9] rounded-sm opacity-25"
+                style={{
+                  top: `${selectionRect.top}px`,
+                  left: `${selectionRect.left}px`,
+                  width: `${selectionRect.width}px`,
+                  height: `${selectionRect.height}px`,
+                  backgroundColor: marker.color,
+                }}
+              />
+            ))
+          )}
         </InputGroup>
       </CardContent>
     </Card>

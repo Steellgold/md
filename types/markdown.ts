@@ -2,7 +2,30 @@
 
 export type PermissionMode = "read" | "readwrite";
 
-export type RecentMarkdownFileSource = "picker" | "drop" | "url";
+export type RecentMarkdownFileSource = "picker" | "drop" | "url" | "collab";
+
+export type CollaborativeAccessMode = "open" | "invite" | "password";
+
+export type CollaborationSelection = {
+  start: number;
+  end: number;
+};
+
+export type CollaborationParticipant = {
+  id: string;
+  name: string;
+  avatarUrl: string;
+  color: string;
+  selection: CollaborationSelection | null;
+  isLocal: boolean;
+};
+
+export type CollaborationSession = {
+  roomId: string;
+  accessMode: CollaborativeAccessMode;
+  inviteToken: string | null;
+  joinUrl: string;
+};
 
 export type MarkdownDocumentStats = {
   characterCount: number;
@@ -25,6 +48,7 @@ export type RecentMarkdownFile = {
   url: string | null;
   urlFileName: string | null;
   share: MarkdownShare | null;
+  collab?: CollaborationSession | null;
   lastOpenedAt: string;
   source: RecentMarkdownFileSource;
   stats?: MarkdownDocumentStats;
@@ -153,6 +177,11 @@ export type MarkdownStore = {
   createLocalCopyOfActiveFile: () => Promise<void>;
   saveActiveFile: () => Promise<void>;
   setDocumentShare: (id: string, share: MarkdownShare) => void;
+  setDocumentCollaboration: (
+    id: string,
+    collab: CollaborationSession | null
+  ) => void;
+  openScratchDocument: (name?: string) => void;
   goHome: () => void;
   closeDocument: (id: string) => void;
   removeRecentFile: (id: string) => Promise<void>;

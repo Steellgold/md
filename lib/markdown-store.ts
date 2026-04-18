@@ -18,6 +18,7 @@ import {
   getUnknownErrorMessage,
 } from "@/lib/markdown-helpers";
 import {
+  type CollaborationSession,
   type MarkdownShare,
   type MarkdownStore,
   type OpenMarkdownDocument,
@@ -603,6 +604,69 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
             : file
         ),
       };
+    }),
+  setDocumentCollaboration: (id: string, collab: CollaborationSession | null) =>
+    set((state) => {
+      const nextDocuments = state.openDocuments.map((document) =>
+        document.id === id
+          ? {
+              ...document,
+              file: {
+                ...document.file,
+                collab,
+              },
+            }
+          : document
+      );
+      const nextActiveFile =
+        state.activeFile?.id === id
+          ? {
+              ...state.activeFile,
+              collab,
+            }
+          : state.activeFile;
+
+      return {
+        openDocuments: nextDocuments,
+        activeFile: nextActiveFile,
+        recentFiles: state.recentFiles.map((file) =>
+          file.id === id
+            ? {
+                ...file,
+                collab,
+              }
+            : file
+        ),
+      };
+    }),
+  openScratchDocument: (name = "Collaborative document.md") =>
+    set((state) => {
+      const id = `collab-${crypto.randomUUID()}`;
+      const file = {
+        id,
+        name,
+        path: null,
+        url: null,
+        urlFileName: null,
+        share: null,
+        collab: null,
+        lastOpenedAt: new Date().toISOString(),
+        source: "collab" as const,
+        stats: getMarkdownDocumentStats(""),
+      };
+      const scratchDocument = {
+        id,
+        file,
+        content: "",
+        savedContent: "",
+        isDirty: true,
+      };
+
+      return buildDocumentState(
+        upsertOpenDocument(state.openDocuments, file, ""),
+        scratchDocument.id,
+        state.recentFiles
+      );
     }),
   goHome: () =>
     set((state) => {

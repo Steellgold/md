@@ -4,6 +4,13 @@ import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
+  Avatar,
+  AvatarFallback,
+  AvatarGroup,
+  AvatarGroupCount,
+  AvatarImage,
+} from "@/components/ui/avatar";
+import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -17,10 +24,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   buildActiveDocumentMeta,
   buildRecentFileMeta,
 } from "@/lib/markdown-helpers";
 import {
+  type CollaborationParticipant,
   type MarkdownDocumentStats,
   type RecentMarkdownFile,
 } from "@/types/markdown";
@@ -37,6 +51,7 @@ import {
   SaveIcon,
   Trash2Icon,
   TypeIcon,
+  UsersIcon,
   XIcon
 } from "lucide-react";
 import { useState } from "react";
@@ -54,6 +69,10 @@ type MarkdownToolbarProps = {
   saveFileAction: () => void;
   shareActionLabel: string;
   shareFileAction: () => void;
+  collaborateActionLabel: string;
+  collaborateFileAction: () => void;
+  collaborators: CollaborationParticipant[];
+  collaborationConnected: boolean;
   refreshFileAction: () => void;
   clearDocumentAction: () => void;
   openRecentAction: (id: string) => void;
@@ -82,6 +101,9 @@ export const MarkdownToolbar = ({
   saveFileAction,
   shareActionLabel,
   shareFileAction,
+  collaborateActionLabel,
+  collaborateFileAction,
+  collaborators,
   refreshFileAction,
   clearDocumentAction,
   openRecentAction,
@@ -94,11 +116,23 @@ export const MarkdownToolbar = ({
   const [isClearHistoryConfirmOpen, setIsClearHistoryConfirmOpen] = useState(false);
 
   const secondaryLabel = buildActiveDocumentMeta(stats, activeFile);
-  const canSaveFile = activeFile?.source !== "url";
+  const canSaveFile =
+    activeFile?.source === "picker" || activeFile?.source === "drop";
   const refreshLabel = activeFile?.source === "url" ? "Reload URL" : "Reopen file";
   const closeLabel = openDocumentsCount > 1 ? "Close tab" : "Close document";
   const visibleRecentFiles = recentFiles.slice(0, 6);
   const overflowRecentFiles = recentFiles.slice(6);
+  const visibleCollaborators = collaborators.slice(0, 4);
+  const remainingCollaborators = collaborators.length - visibleCollaborators.length;
+  const overflowCollaborators = collaborators.slice(4);
+
+  const getInitials = (value: string) =>
+    value
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("");
 
   return (
     <div className="border-b bg-background/80 px-4 py-3 backdrop-blur">
@@ -124,6 +158,49 @@ export const MarkdownToolbar = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {collaborators.length > 0 ? (
+            <TooltipProvider delayDuration={150}>
+              <AvatarGroup>
+                {visibleCollaborators.map((participant) => (
+                  <Tooltip key={participant.id}>
+                    <TooltipTrigger asChild>
+                      <Avatar size="sm">
+                        <AvatarImage
+                          src={participant.avatarUrl}
+                          alt={participant.name}
+                        />
+                        <AvatarFallback>
+                          {getInitials(participant.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                    </TooltipTrigger>
+                    <TooltipContent sideOffset={6}>
+                      {participant.isLocal
+                        ? `${participant.name} (You)`
+                        : participant.name}
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+                {remainingCollaborators > 0 ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <AvatarGroupCount>+{remainingCollaborators}</AvatarGroupCount>
+                    </TooltipTrigger>
+                    <TooltipContent sideOffset={6}>
+                      {overflowCollaborators
+                        .map((participant) =>
+                          participant.isLocal
+                            ? `${participant.name} (You)`
+                            : participant.name
+                        )
+                        .join(", ")}
+                    </TooltipContent>
+                  </Tooltip>
+                ) : null}
+              </AvatarGroup>
+            </TooltipProvider>
+          ) : null}
+
           <ButtonGroup className="flex-wrap">
             {viewOptions.map((option) => {
               const Icon = option.icon;
@@ -277,6 +354,15 @@ export const MarkdownToolbar = ({
           >
             <LinkIcon data-icon="inline-start" />
             {shareActionLabel}
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={collaborateFileAction}
+            disabled={!activeFile || isBusy}
+          >
+            <UsersIcon data-icon="inline-start" />
+            {collaborateActionLabel}
           </Button>
 
           <DropdownMenu>

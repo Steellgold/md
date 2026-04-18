@@ -7,6 +7,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import {
+  type CollaborationParticipant,
   type MarkdownDocumentStats,
   type OpenMarkdownDocument,
   type RecentMarkdownFile,
@@ -33,6 +34,7 @@ type MarkdownActiveDocumentProps = {
   onEditorBlur: () => void;
   onEditorSelectionChange: (editor: HTMLTextAreaElement) => void;
   onEditorScroll: () => void;
+  collaboratorSelections: CollaborationParticipant[];
   onPreviewScroll: () => void;
   previewSelection: MarkdownViewerSelection | null;
   viewMode: ViewMode;
@@ -50,6 +52,10 @@ type MarkdownActiveDocumentProps = {
   saveFileAction: () => void;
   shareActionLabel: string;
   shareFileAction: () => void;
+  collaborateActionLabel: string;
+  collaborateFileAction: () => void;
+  collaborators: CollaborationParticipant[];
+  collaborationConnected: boolean;
   refreshFileAction: () => void;
   clearDocumentAction: () => void;
   setActiveDocumentAction: (id: string) => void;
@@ -83,6 +89,7 @@ export const MarkdownActiveDocument = ({
   onEditorBlur,
   onEditorSelectionChange,
   onEditorScroll,
+  collaboratorSelections,
   onPreviewScroll,
   previewSelection,
   viewMode,
@@ -100,6 +107,10 @@ export const MarkdownActiveDocument = ({
   saveFileAction,
   shareActionLabel,
   shareFileAction,
+  collaborateActionLabel,
+  collaborateFileAction,
+  collaborators,
+  collaborationConnected,
   refreshFileAction,
   clearDocumentAction,
   setActiveDocumentAction,
@@ -135,6 +146,10 @@ export const MarkdownActiveDocument = ({
         saveFileAction={saveFileAction}
         shareActionLabel={shareActionLabel}
         shareFileAction={shareFileAction}
+        collaborateActionLabel={collaborateActionLabel}
+        collaborateFileAction={collaborateFileAction}
+        collaborators={collaborators}
+        collaborationConnected={collaborationConnected}
         refreshFileAction={refreshFileAction}
         clearDocumentAction={clearDocumentAction}
         openRecentAction={openRecentAction}
@@ -171,6 +186,7 @@ export const MarkdownActiveDocument = ({
               onBlur={onEditorBlur}
               onSelectionChange={onEditorSelectionChange}
               onScroll={onEditorScroll}
+              collaboratorSelections={collaboratorSelections}
               undoAction={undoAction}
               redoAction={redoAction}
               boldAction={boldAction}

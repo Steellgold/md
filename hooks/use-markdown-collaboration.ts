@@ -1,0 +1,264 @@
+"use client";
+
+import { getCollaborationColor } from "@/lib/markdown-collaboration";
+import {
+  type CollaborationParticipant,
+  type CollaborationSelection,
+} from "@/types/markdown";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { WebsocketProvider } from "y-websocket";
+import * as Y from "yjs";
+
+type UseMarkdownCollaborationParams = {
+  enabled: boolean;
+  roomId: string | null;
+  wsBaseUrl: string | null;
+  authToken: string | null;
+  userName: string;
+  userAvatarUrl: string;
+  initialContent: string;
+  onContentChange: (content: string) => void;
+};
+
+type UseMarkdownCollaborationResult = {
+  isActive: boolean;
+  isConnected: boolean;
+  participants: CollaborationParticipant[];
+  applyLocalContent: (nextContent: string) => void;
+  updateLocalSelection: (selection: CollaborationSelection | null) => void;
+  undo: () => void;
+  redo: () => void;
+};
+
+type AwarenessUserState = {
+  id: string;
+  name: string;
+  avatarUrl: string;
+  color: string;
+};
+
+type AwarenessState = {
+  user?: AwarenessUserState;
+  selection?: CollaborationSelection | null;
+};
+
+const defaultResult: UseMarkdownCollaborationResult = {
+  isActive: false,
+  isConnected: false,
+  participants: [],
+  applyLocalContent: () => {},
+  updateLocalSelection: () => {},
+  undo: () => {},
+  redo: () => {},
+};
+
+export const useMarkdownCollaboration = ({
+  enabled,
+  roomId,
+  wsBaseUrl,
+  authToken,
+  userName,
+  userAvatarUrl,
+  initialContent,
+  onContentChange,
+}: UseMarkdownCollaborationParams): UseMarkdownCollaborationResult => {
+  const [participants, setParticipants] = useState<CollaborationParticipant[]>(
+    []
+  );
+  const [isConnected, setIsConnected] = useState(false);
+  const yTextRef = useRef<Y.Text | null>(null);
+  const undoManagerRef = useRef<Y.UndoManager | null>(null);
+  const providerRef = useRef<WebsocketProvider | null>(null);
+  const localOriginRef = useRef<object | null>(null);
+  const onContentChangeRef = useRef(onContentChange);
+  const initialContentRef = useRef(initialContent);
+  const seededRoomRef = useRef<string | null>(null);
+  const localUserId = useMemo(() => crypto.randomUUID(), []);
+  const normalizedUserName = useMemo(
+    () => userName.trim() || "Anonymous",
+    [userName]
+  );
+
+  useEffect(() => {
+    onContentChangeRef.current = onContentChange;
+  }, [onContentChange]);
+
+  useEffect(() => {
+    if (!enabled || !roomId || !wsBaseUrl || !authToken) {
+      return;
+    }
+
+    if (seededRoomRef.current !== roomId) {
+      initialContentRef.current = initialContent;
+      seededRoomRef.current = roomId;
+    }
+  }, [authToken, enabled, initialContent, roomId, wsBaseUrl]);
+
+  useEffect(() => {
+    if (!enabled || !roomId || !wsBaseUrl || !authToken) {
+      yTextRef.current = null;
+      undoManagerRef.current = null;
+      providerRef.current?.destroy();
+      providerRef.current = null;
+      return;
+    }
+
+    const yDoc = new Y.Doc();
+    const yText = yDoc.getText("content");
+    const localOrigin = {};
+    localOriginRef.current = localOrigin;
+    yTextRef.current = yText;
+    undoManagerRef.current = new Y.UndoManager(yText, {
+      trackedOrigins: new Set([localOrigin]),
+    });
+
+    const provider = new WebsocketProvider(wsBaseUrl, roomId, yDoc, {
+      params: {
+        token: authToken,
+      },
+      connect: true,
+    });
+    providerRef.current = provider;
+
+    const localUserState: AwarenessUserState = {
+      id: localUserId,
+      name: normalizedUserName,
+      avatarUrl: userAvatarUrl,
+      color: getCollaborationColor(localUserId),
+    };
+
+    provider.awareness.setLocalState({
+      user: localUserState,
+      selection: null,
+    } satisfies AwarenessState);
+
+    const syncParticipants = () => {
+      const currentStates = Array.from(provider.awareness.getStates().values());
+      const nextParticipants = currentStates
+        .map((state) => state as AwarenessState)
+        .filter((state) => Boolean(state.user))
+        .map((state) => ({
+          id: state.user!.id,
+          name: state.user!.name,
+          avatarUrl: state.user!.avatarUrl,
+          color: state.user!.color,
+          selection: state.selection ?? null,
+          isLocal: state.user!.id === localUserId,
+        }))
+        .sort((left, right) =>
+          left.isLocal === right.isLocal
+            ? left.name.localeCompare(right.name)
+            : left.isLocal
+              ? -1
+              : 1
+        );
+
+      setParticipants(nextParticipants);
+    };
+
+    const handleAwarenessChange = () => {
+      syncParticipants();
+    };
+
+    const handleContentChange = () => {
+      onContentChangeRef.current(yText.toString());
+    };
+
+    const handleSynced = (isSynced: boolean) => {
+      setIsConnected(isSynced);
+
+      if (!isSynced) {
+        return;
+      }
+
+      const seedContent = initialContentRef.current;
+
+      if (yText.length === 0 && seedContent !== "") {
+        yDoc.transact(() => {
+          yText.insert(0, seedContent);
+        }, localOrigin);
+      } else {
+        onContentChangeRef.current(yText.toString());
+      }
+    };
+
+    yText.observe(handleContentChange);
+    provider.awareness.on("change", handleAwarenessChange);
+    provider.on("sync", handleSynced);
+    syncParticipants();
+
+    return () => {
+      yText.unobserve(handleContentChange);
+      provider.awareness.off("change", handleAwarenessChange);
+      provider.off("sync", handleSynced);
+      provider.destroy();
+      yDoc.destroy();
+      yTextRef.current = null;
+      undoManagerRef.current = null;
+      providerRef.current = null;
+      setParticipants([]);
+      setIsConnected(false);
+    };
+  }, [
+    authToken,
+    enabled,
+    localUserId,
+    normalizedUserName,
+    roomId,
+    userAvatarUrl,
+    wsBaseUrl,
+  ]);
+
+  const applyLocalContent = useCallback((nextContent: string) => {
+    const yText = yTextRef.current;
+    const localOrigin = localOriginRef.current;
+
+    if (!yText || !localOrigin) {
+      return;
+    }
+
+    if (yText.toString() === nextContent) {
+      return;
+    }
+
+    yText.doc?.transact(() => {
+      yText.delete(0, yText.length);
+      yText.insert(0, nextContent);
+    }, localOrigin);
+  }, []);
+
+  const updateLocalSelection = useCallback(
+    (selection: CollaborationSelection | null) => {
+      const provider = providerRef.current;
+
+      if (!provider) {
+        return;
+      }
+
+      provider.awareness.setLocalStateField("selection", selection);
+    },
+    []
+  );
+
+  const undo = useCallback(() => {
+    undoManagerRef.current?.undo();
+  }, []);
+
+  const redo = useCallback(() => {
+    undoManagerRef.current?.redo();
+  }, []);
+
+  if (!enabled || !roomId || !wsBaseUrl || !authToken) {
+    return defaultResult;
+  }
+
+  return {
+    isActive: true,
+    isConnected,
+    participants,
+    applyLocalContent,
+    updateLocalSelection,
+    undo,
+    redo,
+  };
+};

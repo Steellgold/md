@@ -1,6 +1,7 @@
 "use client";
 
 import { MarkdownActiveDocument } from "@/components/markdown-active-document";
+import { MarkdownCollaborationDialog } from "@/components/markdown-collaboration-dialog";
 import { MarkdownCommandPalette } from "@/components/markdown-command-palette";
 import { MarkdownEmptyState } from "@/components/markdown-empty-state";
 import { MarkdownOpenUrlDialog } from "@/components/markdown-open-url-dialog";
@@ -11,6 +12,7 @@ import { MarkdownShareDialog } from "@/components/markdown-share-dialog";
 import { MarkdownSharedViewer } from "@/components/markdown-shared-viewer";
 import { Spinner } from "@/components/ui/spinner";
 import { useMarkdownHotkeys } from "@/hooks/use-markdown-hotkeys";
+import { useMarkdownCollaboration } from "@/hooks/use-markdown-collaboration";
 import { useScrollSync } from "@/hooks/use-scroll-sync";
 import { extractMarkdownDeepLink } from "@/lib/markdown-deep-link";
 import {
@@ -25,6 +27,13 @@ import {
 } from "@/lib/markdown-export";
 import { shareRecentMarkdownFile } from "@/lib/markdown-file-system";
 import {
+  createCollaborationRoom,
+  createCollaborationRoomId,
+  createCollaborationToken,
+  joinCollaborationRoom,
+  parseCollaborationJoinParams,
+} from "@/lib/markdown-collaboration";
+import {
   getMarkdownDocumentStats,
   getUnknownErrorMessage,
 } from "@/lib/markdown-helpers";
@@ -37,6 +46,7 @@ import { useMarkdownStore } from "@/lib/markdown-store";
 import { useMarkdownUiStore } from "@/lib/markdown-ui-store";
 import { cn } from "@/lib/utils";
 import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection";
+import { faker } from "@faker-js/faker";
 import { ArrowUpRightIcon } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -118,9 +128,11 @@ export const MarkdownApp = () => {
     openPendingRemoteFile,
     reopenRecentFile,
     createNewFile,
+    openScratchDocument,
     createLocalCopyOfActiveFile,
     saveActiveFile,
     setDocumentShare,
+    setDocumentCollaboration,
     goHome,
     setActiveDocument,
     closeDocument,
@@ -137,8 +149,14 @@ export const MarkdownApp = () => {
   const syncScrollEnabled = useMarkdownUiStore(
     (state) => state.syncScrollEnabled
   );
+  const collaborationDisplayName = useMarkdownUiStore(
+    (state) => state.collaborationDisplayName
+  );
 
   const setViewMode = useMarkdownUiStore((state) => state.setViewMode);
+  const setCollaborationDisplayName = useMarkdownUiStore(
+    (state) => state.setCollaborationDisplayName
+  );
 
   const toggleSyncScroll = useMarkdownUiStore(
     (state) => state.toggleSyncScroll
@@ -148,18 +166,31 @@ export const MarkdownApp = () => {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isOpenUrlDialogOpen, setIsOpenUrlDialogOpen] = useState(false);
   const [isShareBusy, setIsShareBusy] = useState(false);
+  const [isCollabBusy, setIsCollabBusy] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [isCollabDialogOpen, setIsCollabDialogOpen] = useState(false);
   const [pendingRecentFileId, setPendingRecentFileId] = useState<string | null>(null);
   const [previewDetached, setPreviewDetached] = useState(false);
   const [previewRenderContent, setPreviewRenderContent] = useState(content);
   const [sharePassword, setSharePassword] = useState("");
   const [shareDialogUrl, setShareDialogUrl] = useState<string | null>(null);
   const [uiError, setUiError] = useState<string | null>(null);
+  const [collabAccessMode, setCollabAccessMode] = useState<
+    "open" | "invite" | "password"
+  >("open");
+  const [collabRoomId, setCollabRoomId] = useState("");
+  const [collabInviteToken, setCollabInviteToken] = useState("");
+  const [collabPassword, setCollabPassword] = useState("");
+  const [collabJoinUrl, setCollabJoinUrl] = useState<string | null>(null);
+  const [collabWsBaseUrl, setCollabWsBaseUrl] = useState<string | null>(null);
+  const [collabAuthToken, setCollabAuthToken] = useState<string | null>(null);
+  const [pendingJoinRoomId, setPendingJoinRoomId] = useState<string | null>(null);
   const [contentHash, setContentHash] = useState<string | null>(null);
   const [editorSelection, setEditorSelection] = useState<MarkdownViewerSelection | null>(null);
 
   const attemptedDeepLinkRef = useRef<string | null>(null);
   const attemptedRouteDocumentIdRef = useRef<string | null>(null);
+  const navigatingHomeRef = useRef(false);
   const historyRef = useRef<Map<string, EditorHistoryState>>(new Map());
   const contentSyncTimeoutRef = useRef<number | null>(null);
   const previewSyncTimeoutRef = useRef<number | null>(null);
@@ -184,7 +215,8 @@ export const MarkdownApp = () => {
   );
 
   const pendingRecentFile = recentFiles.find((file) => file.id === pendingRecentFileId) ?? null;
-  const isPageBusy = isBusy && busyMessage !== null;
+  const isPageBusy = (isBusy && busyMessage !== null) || isCollabBusy;
+  const effectiveBusyMessage = busyMessage ?? (isCollabBusy ? "Connecting..." : null);
 
   const hasPendingShareChanges = hasPendingMarkdownShareChanges(
     activeFile?.share ?? null,
@@ -206,6 +238,7 @@ export const MarkdownApp = () => {
     : hasPendingShareChanges || sharePassword.trim() !== ""
       ? "Update share"
       : "Refresh link";
+  const collaborateActionLabel = collabAuthToken ? "Collaborating" : "Collaborate";
 
   const parsedDeepLink = useMemo(
     () =>
@@ -213,10 +246,33 @@ export const MarkdownApp = () => {
     [pathname, searchParamsKey]
   );
   const routeDocumentId = useMemo(() => getRouteDocumentId(pathname), [pathname]);
+  const parsedCollabJoin = useMemo(
+    () => parseCollaborationJoinParams(new URLSearchParams(searchParamsKey)),
+    [searchParamsKey]
+  );
+  const collaborativeUserName = useMemo(
+    () => collaborationDisplayName.trim() || "Anonymous",
+    [collaborationDisplayName]
+  );
+  const collaborativeAvatarUrl = useMemo(
+    () =>
+      `https://api.dicebear.com/9.x/notionists-neutral/svg?seed=${encodeURIComponent(
+        collaborativeUserName
+      )}`,
+    [collaborativeUserName]
+  );
 
   useEffect(() => {
     hydrate();
   }, [hydrate]);
+
+  useEffect(() => {
+    if (collaborationDisplayName.trim() !== "") {
+      return;
+    }
+
+    setCollaborationDisplayName(faker.person.fullName());
+  }, [collaborationDisplayName, setCollaborationDisplayName]);
 
   useEffect(() => {
     return () => {
@@ -258,6 +314,27 @@ export const MarkdownApp = () => {
     [isLargeDocument, isPreviewVisible]
   );
 
+  const collaboration = useMarkdownCollaboration({
+    enabled: Boolean(activeFile && collabRoomId && collabWsBaseUrl && collabAuthToken),
+    roomId: collabRoomId || null,
+    wsBaseUrl: collabWsBaseUrl,
+    authToken: collabAuthToken,
+    userName: collaborativeUserName,
+    userAvatarUrl: collaborativeAvatarUrl,
+    initialContent: content,
+    onContentChange: (nextContent) => {
+      startTransition(() => {
+        if (activeDocumentId) {
+          setDocumentContent(activeDocumentId, nextContent);
+          return;
+        }
+
+        setContent(nextContent);
+      });
+      syncPreviewContent(nextContent, { immediate: true });
+    },
+  });
+
   useEffect(() => {
     if (!parsedDeepLink) {
       attemptedDeepLinkRef.current = null;
@@ -288,6 +365,12 @@ export const MarkdownApp = () => {
   }, [activeFile, hydrated, openDeepLinkUrl, parsedDeepLink, router]);
 
   useEffect(() => {
+    if (pathname === "/") {
+      navigatingHomeRef.current = false;
+    }
+  }, [pathname]);
+
+  useEffect(() => {
     if (!routeDocumentId) {
       attemptedRouteDocumentIdRef.current = null;
       return;
@@ -303,6 +386,10 @@ export const MarkdownApp = () => {
     }
 
     if (attemptedRouteDocumentIdRef.current === routeDocumentId) {
+      return;
+    }
+
+    if (!activeDocumentId && navigatingHomeRef.current) {
       return;
     }
 
@@ -361,6 +448,40 @@ export const MarkdownApp = () => {
   }, [activeDocumentId, hydrated, parsedDeepLink, pathname, routeDocumentId, router]);
 
   useEffect(() => {
+    if (!hydrated || !parsedCollabJoin) {
+      return;
+    }
+
+    if (!activeFile) {
+      openScratchDocument("Collaborative document.md");
+    }
+
+    setCollabAccessMode(parsedCollabJoin.accessMode);
+    setCollabRoomId(parsedCollabJoin.roomId);
+    setCollabInviteToken(parsedCollabJoin.inviteToken ?? "");
+    setCollabJoinUrl(window.location.toString());
+    setPendingJoinRoomId(parsedCollabJoin.roomId);
+
+    if (parsedCollabJoin.accessMode === "password") {
+      setIsCollabDialogOpen(true);
+      return;
+    }
+
+    void joinCollaborationRoom({
+      roomId: parsedCollabJoin.roomId,
+      inviteToken: parsedCollabJoin.inviteToken,
+    })
+      .then((connection) => {
+        setCollabWsBaseUrl(connection.wsBaseUrl);
+        setCollabAuthToken(connection.token);
+        setPendingJoinRoomId(null);
+      })
+      .catch((error) => {
+        setUiError(getUnknownErrorMessage(error));
+      });
+  }, [activeFile, hydrated, openScratchDocument, parsedCollabJoin]);
+
+  useEffect(() => {
     document.title = activeFile
       ? `${activeFile.name} | ${defaultDocumentTitle}`
       : defaultDocumentTitle;
@@ -378,7 +499,23 @@ export const MarkdownApp = () => {
       setIsShareDialogOpen(false);
       setSharePassword("");
       setShareDialogUrl(null);
+      setCollabWsBaseUrl(null);
+      setCollabAuthToken(null);
+      setPendingJoinRoomId(null);
+      setCollabJoinUrl(null);
+      setCollabPassword("");
       return;
+    }
+
+    if (activeFile.collab) {
+      setCollabAccessMode(activeFile.collab.accessMode);
+      setCollabRoomId(activeFile.collab.roomId);
+      setCollabInviteToken(activeFile.collab.inviteToken ?? "");
+      setCollabJoinUrl(activeFile.collab.joinUrl);
+    } else if (!parsedCollabJoin && !collabAuthToken) {
+      setCollabWsBaseUrl(null);
+      setCollabAuthToken(null);
+      setCollabJoinUrl(null);
     }
 
     let cancelled = false;
@@ -399,7 +536,57 @@ export const MarkdownApp = () => {
     return () => {
       cancelled = true;
     };
-  }, [activeDocumentId, activeFile, content]);
+  }, [activeDocumentId, activeFile, collabAuthToken, content, parsedCollabJoin]);
+
+  useEffect(() => {
+    if (!activeFile?.collab || collabAuthToken || pendingJoinRoomId) {
+      return;
+    }
+
+    if (activeFile.collab.accessMode === "password") {
+      setPendingJoinRoomId(activeFile.collab.roomId);
+      setCollabAccessMode("password");
+      setCollabRoomId(activeFile.collab.roomId);
+      setCollabJoinUrl(activeFile.collab.joinUrl);
+      setIsCollabDialogOpen(true);
+      return;
+    }
+
+    void joinCollaborationRoom({
+      roomId: activeFile.collab.roomId,
+      inviteToken: activeFile.collab.inviteToken,
+    })
+      .then((connection) => {
+        setCollabWsBaseUrl(connection.wsBaseUrl);
+        setCollabAuthToken(connection.token);
+      })
+      .catch((error) => {
+        setUiError(getUnknownErrorMessage(error));
+      });
+  }, [activeFile, collabAuthToken, pendingJoinRoomId]);
+
+  useEffect(() => {
+    if (!activeFile || activeFile.collab || !collabRoomId || !collabJoinUrl) {
+      return;
+    }
+
+    const inviteToken =
+      collabAccessMode === "invite" ? collabInviteToken.trim() || null : null;
+
+    setDocumentCollaboration(activeFile.id, {
+      roomId: collabRoomId,
+      accessMode: collabAccessMode,
+      inviteToken,
+      joinUrl: collabJoinUrl,
+    });
+  }, [
+    activeFile,
+    collabAccessMode,
+    collabInviteToken,
+    collabJoinUrl,
+    collabRoomId,
+    setDocumentCollaboration,
+  ]);
 
   useEffect(() => {
     const nextPreviewContent = isPreviewVisible
@@ -494,6 +681,16 @@ export const MarkdownApp = () => {
         end: event.target.selectionEnd,
       };
 
+      if (collaboration.isActive) {
+        syncPreviewContent(nextValue);
+        collaboration.applyLocalContent(nextValue);
+        collaboration.updateLocalSelection(nextSelection);
+        if (shouldTrackPreviewSelection) {
+          setEditorSelection(nextSelection);
+        }
+        return;
+      }
+
       if (activeDocumentId) {
         const currentHistory = historyRef.current.get(activeDocumentId) ?? {
           entries: [],
@@ -570,9 +767,11 @@ export const MarkdownApp = () => {
     },
     [
       activeDocumentId,
+      collaboration,
       isLargeDocument,
       setContent,
       setDocumentContent,
+      shouldTrackPreviewSelection,
       syncPreviewContent,
     ]
   );
@@ -625,7 +824,14 @@ export const MarkdownApp = () => {
       }
 
       if (!shouldTrackPreviewSelection) {
+        if (collaboration.isActive) {
+          collaboration.updateLocalSelection(nextSelection);
+        }
         return;
+      }
+
+      if (collaboration.isActive) {
+        collaboration.updateLocalSelection(nextSelection);
       }
 
       setEditorSelection((currentValue) =>
@@ -635,7 +841,7 @@ export const MarkdownApp = () => {
           : nextSelection
       );
     },
-    [activeDocumentId, shouldTrackPreviewSelection]
+    [activeDocumentId, collaboration, shouldTrackPreviewSelection]
   );
 
   const { handleEditorScroll, handlePreviewScroll, syncPreviewToEditor } =
@@ -860,6 +1066,118 @@ export const MarkdownApp = () => {
     setIsShareDialogOpen(true);
   }, [activeFile]);
 
+  const openCollabDialogAction = useCallback(() => {
+    if (!activeFile) {
+      return;
+    }
+
+    const existingCollab = activeFile.collab ?? null;
+
+    setCollabAccessMode(existingCollab?.accessMode ?? "open");
+    setCollabRoomId(existingCollab?.roomId ?? createCollaborationRoomId());
+    setCollabInviteToken(
+      existingCollab?.inviteToken ?? createCollaborationToken()
+    );
+    setCollabPassword("");
+    setCollabJoinUrl(existingCollab?.joinUrl ?? collabJoinUrl);
+    setIsCollabDialogOpen(true);
+  }, [activeFile, collabJoinUrl]);
+
+  const startCollaborationAction = useCallback(async () => {
+    if (!activeFile) {
+      return;
+    }
+
+    setIsCollabBusy(true);
+
+    try {
+      if (pendingJoinRoomId) {
+        const connection = await joinCollaborationRoom({
+          roomId: pendingJoinRoomId,
+          inviteToken: collabAccessMode === "invite" ? collabInviteToken : null,
+          password: collabAccessMode === "password" ? collabPassword : null,
+        });
+
+        setCollabWsBaseUrl(connection.wsBaseUrl);
+        setCollabAuthToken(connection.token);
+        setPendingJoinRoomId(null);
+        setIsCollabDialogOpen(false);
+        toast.success("Joined collaboration.");
+        return;
+      }
+
+      const room = await createCollaborationRoom({
+        accessMode: collabAccessMode,
+        inviteToken: collabAccessMode === "invite" ? collabInviteToken : null,
+        password: collabAccessMode === "password" ? collabPassword : null,
+      });
+      const connection = await joinCollaborationRoom({
+        roomId: room.id,
+        inviteToken: room.inviteToken,
+        password: collabAccessMode === "password" ? collabPassword : null,
+      });
+
+      setCollabRoomId(room.id);
+      setCollabInviteToken(room.inviteToken ?? "");
+      setCollabJoinUrl(room.joinUrl);
+      setCollabWsBaseUrl(connection.wsBaseUrl);
+      setCollabAuthToken(connection.token);
+
+      const collab = {
+        roomId: room.id,
+        accessMode: collabAccessMode,
+        inviteToken: room.inviteToken,
+        joinUrl: room.joinUrl,
+      } as const;
+
+      setDocumentCollaboration(activeFile.id, collab);
+      toast.success("Collaboration started.");
+    } catch (error) {
+      setUiError(getUnknownErrorMessage(error));
+    } finally {
+      setIsCollabBusy(false);
+    }
+  }, [
+    activeFile,
+    collabAccessMode,
+    collabInviteToken,
+    collabPassword,
+    pendingJoinRoomId,
+    setDocumentCollaboration,
+  ]);
+
+  const stopCollaborationAction = useCallback(() => {
+    if (!activeFile) {
+      return;
+    }
+
+    setCollabWsBaseUrl(null);
+    setCollabAuthToken(null);
+    setPendingJoinRoomId(null);
+    setCollabJoinUrl(null);
+    setCollabPassword("");
+    setDocumentCollaboration(activeFile.id, null);
+    setIsCollabDialogOpen(false);
+    toast.success("Collaboration stopped.");
+  }, [activeFile, setDocumentCollaboration]);
+
+  const copyCollaborationLinkAction = useCallback(async () => {
+    if (!collabJoinUrl) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(collabJoinUrl);
+      toast.success("Collaboration link copied.");
+    } catch (error) {
+      setUiError(getUnknownErrorMessage(error));
+    }
+  }, [collabJoinUrl]);
+
+  const regenerateCollaborationDisplayNameAction = useCallback(() => {
+    setCollaborationDisplayName(faker.person.fullName());
+  }, [setCollaborationDisplayName]);
+
   const shareActiveFileAction = useCallback(async () => {
     if (!activeFile) {
       return;
@@ -929,9 +1247,12 @@ export const MarkdownApp = () => {
   }, [activeFile, flushPendingEditorContent, setDocumentShare]);
 
   const goHomeAction = useCallback(() => {
+    navigatingHomeRef.current = true;
+    attemptedRouteDocumentIdRef.current = null;
     flushPendingEditorContent();
     goHome();
-  }, [flushPendingEditorContent, goHome]);
+    router.replace("/", { scroll: false });
+  }, [flushPendingEditorContent, goHome, router]);
 
   const clearDocumentAction = useCallback(() => {
     flushPendingEditorContent();
@@ -955,6 +1276,11 @@ export const MarkdownApp = () => {
   );
 
   const undoAction = useCallback(() => {
+    if (collaboration.isActive) {
+      collaboration.undo();
+      return;
+    }
+
     if (contentSyncTimeoutRef.current) {
       window.clearTimeout(contentSyncTimeoutRef.current);
       contentSyncTimeoutRef.current = null;
@@ -982,9 +1308,14 @@ export const MarkdownApp = () => {
     startTransition(() => {
       setContent(nextEntry.content);
     });
-  }, [activeDocumentId, setContent, syncPreviewContent]);
+  }, [activeDocumentId, collaboration, setContent, syncPreviewContent]);
 
   const redoAction = useCallback(() => {
+    if (collaboration.isActive) {
+      collaboration.redo();
+      return;
+    }
+
     if (contentSyncTimeoutRef.current) {
       window.clearTimeout(contentSyncTimeoutRef.current);
       contentSyncTimeoutRef.current = null;
@@ -1015,11 +1346,11 @@ export const MarkdownApp = () => {
     startTransition(() => {
       setContent(nextEntry.content);
     });
-  }, [activeDocumentId, setContent, syncPreviewContent]);
+  }, [activeDocumentId, collaboration, setContent, syncPreviewContent]);
 
   useMarkdownHotkeys({
     enabled: Boolean(activeFile) && !isSharedViewerMode,
-    saveEnabled: activeFile?.source !== "url",
+    saveEnabled: activeFile?.source === "picker" || activeFile?.source === "drop",
     onSaveAction: saveActiveFileAction,
     onOpenSwitcherAction: () => setIsCommandPaletteOpen(true),
     onUndoAction: undoAction,
@@ -1179,6 +1510,7 @@ export const MarkdownApp = () => {
           onEditorBlur={clearEditorSelection}
           onEditorSelectionChange={syncEditorSelection}
           onEditorScroll={handleEditorScroll}
+          collaboratorSelections={collaboration.participants}
           onPreviewScroll={handlePreviewScroll}
           previewSelection={deferredPreviewSelection}
           viewMode={viewMode}
@@ -1196,6 +1528,10 @@ export const MarkdownApp = () => {
           saveFileAction={saveActiveFileAction}
           shareActionLabel={shareActionLabel}
           shareFileAction={openShareDialogAction}
+          collaborateActionLabel={collaborateActionLabel}
+          collaborateFileAction={openCollabDialogAction}
+          collaborators={collaboration.participants}
+          collaborationConnected={collaboration.isConnected}
           refreshFileAction={handleRefresh}
           clearDocumentAction={clearDocumentAction}
           setActiveDocumentAction={setActiveDocumentAction}
@@ -1290,7 +1626,7 @@ export const MarkdownApp = () => {
 
             <div className="space-y-1">
               <p className="text-sm font-medium text-foreground">
-                {busyMessage}
+                {effectiveBusyMessage}
               </p>
               <p className="text-sm text-muted-foreground">
                 {pendingRecentFile && !activeFile
@@ -1357,6 +1693,34 @@ export const MarkdownApp = () => {
         submitLabel={shareDialogSubmitLabel}
       />
 
+      <MarkdownCollaborationDialog
+        open={isCollabDialogOpen}
+        isBusy={isCollabBusy}
+        roomId={collabRoomId}
+        displayName={collaborativeUserName}
+        accessMode={collabAccessMode}
+        inviteToken={collabInviteToken}
+        password={collabPassword}
+        joinUrl={collabJoinUrl}
+        connected={collaboration.isConnected}
+        participantsCount={collaboration.participants.length}
+        onOpenChangeAction={setIsCollabDialogOpen}
+        onDisplayNameChangeAction={setCollaborationDisplayName}
+        onGenerateDisplayNameAction={
+          regenerateCollaborationDisplayNameAction
+        }
+        onAccessModeChangeAction={setCollabAccessMode}
+        onInviteTokenChangeAction={setCollabInviteToken}
+        onPasswordChangeAction={setCollabPassword}
+        onSubmitAction={() => {
+          void startCollaborationAction();
+        }}
+        onStopAction={stopCollaborationAction}
+        onCopyLinkAction={() => {
+          void copyCollaborationLinkAction();
+        }}
+      />
+
       <MarkdownCommandPalette
         open={isCommandPaletteOpen}
         onOpenChange={setIsCommandPaletteOpen}
@@ -1365,7 +1729,9 @@ export const MarkdownApp = () => {
         openDocuments={openDocuments}
         recentFiles={recentFiles}
         viewMode={viewMode}
-        canSaveActiveFile={activeFile?.source !== "url"}
+        canSaveActiveFile={
+          activeFile?.source === "picker" || activeFile?.source === "drop"
+        }
         hasActiveFile={Boolean(activeFile)}
         isBusy={isBusy || isShareBusy}
         openFileAction={() => {
