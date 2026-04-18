@@ -1,6 +1,7 @@
 "use client";
 
 import { rehypeMarkdownViewerSelection } from "@/lib/markdown-viewer-selection";
+import { remarkAlphaOrderedLists } from "@/lib/remark-alpha-ordered-lists";
 import { cn } from "@/lib/utils";
 import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection";
 import { useTheme } from "next-themes";
@@ -11,7 +12,6 @@ import {
   oneDark,
   oneLight,
 } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { remarkAlphaOrderedLists } from "@/lib/remark-alpha-ordered-lists";
 import remarkGfm from "remark-gfm";
 import { type PluggableList } from "unified";
 
@@ -96,6 +96,7 @@ export const MarkdownPreview = ({
         "[&_ol]:list-decimal [&_ol[type='a']]:list-[lower-alpha] [&_ol[type='A']]:list-[upper-alpha] [&_ol]:space-y-1 [&_ol]:pl-5",
         "[&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5",
         "[&_.task-list-item]:list-none",
+        "[&_.task-list-item>input]:mr-1 [&_.task-list-item>input]:shrink-0",
 
         // Tables (GFM)
         "[&_table]:w-full [&_table]:border-collapse",
