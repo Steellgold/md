@@ -1,4 +1,3 @@
-import { continueListOnEnterAction } from "@/lib/markdown-editor";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +12,7 @@ import {
   InputGroupAddon,
   InputGroupTextarea,
 } from "@/components/ui/input-group";
+import { continueListOnEnterAction } from "@/lib/markdown-editor";
 import { buildActiveDocumentMeta } from "@/lib/markdown-helpers";
 import {
   type MarkdownDocumentStats,
@@ -64,54 +64,18 @@ type MarkdownEditorPanelProps = {
 };
 
 const quickActions = [
-  {
-    label: "Undo",
-    icon: Undo2Icon,
-    actionKey: "undoAction",
-  },
-  {
-    label: "Redo",
-    icon: Redo2Icon,
-    actionKey: "redoAction",
-  },
-  {
-    label: "Bold",
-    icon: BoldIcon,
-    actionKey: "boldAction",
-  },
-  {
-    label: "Italic",
-    icon: ItalicIcon,
-    actionKey: "italicAction",
-  },
-  {
-    label: "Inline code",
-    icon: Code2Icon,
-    actionKey: "inlineCodeAction",
-  },
-  {
-    label: "Code block",
-    icon: FileCode2Icon,
-    actionKey: "codeBlockAction",
-  },
+  { label: "Undo", icon: Undo2Icon, actionKey: "undoAction" },
+  { label: "Redo", icon: Redo2Icon, actionKey: "redoAction" },
+  { label: "Bold", icon: BoldIcon, actionKey: "boldAction" },
+  { label: "Italic", icon: ItalicIcon, actionKey: "italicAction" },
+  { label: "Inline code", icon: Code2Icon, actionKey: "inlineCodeAction" },
+  { label: "Code block", icon: FileCode2Icon, actionKey: "codeBlockAction" },
 ] as const;
 
 const listActions = [
-  {
-    label: "Bullet list",
-    icon: ListIcon,
-    actionKey: "bulletListAction",
-  },
-  {
-    label: "Numbered list",
-    icon: ListOrderedIcon,
-    actionKey: "orderedListAction",
-  },
-  {
-    label: "Checklist",
-    icon: ListTodoIcon,
-    actionKey: "taskListAction",
-  },
+  { label: "Bullet list", icon: ListIcon, actionKey: "bulletListAction" },
+  { label: "Numbered list", icon: ListOrderedIcon, actionKey: "orderedListAction" },
+  { label: "Checklist", icon: ListTodoIcon, actionKey: "taskListAction" },
 ] as const;
 
 const headingLevels = [1, 2, 3, 4, 5, 6] as const;
@@ -234,7 +198,7 @@ export const MarkdownEditorPanel = ({
       </CardHeader>
 
       <CardContent className="relative flex-1 min-h-0 p-0">
-        <InputGroup className="h-full! flex-1 min-h-0 flex-col items-stretch overflow-hidden rounded-none border-0 bg-transparent">
+        <InputGroup className="h-full! flex-1 min-h-0 flex-col items-stretch overflow-hidden rounded-none border-0 bg-transparent has-[[data-slot=input-group-control]:focus-visible]:border-input has-[[data-slot=input-group-control]:focus-visible]:ring-0">
           <InputGroupAddon
             ref={topbarRef}
             align="block-start"

@@ -58,22 +58,20 @@ export const MarkdownPreviewPanel = ({
         </div>
       </CardHeader>
 
-      <CardContent className="relative flex-1 min-h-0 px-0">
+      <CardContent className="relative flex flex-1 min-h-0 flex-col px-0">
+        {topOverlayHeight && topOverlayHeight > 0 ? (
+          <div
+            className="z-10 shrink-0 border-b bg-background/75 backdrop-blur-xl"
+            style={{ height: `${topOverlayHeight}px` }}
+          />
+        ) : null}
+
         <div
           ref={previewRef}
           onScroll={onScroll}
           tabIndex={0}
-          className="h-full overflow-y-auto outline-none"
+          className="min-h-0 flex-1 overflow-y-auto outline-none"
         >
-          <div
-            className="sticky top-0 z-10 border-b bg-background/75 backdrop-blur-xl"
-            style={
-              topOverlayHeight && topOverlayHeight > 0
-                ? { height: `${topOverlayHeight}px` }
-                : undefined
-            }
-          />
-
           {content.trim() ? (
             <MarkdownPreview content={content} editorSelection={editorSelection} />
           ) : (

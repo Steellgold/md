@@ -5,7 +5,10 @@ import { MarkdownCommandPalette } from "@/components/markdown-command-palette";
 import { MarkdownEmptyState } from "@/components/markdown-empty-state";
 import { MarkdownOpenUrlDialog } from "@/components/markdown-open-url-dialog";
 import { MarkdownRecentFiles } from "@/components/markdown-recent-files";
+import { MarkdownRemotePasswordDialog } from "@/components/markdown-remote-password-dialog";
 import { MarkdownRemoteSelectionDialog } from "@/components/markdown-remote-selection-dialog";
+import { MarkdownShareDialog } from "@/components/markdown-share-dialog";
+import { MarkdownSharedViewer } from "@/components/markdown-shared-viewer";
 import { Spinner } from "@/components/ui/spinner";
 import { useMarkdownHotkeys } from "@/hooks/use-markdown-hotkeys";
 import { useScrollSync } from "@/hooks/use-scroll-sync";
@@ -20,7 +23,16 @@ import {
   buildMarkdownExportHtml,
   downloadTextFile,
 } from "@/lib/markdown-export";
-import { getMarkdownDocumentStats } from "@/lib/markdown-helpers";
+import { shareRecentMarkdownFile } from "@/lib/markdown-file-system";
+import {
+  getMarkdownDocumentStats,
+  getUnknownErrorMessage,
+} from "@/lib/markdown-helpers";
+import {
+  computeMarkdownContentHash,
+  hasPendingMarkdownShareChanges,
+  isMarkdownShareDirectUrl,
+} from "@/lib/markdown-share";
 import { useMarkdownStore } from "@/lib/markdown-store";
 import { useMarkdownUiStore } from "@/lib/markdown-ui-store";
 import { cn } from "@/lib/utils";
@@ -83,7 +95,9 @@ export const MarkdownApp = () => {
     openPendingRemoteFile,
     reopenRecentFile,
     createNewFile,
+    createLocalCopyOfActiveFile,
     saveActiveFile,
+    setDocumentShare,
     goHome,
     setActiveDocument,
     closeDocument,
@@ -110,14 +124,16 @@ export const MarkdownApp = () => {
   const [isDragActive, setIsDragActive] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isOpenUrlDialogOpen, setIsOpenUrlDialogOpen] = useState(false);
-  const [pendingRecentFileId, setPendingRecentFileId] = useState<string | null>(
-    null
-  );
+  const [isShareBusy, setIsShareBusy] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [pendingRecentFileId, setPendingRecentFileId] = useState<string | null>(null);
   const [previewDetached, setPreviewDetached] = useState(false);
   const [previewRenderContent, setPreviewRenderContent] = useState(content);
+  const [sharePassword, setSharePassword] = useState("");
+  const [shareDialogUrl, setShareDialogUrl] = useState<string | null>(null);
   const [uiError, setUiError] = useState<string | null>(null);
-  const [editorSelection, setEditorSelection] =
-    useState<MarkdownViewerSelection | null>(null);
+  const [contentHash, setContentHash] = useState<string | null>(null);
+  const [editorSelection, setEditorSelection] = useState<MarkdownViewerSelection | null>(null);
 
   const attemptedDeepLinkRef = useRef<string | null>(null);
   const historyRef = useRef<Map<string, EditorHistoryState>>(new Map());
@@ -129,23 +145,43 @@ export const MarkdownApp = () => {
   const searchParamsKey = searchParams.toString();
   const isLargeDocument = content.length >= LARGE_FILE_THRESHOLD;
   const isPreviewVisible = previewDetached || viewMode !== "editor";
-  const shouldTrackPreviewSelection =
-    !isLargeDocument && (previewDetached || viewMode !== "editor");
+  const shouldTrackPreviewSelection = !isLargeDocument && (previewDetached || viewMode !== "editor");
   const deferredStatsContent = useDeferredValue(content);
   const deferredPreviewContent = useDeferredValue(previewRenderContent);
-  const previewContent = isLargeDocument
-    ? previewRenderContent
-    : deferredPreviewContent;
+  const previewContent = isLargeDocument ? previewRenderContent : deferredPreviewContent;
+
   const deferredPreviewSelection = useDeferredValue(
     shouldTrackPreviewSelection ? editorSelection : null
   );
+
   const activeDocumentStats = useMemo(
     () => getMarkdownDocumentStats(deferredStatsContent),
     [deferredStatsContent]
   );
-  const pendingRecentFile =
-    recentFiles.find((file) => file.id === pendingRecentFileId) ?? null;
+
+  const pendingRecentFile = recentFiles.find((file) => file.id === pendingRecentFileId) ?? null;
   const isPageBusy = isBusy && busyMessage !== null;
+
+  const hasPendingShareChanges = hasPendingMarkdownShareChanges(
+    activeFile?.share ?? null,
+    contentHash
+  );
+
+  const isSharedViewerMode = activeFile?.source === "url" && isMarkdownShareDirectUrl(activeFile.url);
+
+  const shareActionLabel = isShareBusy
+    ? "Sharing..."
+    : !activeFile?.share
+      ? "Share"
+      : hasPendingShareChanges
+        ? "Share changes"
+        : "Share";
+
+  const shareDialogSubmitLabel = !activeFile?.share
+    ? "Create link"
+    : hasPendingShareChanges || sharePassword.trim() !== ""
+      ? "Update share"
+      : "Refresh link";
 
   const parsedDeepLink = useMemo(
     () =>
@@ -234,6 +270,35 @@ export const MarkdownApp = () => {
   }, [activeFile]);
 
   useEffect(() => {
+    if (!activeFile) {
+      setContentHash(null);
+      setIsShareDialogOpen(false);
+      setSharePassword("");
+      setShareDialogUrl(null);
+      return;
+    }
+
+    let cancelled = false;
+    const nextContent = editorRef.current?.value ?? content;
+
+    void computeMarkdownContentHash(nextContent)
+      .then((nextHash) => {
+        if (!cancelled) {
+          setContentHash(nextHash);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setContentHash(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeDocumentId, activeFile, content]);
+
+  useEffect(() => {
     const nextPreviewContent = isPreviewVisible
       ? (editorRef.current?.value ?? content)
       : content;
@@ -288,6 +353,10 @@ export const MarkdownApp = () => {
   }, [openDocuments]);
 
   useEffect(() => {
+    if (isSharedViewerMode) {
+      return;
+    }
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.altKey) {
         return;
@@ -310,7 +379,7 @@ export const MarkdownApp = () => {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, []);
+  }, [isSharedViewerMode]);
 
   const handleEditorChange = useCallback(
     (event: ChangeEvent<HTMLTextAreaElement>) => {
@@ -635,6 +704,85 @@ export const MarkdownApp = () => {
     await saveActiveFile();
   }, [flushPendingEditorContent, saveActiveFile]);
 
+  const editSharedFileLocallyAction = useCallback(async () => {
+    flushPendingEditorContent();
+    await createLocalCopyOfActiveFile();
+  }, [createLocalCopyOfActiveFile, flushPendingEditorContent]);
+
+  const copyShareUrlAction = useCallback(async () => {
+    if (!shareDialogUrl) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareDialogUrl);
+    } catch (error) {
+      setUiError(getUnknownErrorMessage(error));
+    }
+  }, [shareDialogUrl]);
+
+  const openShareDialogAction = useCallback(() => {
+    if (!activeFile) {
+      return;
+    }
+
+    setSharePassword("");
+    setShareDialogUrl(activeFile.share?.url ?? null);
+    setIsShareDialogOpen(true);
+  }, [activeFile]);
+
+  const shareActiveFileAction = useCallback(async () => {
+    if (!activeFile) {
+      return;
+    }
+
+    const nextContent = flushPendingEditorContent();
+
+    setIsShareBusy(true);
+
+    try {
+      const result = await shareRecentMarkdownFile(activeFile.id, nextContent, {
+        password: sharePassword,
+      });
+
+      setDocumentShare(activeFile.id, result.share);
+      setContentHash(result.share.contentHash);
+      setShareDialogUrl(result.share.url);
+      setSharePassword("");
+      setIsShareDialogOpen(true);
+    } catch (error) {
+      setUiError(getUnknownErrorMessage(error));
+    } finally {
+      setIsShareBusy(false);
+    }
+  }, [activeFile, flushPendingEditorContent, setDocumentShare, sharePassword]);
+
+  const removeSharePasswordAction = useCallback(async () => {
+    if (!activeFile?.share?.requiresPassword) {
+      return;
+    }
+
+    const nextContent = flushPendingEditorContent();
+
+    setIsShareBusy(true);
+
+    try {
+      const result = await shareRecentMarkdownFile(activeFile.id, nextContent, {
+        removePassword: true,
+      });
+
+      setDocumentShare(activeFile.id, result.share);
+      setContentHash(result.share.contentHash);
+      setShareDialogUrl(result.share.url);
+      setSharePassword("");
+      setIsShareDialogOpen(true);
+    } catch (error) {
+      setUiError(getUnknownErrorMessage(error));
+    } finally {
+      setIsShareBusy(false);
+    }
+  }, [activeFile, flushPendingEditorContent, setDocumentShare]);
+
   const goHomeAction = useCallback(() => {
     flushPendingEditorContent();
     goHome();
@@ -725,7 +873,7 @@ export const MarkdownApp = () => {
   }, [activeDocumentId, setContent, syncPreviewContent]);
 
   useMarkdownHotkeys({
-    enabled: Boolean(activeFile),
+    enabled: Boolean(activeFile) && !isSharedViewerMode,
     saveEnabled: activeFile?.source !== "url",
     onSaveAction: saveActiveFileAction,
     onOpenSwitcherAction: () => setIsCommandPaletteOpen(true),
@@ -847,9 +995,9 @@ export const MarkdownApp = () => {
       onDrop={handleDrop}
     >
       {error || uiError ? (
-        <div className="absolute right-4 bottom-4 z-50 flex flex-col gap-3">
+        <div className="fixed right-4 bottom-4 z-50 flex max-w-[calc(100vw-2rem)] flex-col gap-3">
           {error ? (
-            <div className="mx-auto flex items-center gap-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive backdrop-blur-xl">
+            <div className="flex items-center gap-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive backdrop-blur-xl">
               <div className="flex items-center gap-2">
                 <TriangleAlertIcon className="size-4" />
                 {error}
@@ -862,7 +1010,7 @@ export const MarkdownApp = () => {
           ) : null}
 
           {uiError ? (
-            <div className="mx-auto flex items-center gap-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive backdrop-blur-xl">
+            <div className="flex items-center gap-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive backdrop-blur-xl">
               <div className="flex items-center gap-2">
                 <TriangleAlertIcon className="size-4" />
                 {uiError}
@@ -876,13 +1024,23 @@ export const MarkdownApp = () => {
         </div>
       ) : null}
 
-      {activeFile ? (
+      {activeFile && isSharedViewerMode ? (
+        <MarkdownSharedViewer
+          activeFile={activeFile}
+          content={previewContent}
+          isBusy={isBusy}
+          previewRef={previewRef}
+          editLocallyAction={() => {
+            void editSharedFileLocallyAction();
+          }}
+        />
+      ) : activeFile ? (
         <MarkdownActiveDocument
           activeFile={activeFile}
           openDocuments={openDocuments}
           activeDocumentId={activeDocumentId}
           recentFiles={recentFiles}
-          isBusy={isBusy}
+          isBusy={isBusy || isShareBusy}
           content={content}
           stats={activeDocumentStats}
           previewContent={previewContent}
@@ -907,6 +1065,8 @@ export const MarkdownApp = () => {
           showOpenUrlDialogAction={showOpenUrlDialog}
           goHomeAction={goHomeAction}
           saveFileAction={saveActiveFileAction}
+          shareActionLabel={shareActionLabel}
+          shareFileAction={openShareDialogAction}
           refreshFileAction={handleRefresh}
           clearDocumentAction={clearDocumentAction}
           setActiveDocumentAction={setActiveDocumentAction}
@@ -1021,12 +1181,53 @@ export const MarkdownApp = () => {
         }}
         clearRemoteSelectionAction={clearPendingRemoteOpen}
       />
+
+      <MarkdownRemotePasswordDialog
+        isBusy={isBusy}
+        isOpen={Boolean(pendingRemoteOpen?.passwordRequired)}
+        onOpenChange={(open) => {
+          if (!open) {
+            clearPendingRemoteOpen();
+          }
+        }}
+        openProtectedFileAction={(password) => {
+          void openPendingRemoteFile(undefined, password);
+        }}
+      />
+
       <MarkdownOpenUrlDialog
         isBusy={isBusy}
         openUrlAction={openFromUrl}
         open={isOpenUrlDialogOpen}
         onOpenChange={setIsOpenUrlDialogOpen}
       />
+
+      <MarkdownShareDialog
+        isBusy={isShareBusy}
+        open={isShareDialogOpen}
+        onOpenChangeAction={(open) => {
+          setIsShareDialogOpen(open);
+
+          if (!open) {
+            setSharePassword("");
+          }
+        }}
+        onCopyAction={() => {
+          void copyShareUrlAction();
+        }}
+        onPasswordChangeAction={setSharePassword}
+        onRemovePasswordAction={() => {
+          void removeSharePasswordAction();
+        }}
+        onSubmitAction={() => {
+          void shareActiveFileAction();
+        }}
+        password={sharePassword}
+        shareUrl={shareDialogUrl}
+        hasProtectedShare={Boolean(activeFile?.share?.requiresPassword)}
+        submitLabel={shareDialogSubmitLabel}
+      />
+
       <MarkdownCommandPalette
         open={isCommandPaletteOpen}
         onOpenChange={setIsCommandPaletteOpen}
@@ -1037,7 +1238,7 @@ export const MarkdownApp = () => {
         viewMode={viewMode}
         canSaveActiveFile={activeFile?.source !== "url"}
         hasActiveFile={Boolean(activeFile)}
-        isBusy={isBusy}
+        isBusy={isBusy || isShareBusy}
         openFileAction={() => {
           void openWithPicker();
         }}
@@ -1048,6 +1249,8 @@ export const MarkdownApp = () => {
         saveFileAction={() => {
           void saveActiveFileAction();
         }}
+        shareActionLabel={shareActionLabel}
+        shareFileAction={openShareDialogAction}
         refreshFileAction={() => {
           void handleRefresh();
         }}

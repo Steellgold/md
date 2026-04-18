@@ -25,9 +25,7 @@ import {
   type RecentMarkdownFile,
 } from "@/types/markdown";
 import {
-  ChevronDownIcon,
-  CommandIcon,
-  EllipsisIcon,
+  ChevronDownIcon, EllipsisIcon,
   FolderOpenIcon,
   HistoryIcon,
   HouseIcon,
@@ -39,7 +37,7 @@ import {
   SaveIcon,
   Trash2Icon,
   TypeIcon,
-  XIcon,
+  XIcon
 } from "lucide-react";
 import { useState } from "react";
 
@@ -54,6 +52,8 @@ type MarkdownToolbarProps = {
   showOpenUrlDialogAction: () => void;
   goHomeAction: () => void;
   saveFileAction: () => void;
+  shareActionLabel: string;
+  shareFileAction: () => void;
   refreshFileAction: () => void;
   clearDocumentAction: () => void;
   openRecentAction: (id: string) => void;
@@ -65,21 +65,9 @@ type MarkdownToolbarProps = {
 };
 
 const viewOptions = [
-  {
-    value: "split" as const,
-    label: "Split",
-    icon: PanelLeftIcon,
-  },
-  {
-    value: "editor" as const,
-    label: "Editor",
-    icon: TypeIcon,
-  },
-  {
-    value: "preview" as const,
-    label: "Preview",
-    icon: PanelRightIcon,
-  },
+  { value: "editor" as const, label: "Editor", icon: TypeIcon },
+  { value: "split" as const, label: "Split", icon: PanelLeftIcon },
+  { value: "preview" as const, label: "Preview", icon: PanelRightIcon },
 ];
 
 export const MarkdownToolbar = ({
@@ -89,10 +77,11 @@ export const MarkdownToolbar = ({
   recentFiles,
   isBusy,
   openFileAction,
-  showCommandPaletteAction,
   showOpenUrlDialogAction,
   goHomeAction,
   saveFileAction,
+  shareActionLabel,
+  shareFileAction,
   refreshFileAction,
   clearDocumentAction,
   openRecentAction,
@@ -102,13 +91,12 @@ export const MarkdownToolbar = ({
   syncScrollEnabled,
   toggleSyncScrollAction,
 }: MarkdownToolbarProps) => {
+  const [isClearHistoryConfirmOpen, setIsClearHistoryConfirmOpen] = useState(false);
+
   const secondaryLabel = buildActiveDocumentMeta(stats, activeFile);
   const canSaveFile = activeFile?.source !== "url";
-  const refreshLabel =
-    activeFile?.source === "url" ? "Reload URL" : "Reopen file";
+  const refreshLabel = activeFile?.source === "url" ? "Reload URL" : "Reopen file";
   const closeLabel = openDocumentsCount > 1 ? "Close tab" : "Close document";
-  const [isClearHistoryConfirmOpen, setIsClearHistoryConfirmOpen] =
-    useState(false);
   const visibleRecentFiles = recentFiles.slice(0, 6);
   const overflowRecentFiles = recentFiles.slice(6);
 
@@ -143,8 +131,7 @@ export const MarkdownToolbar = ({
               return (
                 <Button
                   key={option.value}
-                  variant={viewMode === option.value ? "secondary" : "outline"}
-                  size="sm"
+                  variant={viewMode === option.value ? "default" : "outline"}
                   onClick={() => setViewModeAction(option.value)}
                 >
                   <Icon data-icon="inline-start" />
@@ -189,12 +176,16 @@ export const MarkdownToolbar = ({
                   <FolderOpenIcon />
                   Open file
                 </DropdownMenuItem>
+
                 <DropdownMenuItem onSelect={showOpenUrlDialogAction}>
                   <LinkIcon />
                   Open URL
                 </DropdownMenuItem>
+
                 <DropdownMenuSeparator />
+
                 <DropdownMenuLabel>Recent</DropdownMenuLabel>
+
                 {visibleRecentFiles.length > 0 ? (
                   <DropdownMenuGroup>
                     {visibleRecentFiles.map((file) => {
@@ -222,6 +213,7 @@ export const MarkdownToolbar = ({
                 ) : (
                   <DropdownMenuItem disabled>No recent files</DropdownMenuItem>
                 )}
+
                 {overflowRecentFiles.length > 0 ? (
                   <DropdownMenuSub>
                     <DropdownMenuSubTrigger>
@@ -253,6 +245,7 @@ export const MarkdownToolbar = ({
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
                 ) : null}
+
                 {recentFiles.length > 0 ? (
                   <>
                     <DropdownMenuSeparator />
@@ -277,9 +270,13 @@ export const MarkdownToolbar = ({
             Save
           </Button>
 
-          <Button variant="outline" onClick={showCommandPaletteAction}>
-            <CommandIcon data-icon="inline-start" />
-            Quick switcher
+          <Button
+            variant="outline"
+            onClick={shareFileAction}
+            disabled={!activeFile || isBusy}
+          >
+            <LinkIcon data-icon="inline-start" />
+            {shareActionLabel}
           </Button>
 
           <DropdownMenu>
@@ -288,6 +285,7 @@ export const MarkdownToolbar = ({
                 <EllipsisIcon />
               </Button>
             </DropdownMenuTrigger>
+
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>Document actions</DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -298,6 +296,7 @@ export const MarkdownToolbar = ({
                 <RefreshCcwIcon />
                 {refreshLabel}
               </DropdownMenuItem>
+
               <DropdownMenuCheckboxItem
                 checked={syncScrollEnabled}
                 onCheckedChange={toggleSyncScrollAction}

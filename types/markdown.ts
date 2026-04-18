@@ -10,28 +10,31 @@ export type MarkdownDocumentStats = {
   lineCount: number;
 };
 
+export type MarkdownShare = {
+  id: string;
+  url: string;
+  contentHash: string;
+  lastSharedAt: string;
+  requiresPassword: boolean;
+};
+
 export type RecentMarkdownFile = {
   id: string;
   name: string;
   path: string | null;
   url: string | null;
   urlFileName: string | null;
+  share: MarkdownShare | null;
   lastOpenedAt: string;
   source: RecentMarkdownFileSource;
   stats?: MarkdownDocumentStats;
 };
 
 export type MarkdownOpenFromUrlActionResult =
-  | {
-      status: "opened";
-    }
-  | {
-      status: "selection-required";
-      files: string[];
-    }
-  | {
-      status: "error";
-    };
+  | { status: "opened"; }
+  | { status: "password-required"; }
+  | { status: "selection-required"; files: string[]; }
+  | { status: "error"; };
 
 export type PendingMarkdownImport = {
   entry: RecentMarkdownFile;
@@ -49,11 +52,21 @@ export type OpenMarkdownDocument = {
 export type PendingRemoteMarkdownOpen = {
   url: string;
   files: string[];
+  passwordRequired?: boolean;
 };
 
 export type OpenMarkdownResult = {
   entry: RecentMarkdownFile;
   content: string;
+};
+
+export type MarkdownShareResult = {
+  share: MarkdownShare;
+};
+
+export type MarkdownShareOptions = {
+  password?: string;
+  removePassword?: boolean;
 };
 
 export type PickerOptions = {
@@ -121,7 +134,8 @@ export type MarkdownStore = {
   openWithPicker: () => Promise<void>;
   openFromUrl: (
     url: string,
-    fileName?: string
+    fileName?: string,
+    password?: string
   ) => Promise<MarkdownOpenFromUrlActionResult>;
   openDeepLinkUrl: (url: string) => Promise<void>;
   openDroppedFiles: (
@@ -129,11 +143,16 @@ export type MarkdownStore = {
     items?: DataTransferItemList | null
   ) => Promise<void>;
   clearPendingImports: () => void;
-  openPendingRemoteFile: (fileName: string) => Promise<void>;
+  openPendingRemoteFile: (
+    fileName?: string,
+    password?: string
+  ) => Promise<void>;
   clearPendingRemoteOpen: () => void;
   reopenRecentFile: (id: string) => Promise<void>;
   createNewFile: () => Promise<void>;
+  createLocalCopyOfActiveFile: () => Promise<void>;
   saveActiveFile: () => Promise<void>;
+  setDocumentShare: (id: string, share: MarkdownShare) => void;
   goHome: () => void;
   closeDocument: (id: string) => void;
   removeRecentFile: (id: string) => Promise<void>;

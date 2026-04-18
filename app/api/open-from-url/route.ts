@@ -28,6 +28,12 @@ class RemoteFileSelectionRequiredError extends Error {
   }
 }
 
+class RemotePasswordRequiredError extends Error {
+  constructor(message = "This remote document requires a password.") {
+    super(message);
+  }
+}
+
 const isHttpUrl = (url: URL) =>
   url.protocol === "http:" || url.protocol === "https:";
 
@@ -76,12 +82,45 @@ const getFileNameFromUrl = (url: URL) => {
   }
 };
 
+const decodeFileNameValue = (value: string) => {
+  const normalizedValue = value.trim().replace(/^"(.*)"$/u, "$1");
+
+  try {
+    return decodeURIComponent(normalizedValue);
+  } catch {
+    return normalizedValue;
+  }
+};
+
+const getFileNameFromContentDisposition = (value: string | null) => {
+  if (!value) {
+    return null;
+  }
+
+  const utf8FileNameMatch = value.match(/filename\*\s*=\s*UTF-8''([^;]+)/iu);
+
+  if (utf8FileNameMatch?.[1]) {
+    return decodeFileNameValue(utf8FileNameMatch[1]);
+  }
+
+  const fileNameMatch = value.match(/filename\s*=\s*(".*?"|[^;]+)/iu);
+
+  if (fileNameMatch?.[1]) {
+    return decodeFileNameValue(fileNameMatch[1]);
+  }
+
+  return null;
+};
+
 const createTimeoutSignal = () => AbortSignal.timeout(REQUEST_TIMEOUT_MS);
 
 const resolveGitHubBlobUrl = (url: URL) => {
   const segments = url.pathname.split("/").filter(Boolean);
 
-  if (segments.length < 5 || (segments[2] !== "blob" && segments[2] !== "raw")) {
+  if (
+    segments.length < 5 ||
+    (segments[2] !== "blob" && segments[2] !== "raw")
+  ) {
     throw new Error(
       "GitHub URLs must point to a file path such as /blob/main/README.md."
     );
@@ -113,7 +152,9 @@ const fetchJson = async <T>(url: URL) => {
   });
 
   if (!response.ok) {
-    throw new Error(`Unable to resolve the remote document (${response.status}).`);
+    throw new Error(
+      `Unable to resolve the remote document (${response.status}).`
+    );
   }
 
   return (await response.json()) as T;
@@ -134,7 +175,9 @@ const pickGistFile = (gist: GistPayload, requestedFileName: string | null) => {
     );
 
     if (!match) {
-      throw new Error(`No file named "${requestedFileName}" was found in the Gist.`);
+      throw new Error(
+        `No file named "${requestedFileName}" was found in the Gist.`
+      );
     }
 
     return match;
@@ -178,7 +221,10 @@ const resolveGistUrl = async (url: URL, requestedFileName?: string) => {
 
   const apiUrl = new URL(`https://api.github.com/gists/${gistId}`);
   const gist = await fetchJson<GistPayload>(apiUrl);
-  const file = pickGistFile(gist, requestedFileName ?? url.searchParams.get("file"));
+  const file = pickGistFile(
+    gist,
+    requestedFileName ?? url.searchParams.get("file")
+  );
 
   return {
     downloadUrl: new URL(file.raw_url!),
@@ -208,19 +254,44 @@ const resolveRemoteSource = async (url: URL, requestedFileName?: string) => {
   };
 };
 
-const fetchRemoteText = async (url: URL) => {
+const fetchRemoteText = async (url: URL, password?: string) => {
   const response = await fetch(url, {
     headers: {
       Accept: "text/markdown, text/plain;q=0.9, */*;q=0.1",
       "User-Agent": "md-open-from-url",
+      ...(password
+        ? {
+            "x-markdown-share-password": password,
+          }
+        : {}),
     },
     cache: "no-store",
     redirect: "follow",
     signal: createTimeoutSignal(),
   });
 
+  if (response.status === 401) {
+    const contentType =
+      response.headers.get("content-type")?.toLowerCase() ?? "";
+
+    if (contentType.includes("application/json")) {
+      const payload = (await response.json()) as {
+        error?: string;
+        requiresPassword?: boolean;
+      };
+
+      if (payload.requiresPassword) {
+        throw new RemotePasswordRequiredError(
+          payload.error ?? "This remote document requires a password."
+        );
+      }
+    }
+  }
+
   if (!response.ok) {
-    throw new Error(`Unable to download the remote document (${response.status}).`);
+    throw new Error(
+      `Unable to download the remote document (${response.status}).`
+    );
   }
 
   const contentLength = Number(response.headers.get("content-length") ?? "0");
@@ -232,7 +303,9 @@ const fetchRemoteText = async (url: URL) => {
   const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
 
   if (contentType.includes("text/html")) {
-    throw new Error("The URL returned an HTML page. Use a direct file URL instead.");
+    throw new Error(
+      "The URL returned an HTML page. Use a direct file URL instead."
+    );
   }
 
   const content = await response.text();
@@ -241,13 +314,19 @@ const fetchRemoteText = async (url: URL) => {
     throw new Error("The remote document is too large to open in the editor.");
   }
 
-  return content;
+  return {
+    content,
+    fileName: getFileNameFromContentDisposition(
+      response.headers.get("content-disposition")
+    ),
+  };
 };
 
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as {
       fileName?: string;
+      password?: string;
       url?: string;
     };
     const rawUrl = body.url?.trim();
@@ -287,11 +366,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const content = await fetchRemoteText(downloadUrl);
+    const remoteFile = await fetchRemoteText(
+      downloadUrl,
+      body.password?.trim()
+    );
 
     return NextResponse.json({
-      content,
-      name: fileName,
+      content: remoteFile.content,
+      name: remoteFile.fileName ?? fileName,
       selectedFileName: fileName,
       url: sourceUrl.toString(),
       resolvedUrl: downloadUrl.toString(),
@@ -304,6 +386,16 @@ export async function POST(request: Request) {
           files: error.files,
         },
         { status: 409 }
+      );
+    }
+
+    if (error instanceof RemotePasswordRequiredError) {
+      return NextResponse.json(
+        {
+          error: error.message,
+          requiresPassword: true,
+        },
+        { status: 401 }
       );
     }
 

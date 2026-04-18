@@ -9,6 +9,9 @@ import {
 import {
   type DataTransferItemWithHandle,
   type MarkdownFileHandle,
+  type MarkdownShare,
+  type MarkdownShareOptions,
+  type MarkdownShareResult,
   type OpenFilePickerOptions,
   type PendingMarkdownImport,
   type PermissionMode,
@@ -146,16 +149,47 @@ const readContent = async (handle: FileSystemFileHandle) => {
   return file.text();
 };
 
+const normalizeRemoteUrl = (value: string | null | undefined) => {
+  const trimmedValue = (value ?? "").trim();
+
+  if (trimmedValue === "") {
+    return null;
+  }
+
+  try {
+    return new URL(trimmedValue).toString();
+  } catch {
+    return trimmedValue;
+  }
+};
+
+const getShareTargetUrl = (value: string | null | undefined) => {
+  const normalizedValue = normalizeRemoteUrl(value);
+
+  if (!normalizedValue) {
+    return null;
+  }
+
+  try {
+    const shareUrl = new URL(normalizedValue);
+    return normalizeRemoteUrl(shareUrl.searchParams.get("open"));
+  } catch {
+    return null;
+  }
+};
+
 const createEntryFromHandle = async (
   handle: FileSystemFileHandle,
   source: RecentMarkdownFile["source"],
   content: string,
-  id = crypto.randomUUID()
+  id = crypto.randomUUID(),
+  share: RecentMarkdownFile["share"] = null
 ) => {
   return {
     id,
     name: handle.name,
     path: null,
+    share,
     url: null,
     urlFileName: null,
     lastOpenedAt: new Date().toISOString(),
@@ -166,7 +200,8 @@ const createEntryFromHandle = async (
 
 const requestMarkdownFromUrl = async (
   url: string,
-  fileName?: string
+  fileName?: string,
+  password?: string
 ): Promise<
   | {
       status: "opened";
@@ -174,6 +209,9 @@ const requestMarkdownFromUrl = async (
       name: string;
       selectedFileName: string | null;
       url: string;
+    }
+  | {
+      status: "password-required";
     }
   | {
       status: "selection-required";
@@ -185,7 +223,7 @@ const requestMarkdownFromUrl = async (
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ url, fileName }),
+    body: JSON.stringify({ url, fileName, password }),
   });
 
   const payload = (await response.json()) as {
@@ -193,6 +231,7 @@ const requestMarkdownFromUrl = async (
     error?: string;
     files?: string[];
     name?: string;
+    requiresPassword?: boolean;
     selectedFileName?: string | null;
     url?: string;
   };
@@ -205,6 +244,12 @@ const requestMarkdownFromUrl = async (
     return {
       status: "selection-required",
       files: payload.files,
+    };
+  }
+
+  if (response.status === 401 && payload.requiresPassword) {
+    return {
+      status: "password-required",
     };
   }
 
@@ -232,12 +277,43 @@ const requestMarkdownFromUrl = async (
   };
 };
 
+const requestMarkdownShare = async (
+  fileName: string,
+  content: string,
+  existingShareId?: string | null,
+  options: MarkdownShareOptions = {}
+): Promise<MarkdownShareResult> => {
+  const response = await fetch("/api/share", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      content,
+      existingShareId,
+      name: fileName,
+      password: options.password,
+      removePassword: options.removePassword,
+    }),
+  });
+  const payload = (await response.json()) as {
+    error?: string;
+    share?: MarkdownShare;
+  };
+
+  if (!response.ok || !payload.share) {
+    throw new Error(payload.error ?? "Unable to share the document.");
+  }
+
+  return {
+    share: payload.share,
+  };
+};
+
 const findMatchingRemoteFile = (url: string, fileName: string | null) =>
   readRecentFilesFromStorage().find(
     (file) =>
-      file.source === "url" &&
-      file.url === url &&
-      file.urlFileName === fileName
+      file.source === "url" && file.url === url && file.urlFileName === fileName
   ) ?? null;
 
 const findMatchingRecentFile = async (handle: FileSystemFileHandle) => {
@@ -280,6 +356,31 @@ const persistRecentEntries = (entries: RecentMarkdownFile[]) => {
   return nextFiles;
 };
 
+const reopenLocalRecentFile = async (knownEntry: RecentMarkdownFile) => {
+  const handle = await getHandle(knownEntry.id);
+
+  if (!handle) {
+    throw new Error("This recent file is no longer available in the browser.");
+  }
+
+  const hasPermission = await ensurePermission(handle as MarkdownFileHandle);
+
+  if (!hasPermission) {
+    throw new Error("Permission is required to reopen this file.");
+  }
+
+  const content = await readContent(handle);
+  const nextEntry = {
+    ...knownEntry,
+    name: handle.name,
+    lastOpenedAt: new Date().toISOString(),
+    stats: getMarkdownDocumentStats(content),
+  } satisfies RecentMarkdownFile;
+  const recentFiles = persistRecentEntry(nextEntry);
+
+  return { entry: nextEntry, content, recentFiles };
+};
+
 const createEntryFromFile = (
   file: File,
   content: string,
@@ -289,6 +390,7 @@ const createEntryFromFile = (
     id: crypto.randomUUID(),
     name: file.name,
     path: file.webkitRelativePath || null,
+    share: null,
     url: null,
     urlFileName: null,
     lastOpenedAt: new Date().toISOString(),
@@ -330,7 +432,8 @@ export const openMarkdownWithPicker = async (options: PickerOptions = {}) => {
       handle,
       options.source ?? "picker",
       content,
-      existingEntry?.id ?? options.id
+      existingEntry?.id ?? options.id,
+      existingEntry?.share ?? null
     );
 
     await saveHandle(entry.id, handle);
@@ -343,7 +446,9 @@ export const openMarkdownWithPicker = async (options: PickerOptions = {}) => {
     });
   }
 
-  const recentFiles = persistRecentEntries(documents.map((document) => document.entry));
+  const recentFiles = persistRecentEntries(
+    documents.map((document) => document.entry)
+  );
 
   if (documents.length === 1) {
     const [document] = documents;
@@ -368,6 +473,7 @@ export const openMarkdownFromUrl = async (
   options: {
     fileName?: string;
     id?: string;
+    password?: string;
   } = {}
 ) => {
   const normalizedUrl = url.trim();
@@ -376,9 +482,29 @@ export const openMarkdownFromUrl = async (
     throw new Error("Enter a URL to open.");
   }
 
-  const result = await requestMarkdownFromUrl(normalizedUrl, options.fileName);
+  const matchingSharedLocalFile = readRecentFilesFromStorage().find(
+    (file) =>
+      file.source !== "url" &&
+      getShareTargetUrl(file.share?.url) === normalizeRemoteUrl(normalizedUrl)
+  );
 
-  if (result.status === "selection-required") {
+  if (matchingSharedLocalFile) {
+    return {
+      status: "opened" as const,
+      ...(await reopenLocalRecentFile(matchingSharedLocalFile)),
+    };
+  }
+
+  const result = await requestMarkdownFromUrl(
+    normalizedUrl,
+    options.fileName,
+    options.password
+  );
+
+  if (
+    result.status === "selection-required" ||
+    result.status === "password-required"
+  ) {
     return result;
   }
 
@@ -390,6 +516,7 @@ export const openMarkdownFromUrl = async (
     id: existingEntry?.id ?? options.id ?? crypto.randomUUID(),
     name: result.name,
     path: null,
+    share: existingEntry?.share ?? null,
     url: result.url,
     urlFileName: result.selectedFileName,
     lastOpenedAt: new Date().toISOString(),
@@ -452,7 +579,13 @@ export const openDroppedMarkdownFiles = async (
 
     const existingEntry = await findMatchingRecentFile(handle);
     const entry = {
-      ...(await createEntryFromHandle(handle, "drop", content, existingEntry?.id)),
+      ...(await createEntryFromHandle(
+        handle,
+        "drop",
+        content,
+        existingEntry?.id,
+        existingEntry?.share ?? null
+      )),
       path: file.webkitRelativePath || existingEntry?.path || null,
     } satisfies RecentMarkdownFile;
 
@@ -483,7 +616,9 @@ export const openDroppedMarkdownFiles = async (
 };
 
 export const reopenRecentMarkdownFile = async (id: string) => {
-  const knownEntry = readRecentFilesFromStorage().find((file) => file.id === id);
+  const knownEntry = readRecentFilesFromStorage().find(
+    (file) => file.id === id
+  );
 
   if (!knownEntry) {
     throw new Error("The recent file entry could not be found.");
@@ -500,41 +635,31 @@ export const reopenRecentMarkdownFile = async (id: string) => {
     });
 
     if (result.status === "selection-required") {
-      throw new Error(
-        "This remote document needs a file selection again. Open it from URL to choose the file."
-      );
+      return {
+        status: "selection-required" as const,
+        url: knownEntry.url,
+        files: result.files,
+      };
+    }
+
+    if (result.status === "password-required") {
+      return {
+        status: "password-required" as const,
+        url: knownEntry.url,
+        fileName: knownEntry.urlFileName ?? undefined,
+      };
     }
 
     return result;
   }
 
-  const handle = await getHandle(id);
-
-  if (!handle) {
-    throw new Error("This recent file is no longer available in the browser.");
-  }
-
-  const hasPermission = await ensurePermission(handle as MarkdownFileHandle);
-
-  if (!hasPermission) {
-    throw new Error("Permission is required to reopen this file.");
-  }
-
-  const content = await readContent(handle);
-  const nextEntry = {
-    ...knownEntry,
-    name: handle.name,
-    lastOpenedAt: new Date().toISOString(),
-    stats: getMarkdownDocumentStats(content),
-  } satisfies RecentMarkdownFile;
-
-  const recentFiles = persistRecentEntry(nextEntry);
-
-  return { entry: nextEntry, content, recentFiles };
+  return reopenLocalRecentFile(knownEntry);
 };
 
 export const saveRecentMarkdownFile = async (id: string, content: string) => {
-  const knownEntry = readRecentFilesFromStorage().find((file) => file.id === id);
+  const knownEntry = readRecentFilesFromStorage().find(
+    (file) => file.id === id
+  );
 
   if (knownEntry?.source === "url") {
     throw new Error(
@@ -586,7 +711,10 @@ export const getRecentMarkdownFiles = () =>
 
 export const canUsePersistentLocalFiles = () => supportsOpenFilePicker();
 
-export const createNewMarkdownFile = async (initialContent = "") => {
+export const createNewMarkdownFile = async (
+  initialContent = "",
+  suggestedName = "Untitled.md"
+) => {
   if (
     !supportsOpenFilePicker() ||
     typeof window.showSaveFilePicker !== "function"
@@ -596,7 +724,7 @@ export const createNewMarkdownFile = async (initialContent = "") => {
 
   const handle = await window.showSaveFilePicker({
     id: "markdown-save",
-    suggestedName: "Untitled.md",
+    suggestedName,
     excludeAcceptAllOption: true,
     types: MARKDOWN_FILE_TYPES,
   });
@@ -621,7 +749,8 @@ export const createNewMarkdownFile = async (initialContent = "") => {
     handle,
     "picker",
     initialContent,
-    existingEntry?.id
+    existingEntry?.id,
+    existingEntry?.share ?? null
   );
 
   await saveHandle(entry.id, handle);
@@ -666,4 +795,57 @@ export const clearRecentMarkdownFiles = async () => {
   writeRecentFilesToStorage([]);
 
   return [];
+};
+
+export const shareRecentMarkdownFile = async (
+  id: string,
+  content: string,
+  options: MarkdownShareOptions = {}
+) => {
+  const knownEntry = readRecentFilesFromStorage().find(
+    (file) => file.id === id
+  );
+
+  if (!knownEntry) {
+    throw new Error("The recent file entry could not be found.");
+  }
+
+  const result = await requestMarkdownShare(
+    knownEntry.name,
+    content,
+    knownEntry.share?.id,
+    options
+  );
+  const nextEntry = {
+    ...knownEntry,
+    share: result.share,
+    stats: getMarkdownDocumentStats(content),
+  } satisfies RecentMarkdownFile;
+  const recentFiles = persistRecentEntry(nextEntry);
+
+  return {
+    entry: nextEntry,
+    recentFiles,
+    share: result.share,
+  };
+};
+
+export const setRecentMarkdownFileShare = (
+  id: string,
+  share: RecentMarkdownFile["share"]
+) => {
+  const knownEntry = readRecentFilesFromStorage().find(
+    (file) => file.id === id
+  );
+
+  if (!knownEntry) {
+    throw new Error("The recent file entry could not be found.");
+  }
+
+  const nextEntry = {
+    ...knownEntry,
+    share,
+  } satisfies RecentMarkdownFile;
+
+  return persistRecentEntry(nextEntry);
 };

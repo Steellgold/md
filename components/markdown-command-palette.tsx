@@ -47,6 +47,8 @@ type MarkdownCommandPaletteProps = {
   openUrlDialogAction: () => void;
   createNewAction: () => void;
   saveFileAction: () => void;
+  shareActionLabel: string;
+  shareFileAction: () => void;
   refreshFileAction: () => void;
   exportMarkdownAction: () => void;
   exportHtmlAction: () => void;
@@ -95,6 +97,8 @@ export const MarkdownCommandPalette = ({
   openUrlDialogAction,
   createNewAction,
   saveFileAction,
+  shareActionLabel,
+  shareFileAction,
   refreshFileAction,
   exportMarkdownAction,
   exportHtmlAction,
@@ -151,6 +155,13 @@ export const MarkdownCommandPalette = ({
               <SaveIcon />
               Save current file
               <CommandShortcut>{platformShortcut}S</CommandShortcut>
+            </CommandItem>
+            <CommandItem
+              onSelect={() => runAction(shareFileAction)}
+              disabled={!hasActiveFile || isBusy}
+            >
+              <LinkIcon />
+              {shareActionLabel}
             </CommandItem>
             <CommandItem
               onSelect={() => runAction(refreshFileAction)}

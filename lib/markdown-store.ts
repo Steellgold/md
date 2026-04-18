@@ -1,7 +1,5 @@
 "use client";
 
-import { create } from "zustand";
-
 import {
   canUsePersistentLocalFiles,
   clearRecentMarkdownFiles,
@@ -20,11 +18,13 @@ import {
   getUnknownErrorMessage,
 } from "@/lib/markdown-helpers";
 import {
+  type MarkdownShare,
   type MarkdownStore,
   type OpenMarkdownDocument,
   type PendingMarkdownImport,
   type RecentMarkdownFile,
 } from "@/types/markdown";
+import { create } from "zustand";
 
 const getBusyState = (busyMessage: string) => ({
   isBusy: true,
@@ -56,13 +56,13 @@ const updateDocumentContent = (
       stats,
     },
   };
+
   const nextDocuments = [...state.openDocuments];
   nextDocuments[activeDocumentIndex] = nextDocument;
 
   return {
     openDocuments: nextDocuments,
-    content:
-      state.activeDocumentId === documentId ? content : state.content,
+    content: state.activeDocumentId === documentId ? content : state.content,
     activeFile:
       state.activeDocumentId === documentId
         ? nextDocument.file
@@ -128,8 +128,7 @@ const buildDocumentState = (
   overrides: Partial<MarkdownStore> = {}
 ) => {
   const activeDocumentId = resolveActiveDocumentId(documents, preferredId);
-  const activeDocument =
-    documents.find((document) => document.id === activeDocumentId) ?? null;
+  const activeDocument = documents.find((document) => document.id === activeDocumentId) ?? null;
 
   return {
     openDocuments: documents,
@@ -238,7 +237,23 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
     try {
       const result = await openMarkdownFromUrl(url, { fileName });
 
-      if (result.status === "selection-required") {
+      if ("status" in result && result.status === "password-required") {
+        set({
+          pendingImports: [],
+          pendingRemoteOpen: {
+            url,
+            files: [],
+            passwordRequired: true,
+          },
+          isBusy: false,
+          busyMessage: null,
+          error: null,
+        });
+
+        return result;
+      }
+
+      if ("status" in result && result.status === "selection-required") {
         set({
           pendingImports: [],
           pendingRemoteOpen: null,
@@ -268,6 +283,21 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
 
     try {
       const result = await openMarkdownFromUrl(url);
+
+      if (result.status === "password-required") {
+        set({
+          pendingImports: [],
+          pendingRemoteOpen: {
+            url,
+            files: [],
+            passwordRequired: true,
+          },
+          isBusy: false,
+          busyMessage: null,
+          error: null,
+        });
+        return;
+      }
 
       if (result.status === "selection-required") {
         set({
@@ -325,7 +355,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
     }
   },
   clearPendingImports: () => set({ pendingImports: [] }),
-  openPendingRemoteFile: async (fileName) => {
+  openPendingRemoteFile: async (fileName, password) => {
     const state = useMarkdownStore.getState();
     const pendingRemoteOpen = state.pendingRemoteOpen;
 
@@ -337,15 +367,37 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
     set(getBusyState(`Opening ${fileName}...`));
 
     try {
+      const rememberedFileName =
+        pendingRemoteOpen.files.length === 1
+          ? pendingRemoteOpen.files[0]
+          : undefined;
+      const effectiveFileName = fileName ?? rememberedFileName;
+
       const result = await openMarkdownFromUrl(pendingRemoteOpen.url, {
-        fileName,
+        fileName: effectiveFileName,
+        password,
       });
+
+      if (result.status === "password-required") {
+        set({
+          pendingRemoteOpen: {
+            url: pendingRemoteOpen.url,
+            files: [],
+            passwordRequired: true,
+          },
+          isBusy: false,
+          busyMessage: null,
+          error: null,
+        });
+        return;
+      }
 
       if (result.status === "selection-required") {
         set({
           pendingRemoteOpen: {
             url: pendingRemoteOpen.url,
             files: result.files,
+            passwordRequired: false,
           },
           isBusy: false,
           busyMessage: null,
@@ -382,8 +434,41 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
     set(getBusyState(`Opening ${knownEntry?.name ?? "file"}...`));
 
     try {
-      const { entry, content, recentFiles } =
-        await reopenRecentMarkdownFile(id);
+      const result = await reopenRecentMarkdownFile(id);
+
+      if ("status" in result) {
+        if (result.status === "password-required") {
+          set({
+            pendingImports: [],
+            pendingRemoteOpen: {
+              url: result.url,
+              files: result.fileName ? [result.fileName] : [],
+              passwordRequired: true,
+            },
+            isBusy: false,
+            busyMessage: null,
+            error: null,
+          });
+          return;
+        }
+
+        if (result.status === "selection-required") {
+          set({
+            pendingImports: [],
+            pendingRemoteOpen: {
+              url: result.url,
+              files: result.files,
+              passwordRequired: false,
+            },
+            isBusy: false,
+            busyMessage: null,
+            error: null,
+          });
+          return;
+        }
+      }
+
+      const { entry, content, recentFiles } = result;
 
       set((state) =>
         buildDocumentState(
@@ -404,6 +489,37 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       set((state) =>
         buildDocumentState(
           upsertOpenDocument(state.openDocuments, entry, content),
+          entry.id,
+          recentFiles
+        )
+      );
+    } catch (error) {
+      set(getErrorState(error));
+    }
+  },
+  createLocalCopyOfActiveFile: async () => {
+    const state = useMarkdownStore.getState();
+    const activeDocument =
+      state.openDocuments.find(
+        (document) => document.id === state.activeDocumentId
+      ) ?? null;
+
+    if (!activeDocument) {
+      set(getErrorState(new Error("No active file to copy locally.")));
+      return;
+    }
+
+    set(getBusyState("Creating local copy..."));
+
+    try {
+      const { entry, content, recentFiles } = await createNewMarkdownFile(
+        activeDocument.content,
+        activeDocument.file.name
+      );
+
+      set((currentState) =>
+        buildDocumentState(
+          upsertOpenDocument(currentState.openDocuments, entry, content),
           entry.id,
           recentFiles
         )
@@ -454,6 +570,40 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       set(getErrorState(error));
     }
   },
+  setDocumentShare: (id: string, share: MarkdownShare) =>
+    set((state) => {
+      const nextDocuments = state.openDocuments.map((document) =>
+        document.id === id
+          ? {
+              ...document,
+              file: {
+                ...document.file,
+                share,
+              },
+            }
+          : document
+      );
+      const nextActiveFile =
+        state.activeFile?.id === id
+          ? {
+              ...state.activeFile,
+              share,
+            }
+          : state.activeFile;
+
+      return {
+        openDocuments: nextDocuments,
+        activeFile: nextActiveFile,
+        recentFiles: state.recentFiles.map((file) =>
+          file.id === id
+            ? {
+                ...file,
+                share,
+              }
+            : file
+        ),
+      };
+    }),
   goHome: () =>
     set((state) => {
       state.openDocuments.forEach((document) => {
@@ -492,16 +642,6 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       return buildDocumentState(nextDocuments, preferredId, state.recentFiles);
     }),
   removeRecentFile: async (id) => {
-    const knownEntry =
-      useMarkdownStore.getState().recentFiles.find((file) => file.id === id) ??
-      null;
-
-    set(
-      getBusyState(
-        `Removing ${knownEntry?.name ?? "file"} from recent files...`
-      )
-    );
-
     try {
       const recentFiles = await removeRecentMarkdownFile(id);
       set((state) => ({
@@ -521,8 +661,6 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
     }
   },
   clearRecentFiles: async () => {
-    set(getBusyState("Clearing recent files..."));
-
     try {
       await clearRecentMarkdownFiles();
       set((state) => ({

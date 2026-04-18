@@ -76,7 +76,7 @@ export const MarkdownPreview = ({
 
         // Block content
         "[&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-4 [&_blockquote]:text-muted-foreground",
-        "[&_p]:mb-4",
+        "[&_p]:mb-4 [&_p:last-child]:mb-0",
         "[&_hr]:my-6 [&_hr]:border-border",
 
         // Headings

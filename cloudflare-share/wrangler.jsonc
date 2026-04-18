@@ -1,0 +1,22 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "bettermd-share",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-18",
+  "workers_dev": true,
+  "vars": {
+    "SHARE_TOKEN_BYTES": "24"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "SHARE_INDEX",
+      "id": "59da558069544db08957bddc0f5a64b8"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "SHARE_BUCKET",
+      "bucket_name": "bettermd"
+    }
+  ]
+}

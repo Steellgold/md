@@ -13,6 +13,8 @@ MD lets you write, preview, reopen, and import Markdown files quickly from local
 - Split, editor-only, and preview-only views
 - Persistent user settings with Zustand
 - Recent files history with clear confirmation
+- Read-only sharing via a dedicated Cloudflare Worker
+- Optional password protection for shared links
 - Remote opening from:
   - GitHub file URLs
   - Gist URLs, including multi-file gist selection
@@ -29,6 +31,7 @@ MD lets you write, preview, reopen, and import Markdown files quickly from local
 - Zustand
 - react-markdown
 - react-syntax-highlighter
+- Cloudflare Worker + R2 + KV for sharing
 
 ## Getting Started
 
@@ -60,23 +63,34 @@ bun build
 bun start
 bun lint
 bun typecheck
+bun run share:dev
+bun run share:deploy
 ```
 
 ## Environment
 
-Optional:
+Vercel / Next.js app:
 
 ```bash
 NEXT_PUBLIC_APP_URL=https://your-domain.com
+SHARE_API_BASE_URL=https://share.example.com
+SHARE_API_TOKEN=replace-me-if-you-protect-the-worker-write-api
 ```
 
-Use this if you want absolute metadata URLs for Open Graph and Twitter cards in production.
+Use `NEXT_PUBLIC_APP_URL` for absolute links and `SHARE_API_BASE_URL` for the
+standalone Cloudflare share service.
+
+The Cloudflare worker has its own config under [`cloudflare-share/`](./cloudflare-share).
+
+Copy `.env.example` to `.env.local` for local development.
 
 ## Notes
 
 - Local file reopening depends on browser support for the File System Access API.
 - Remote URLs are validated server-side and local or private network addresses are blocked.
 - Remote documents can be opened and reloaded, but they are intentionally read-only.
+- Shared documents open through the existing remote URL flow and remain read-only.
+- Shared documents can optionally require a password before the app opens them.
 - UI preferences such as split view and sync scroll are persisted in local storage.
 
 ## Project Structure
@@ -84,8 +98,11 @@ Use this if you want absolute metadata URLs for Open Graph and Twitter cards in 
 ```text
 app/
   api/open-from-url/    Remote markdown resolution and download
+  api/share/            Proxy to the external Cloudflare share service
 components/
   markdown-*.tsx        Editor, preview, toolbar, dialogs, recents
+cloudflare-share/
+  src/index.ts          Standalone Worker for share create/read
 lib/
   markdown-*.ts         File access, state helpers, editor helpers
 types/
@@ -96,6 +113,21 @@ public/
 
 ## Deployment
 
-Vercel works out of the box for the app itself.
+Deploy the Next.js app to Vercel as usual.
 
-If metadata previews should be fully correct in production, set `NEXT_PUBLIC_APP_URL` in the Vercel project environment variables.
+```bash
+bun build
+```
+
+Deploy the share service separately to Cloudflare:
+
+```bash
+bun run share:deploy
+```
+
+The worker needs:
+
+- one Workers KV namespace
+- one R2 bucket
+- `SHARE_PASSWORD_PEPPER` secret
+- optionally `SHARE_API_TOKEN` if you want the write API locked down
