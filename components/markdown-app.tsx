@@ -1195,26 +1195,16 @@ export const MarkdownApp = () => {
         setPendingRecentFileId(id);
       }
 
-      const selectedFileName =
-        recentFiles.find((file) => file.id === id)?.name ?? "Recent file";
-
       clearError();
 
       void reopenRecentFile(id)
-        .then(() => {
-          if (!useMarkdownStore.getState().error) {
-            toast.success("File reopened.", {
-              description: selectedFileName,
-            });
-          }
-        })
         .finally(() => {
           setPendingRecentFileId((currentValue) =>
             currentValue === id ? null : currentValue
           );
         });
     },
-    [activeFile, clearError, recentFiles, reopenRecentFile]
+    [activeFile, clearError, reopenRecentFile]
   );
 
   const saveActiveFileAction = useCallback(async () => {
