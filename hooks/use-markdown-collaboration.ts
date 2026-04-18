@@ -252,9 +252,42 @@ export const useMarkdownCollaboration = ({
       return;
     }
 
+    const currentContent = yText.toString();
+    const currentLength = currentContent.length;
+    const nextLength = nextContent.length;
+    let prefixLength = 0;
+
+    while (
+      prefixLength < currentLength &&
+      prefixLength < nextLength &&
+      currentContent.charCodeAt(prefixLength) ===
+        nextContent.charCodeAt(prefixLength)
+    ) {
+      prefixLength += 1;
+    }
+
+    let suffixLength = 0;
+
+    while (
+      suffixLength < currentLength - prefixLength &&
+      suffixLength < nextLength - prefixLength &&
+      currentContent.charCodeAt(currentLength - 1 - suffixLength) ===
+        nextContent.charCodeAt(nextLength - 1 - suffixLength)
+    ) {
+      suffixLength += 1;
+    }
+
+    const deleteLength = currentLength - prefixLength - suffixLength;
+    const insertText = nextContent.slice(prefixLength, nextLength - suffixLength);
+
     yText.doc?.transact(() => {
-      yText.delete(0, yText.length);
-      yText.insert(0, nextContent);
+      if (deleteLength > 0) {
+        yText.delete(prefixLength, deleteLength);
+      }
+
+      if (insertText !== "") {
+        yText.insert(prefixLength, insertText);
+      }
     }, localOrigin);
   }, []);
 

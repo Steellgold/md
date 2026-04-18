@@ -166,7 +166,55 @@ export const MarkdownEditorPanel = ({
       return;
     }
 
+    const previousContent = editorElement.value;
+    const previousSelectionStart = editorElement.selectionStart;
+    const previousSelectionEnd = editorElement.selectionEnd;
+    const previousScrollTop = editorElement.scrollTop;
+    const previousScrollLeft = editorElement.scrollLeft;
+    const previousLength = previousContent.length;
+    const nextLength = content.length;
+    let prefixLength = 0;
+
+    while (
+      prefixLength < previousLength &&
+      prefixLength < nextLength &&
+      previousContent.charCodeAt(prefixLength) === content.charCodeAt(prefixLength)
+    ) {
+      prefixLength += 1;
+    }
+
+    let suffixLength = 0;
+
+    while (
+      suffixLength < previousLength - prefixLength &&
+      suffixLength < nextLength - prefixLength &&
+      previousContent.charCodeAt(previousLength - 1 - suffixLength) ===
+        content.charCodeAt(nextLength - 1 - suffixLength)
+    ) {
+      suffixLength += 1;
+    }
+
+    const previousChangedEnd = previousLength - suffixLength;
+    const nextChangedEnd = nextLength - suffixLength;
+    const lengthDelta = nextLength - previousLength;
+
+    const remapSelectionIndex = (index: number) => {
+      if (index <= prefixLength) {
+        return index;
+      }
+
+      if (index >= previousChangedEnd) {
+        return Math.max(0, Math.min(nextLength, index + lengthDelta));
+      }
+
+      return nextChangedEnd;
+    };
+
     editorElement.value = content;
+    editorElement.selectionStart = remapSelectionIndex(previousSelectionStart);
+    editorElement.selectionEnd = remapSelectionIndex(previousSelectionEnd);
+    editorElement.scrollTop = previousScrollTop;
+    editorElement.scrollLeft = previousScrollLeft;
   }, [content, editorRef]);
 
   const handleEditorChange = useCallback(
