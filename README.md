@@ -15,6 +15,8 @@ MD lets you write, preview, reopen, and import Markdown files quickly from local
 - Recent files history with clear confirmation
 - Read-only sharing via a dedicated Cloudflare Worker
 - Optional password protection for shared links
+- Real-time collaborative editing rooms (Cloudflare Durable Objects + WebSocket)
+- Collaboration access modes: open link, invite token, or password
 - Remote opening from:
   - GitHub file URLs
   - Gist URLs, including multi-file gist selection
@@ -31,7 +33,7 @@ MD lets you write, preview, reopen, and import Markdown files quickly from local
 - Zustand
 - react-markdown
 - react-syntax-highlighter
-- Cloudflare Worker + R2 + KV for sharing
+- Cloudflare Worker + Durable Objects + R2 + KV
 
 ## Getting Started
 
@@ -99,10 +101,11 @@ Copy `.env.example` to `.env.local` for local development.
 app/
   api/open-from-url/    Remote markdown resolution and download
   api/share/            Proxy to the external Cloudflare share service
+  api/collab/           Proxy to collaborative room create/join endpoints
 components/
   markdown-*.tsx        Editor, preview, toolbar, dialogs, recents
 cloudflare-share/
-  src/index.ts          Standalone Worker for share create/read
+  src/index.ts          Worker for share create/read + collaborative rooms
 lib/
   markdown-*.ts         File access, state helpers, editor helpers
 types/
@@ -129,5 +132,6 @@ The worker needs:
 
 - one Workers KV namespace
 - one R2 bucket
+- one Durable Object namespace (`COLLAB_ROOMS`)
 - `SHARE_PASSWORD_PEPPER` secret
 - optionally `SHARE_API_TOKEN` if you want the write API locked down
