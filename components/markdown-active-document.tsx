@@ -50,6 +50,7 @@ type MarkdownActiveDocumentProps = {
   showOpenUrlDialogAction: () => void;
   goHomeAction: () => void;
   saveFileAction: () => void;
+  saveFileBusy: boolean;
   shareActionLabel: string;
   shareFileAction: () => void;
   collaborateActionLabel: string;
@@ -110,6 +111,7 @@ export const MarkdownActiveDocument = ({
   showOpenUrlDialogAction,
   goHomeAction,
   saveFileAction,
+  saveFileBusy,
   shareActionLabel,
   shareFileAction,
   collaborateActionLabel,
@@ -153,6 +155,7 @@ export const MarkdownActiveDocument = ({
         showOpenUrlDialogAction={showOpenUrlDialogAction}
         goHomeAction={goHomeAction}
         saveFileAction={saveFileAction}
+        saveFileBusy={saveFileBusy}
         shareActionLabel={shareActionLabel}
         shareFileAction={shareFileAction}
         collaborateActionLabel={collaborateActionLabel}

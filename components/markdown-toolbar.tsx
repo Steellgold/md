@@ -38,6 +38,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Tooltip,
   TooltipContent,
@@ -80,6 +81,7 @@ type MarkdownToolbarProps = {
   showOpenUrlDialogAction: () => void;
   goHomeAction: () => void;
   saveFileAction: () => void;
+  saveFileBusy: boolean;
   shareActionLabel: string;
   shareFileAction: () => void;
   collaborateActionLabel: string;
@@ -116,6 +118,7 @@ export const MarkdownToolbar = ({
   showOpenUrlDialogAction,
   goHomeAction,
   saveFileAction,
+  saveFileBusy,
   shareActionLabel,
   shareFileAction,
   collaborateActionLabel,
@@ -408,9 +411,13 @@ export const MarkdownToolbar = ({
           {canSaveFile || !collaborationActive ? (
             <Button
               onClick={saveFileAction}
-              disabled={!activeFile || !canSaveFile || isBusy}
+              disabled={!activeFile || !canSaveFile || isBusy || saveFileBusy}
             >
-              <SaveIcon data-icon="inline-start" />
+              {saveFileBusy ? (
+                <Spinner data-icon="inline-start" />
+              ) : (
+                <SaveIcon data-icon="inline-start" />
+              )}
               Save
             </Button>
           ) : null}

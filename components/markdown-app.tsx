@@ -170,6 +170,7 @@ export const MarkdownApp = () => {
   const [isOpenUrlDialogOpen, setIsOpenUrlDialogOpen] = useState(false);
   const [isShareBusy, setIsShareBusy] = useState(false);
   const [isCollabBusy, setIsCollabBusy] = useState(false);
+  const [isSaveBusy, setIsSaveBusy] = useState(false);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const [isCollabDialogOpen, setIsCollabDialogOpen] = useState(false);
   const [pendingRecentFileId, setPendingRecentFileId] = useState<string | null>(null);
@@ -1219,12 +1220,17 @@ export const MarkdownApp = () => {
   const saveActiveFileAction = useCallback(async () => {
     flushPendingEditorContent();
     clearError();
-    await saveActiveFile();
-    if (!useMarkdownStore.getState().error && activeFile) {
-      resetCollabUnsavedTracking();
-      toast.success("File saved.", {
-        description: activeFile.name,
-      });
+    setIsSaveBusy(true);
+    try {
+      await saveActiveFile({ silent: true });
+      if (!useMarkdownStore.getState().error && activeFile) {
+        resetCollabUnsavedTracking();
+        toast.success("File saved.", {
+          description: activeFile.name,
+        });
+      }
+    } finally {
+      setIsSaveBusy(false);
     }
   }, [
     activeFile,
@@ -1724,6 +1730,7 @@ export const MarkdownApp = () => {
           showOpenUrlDialogAction={showOpenUrlDialog}
           goHomeAction={goHomeAction}
           saveFileAction={saveActiveFileAction}
+          saveFileBusy={isSaveBusy}
           shareActionLabel={shareActionLabel}
           shareFileAction={openShareDialogAction}
           collaborateActionLabel={collaborateActionLabel}
