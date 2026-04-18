@@ -94,10 +94,10 @@ type MarkdownActiveDocumentProps = {
   alphaListAction: () => void;
   taskListAction: () => void;
   insertTableAction: (columns: number, rows: number) => void;
+  internalLinkTargets: string[];
+  insertInternalLinkAction: (relativePath: string) => void;
+  insertExternalLinkAction: () => void;
 };
-
-const clampPanelSize = (value: number, min: number, max: number) =>
-  Math.min(max, Math.max(min, value));
 
 const WORKSPACE_TREE_HEADER_ONLY_SIZE = "56px";
 const WORKSPACE_TREE_DEFAULT_SIZE = "176px";
@@ -166,6 +166,9 @@ export const MarkdownActiveDocument = ({
   alphaListAction,
   taskListAction,
   insertTableAction,
+  internalLinkTargets,
+  insertInternalLinkAction,
+  insertExternalLinkAction,
 }: MarkdownActiveDocumentProps) => {
   const [editorTopbarHeight, setEditorTopbarHeight] = useState(0);
   const [isWorkspaceTreeCollapsed, setIsWorkspaceTreeCollapsed] = useState(false);
@@ -193,6 +196,9 @@ export const MarkdownActiveDocument = ({
       <MarkdownToolbar
         activeFile={activeFile}
         openDocumentsCount={openDocuments.length}
+        dirtyOpenDocumentNames={openDocuments
+          .filter((document) => document.isDirty)
+          .map((document) => document.file.name)}
         recentFiles={recentFiles}
         isBusy={isBusy}
         openFileAction={openFileAction}
@@ -264,8 +270,11 @@ export const MarkdownActiveDocument = ({
                     orderedListAction={orderedListAction}
                     alphaListAction={alphaListAction}
                     taskListAction={taskListAction}
-                    insertTableAction={insertTableAction}
-                  />
+                          insertTableAction={insertTableAction}
+                          internalLinkTargets={internalLinkTargets}
+                          insertInternalLinkAction={insertInternalLinkAction}
+                          insertExternalLinkAction={insertExternalLinkAction}
+                        />
                 </ResizablePanel>
 
                 <ResizableHandle withHandle className="bg-border/80" />
@@ -382,6 +391,9 @@ export const MarkdownActiveDocument = ({
                 alphaListAction={alphaListAction}
                 taskListAction={taskListAction}
                 insertTableAction={insertTableAction}
+                internalLinkTargets={internalLinkTargets}
+                insertInternalLinkAction={insertInternalLinkAction}
+                insertExternalLinkAction={insertExternalLinkAction}
               />
             </ResizablePanel>
           ) : null}

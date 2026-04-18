@@ -30,10 +30,12 @@ import {
 } from "@/types/markdown";
 import {
   BoldIcon,
+  ChevronDownIcon,
   Code2Icon,
   FileCode2Icon,
   Heading1Icon,
   ItalicIcon,
+  LinkIcon,
   ListIcon,
   ListOrderedIcon,
   ListTodoIcon,
@@ -75,6 +77,9 @@ type MarkdownEditorPanelProps = {
   alphaListAction: () => void;
   taskListAction: () => void;
   insertTableAction: (columns: number, rows: number) => void;
+  internalLinkTargets: string[];
+  insertInternalLinkAction: (relativePath: string) => void;
+  insertExternalLinkAction: () => void;
 };
 
 const quickActions = [
@@ -128,6 +133,9 @@ export const MarkdownEditorPanel = ({
   alphaListAction,
   taskListAction,
   insertTableAction,
+  internalLinkTargets,
+  insertInternalLinkAction,
+  insertExternalLinkAction,
 }: MarkdownEditorPanelProps) => {
   const topbarRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
@@ -428,6 +436,48 @@ export const MarkdownEditorPanel = ({
                 </DropdownMenu>
 
                 <MarkdownTableInsertControl onInsert={insertTableAction} />
+
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  title="Insert external link"
+                  aria-label="Insert external link"
+                  onClick={insertExternalLinkAction}
+                >
+                  <LinkIcon />
+                </Button>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      title="Insert workspace page link"
+                      aria-label="Insert workspace page link"
+                      disabled={internalLinkTargets.length === 0}
+                    >
+                      <ChevronDownIcon />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-64">
+                    {internalLinkTargets.length > 0 ? (
+                      internalLinkTargets.map((relativePath) => (
+                        <DropdownMenuItem
+                          key={relativePath}
+                          onSelect={() => insertInternalLinkAction(relativePath)}
+                        >
+                          <LinkIcon />
+                          <span className="truncate">{relativePath}</span>
+                        </DropdownMenuItem>
+                      ))
+                    ) : (
+                      <DropdownMenuItem disabled>
+                        <LinkIcon />
+                        No other workspace pages
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
 
                 {quickActions.map((item) => {
                   const Icon = item.icon;

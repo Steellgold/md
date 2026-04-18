@@ -1755,6 +1755,7 @@ export const MarkdownApp = () => {
         return;
       }
 
+      const encodedRelativeLink = encodeURI(relativeLink);
       const defaultLabel = targetPath
         .split("/")
         .at(-1)
@@ -1763,12 +1764,39 @@ export const MarkdownApp = () => {
 
       insertMarkdownLinkAction(
         editorRef.current,
-        relativeLink,
+        encodedRelativeLink,
         defaultLabel && defaultLabel.length > 0 ? defaultLabel : "page"
       );
     },
     [activeFile?.relativePath]
   );
+
+  const insertExternalLinkAction = useCallback(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const inputValue = window.prompt(
+      "Enter the external URL to insert:",
+      "https://"
+    );
+
+    if (inputValue === null) {
+      return;
+    }
+
+    const trimmedValue = inputValue.trim();
+
+    if (!trimmedValue) {
+      return;
+    }
+
+    const href = /^[a-z][a-z\\d+.-]*:/iu.test(trimmedValue)
+      ? trimmedValue
+      : `https://${trimmedValue.replace(/^\/+/u, "")}`;
+
+    insertMarkdownLinkAction(editorRef.current, href, "link");
+  }, []);
 
   const openInternalPreviewLinkAction = useCallback(
     (href: string) => {
@@ -1932,6 +1960,9 @@ export const MarkdownApp = () => {
           alphaListAction={alphaListAction}
           taskListAction={taskListAction}
           insertTableAction={insertTableAction}
+          internalLinkTargets={internalLinkTargets}
+          insertInternalLinkAction={insertInternalLinkToPathAction}
+          insertExternalLinkAction={insertExternalLinkAction}
         />
       ) : (
         <div className="flex flex-1 flex-col">

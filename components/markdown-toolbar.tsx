@@ -69,11 +69,12 @@ import {
   UsersIcon,
   XIcon
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type MarkdownToolbarProps = {
   activeFile: RecentMarkdownFile | null;
   openDocumentsCount: number;
+  dirtyOpenDocumentNames: string[];
   recentFiles: RecentMarkdownFile[];
   isBusy: boolean;
   openFileAction: () => void;
@@ -112,6 +113,7 @@ const viewOptions = [
 export const MarkdownToolbar = ({
   activeFile,
   openDocumentsCount,
+  dirtyOpenDocumentNames,
   recentFiles,
   isBusy,
   openFileAction,
@@ -141,7 +143,9 @@ export const MarkdownToolbar = ({
 }: MarkdownToolbarProps) => {
   const [isClearHistoryConfirmOpen, setIsClearHistoryConfirmOpen] = useState(false);
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
+  const [homeConfirmIndex, setHomeConfirmIndex] = useState<number | null>(null);
   const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
+  const homeConfirmAdvancingRef = useRef(false);
 
   const secondaryLabel = activeFile?.url
     ? "Remote document"
@@ -150,7 +154,10 @@ export const MarkdownToolbar = ({
       : activeFile?.lastOpenedAt
         ? `Opened ${new Date(activeFile.lastOpenedAt).toLocaleString()}`
         : "Local document";
-  const canSaveFile = activeFile?.source === "picker" || activeFile?.source === "drop";
+  const canSaveFile =
+    activeFile?.source === "picker" ||
+    activeFile?.source === "drop" ||
+    activeFile?.source === "folder";
   const refreshLabel = activeFile?.source === "url" ? "Reload URL" : "Reopen file";
   const closeLabel = openDocumentsCount > 1 ? "Close tab" : "Close document";
   const visibleRecentFiles = recentFiles.slice(0, 6);
@@ -216,6 +223,45 @@ export const MarkdownToolbar = ({
       .map((part) => part[0]?.toUpperCase() ?? "")
       .join("");
 
+  const currentHomeConfirmFileName =
+    homeConfirmIndex === null ? null : dirtyOpenDocumentNames[homeConfirmIndex] ?? null;
+
+  const triggerGoHomeAction = () => {
+    if (dirtyOpenDocumentNames.length === 0) {
+      goHomeAction();
+      return;
+    }
+
+    setHomeConfirmIndex(0);
+  };
+
+  const cancelGoHomeAction = () => {
+    setHomeConfirmIndex(null);
+  };
+
+  const confirmGoHomeAction = () => {
+    if (homeConfirmIndex === null) {
+      goHomeAction();
+      return;
+    }
+
+    homeConfirmAdvancingRef.current = true;
+
+    if (homeConfirmIndex >= dirtyOpenDocumentNames.length - 1) {
+      setHomeConfirmIndex(null);
+      goHomeAction();
+      window.setTimeout(() => {
+        homeConfirmAdvancingRef.current = false;
+      }, 0);
+      return;
+    }
+
+    setHomeConfirmIndex(homeConfirmIndex + 1);
+    window.setTimeout(() => {
+      homeConfirmAdvancingRef.current = false;
+    }, 0);
+  };
+
   return (
     <div className="border-b bg-background/80 px-4 py-3 backdrop-blur">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -223,7 +269,7 @@ export const MarkdownToolbar = ({
           <Button
             variant="outline"
             size="icon"
-            onClick={goHomeAction}
+            onClick={triggerGoHomeAction}
             title="Back to home"
           >
             <HouseIcon />
@@ -240,6 +286,26 @@ export const MarkdownToolbar = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <ConfirmDialog
+            open={homeConfirmIndex !== null && currentHomeConfirmFileName !== null}
+            onOpenChange={(open) => {
+              if (open || homeConfirmAdvancingRef.current) {
+                return;
+              }
+
+              cancelGoHomeAction();
+            }}
+            title="Modifications non enregistrées"
+            content={
+              currentHomeConfirmFileName
+                ? `Le fichier "${currentHomeConfirmFileName}" contient des modifications non enregistrées.`
+                : ""
+            }
+            cancelButton="Annuler"
+            confirmButton="Fermer quand même"
+            onConfirm={confirmGoHomeAction}
+          />
+
           <ConfirmDialog
             open={isClearHistoryConfirmOpen}
             onOpenChange={setIsClearHistoryConfirmOpen}

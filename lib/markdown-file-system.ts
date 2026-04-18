@@ -57,6 +57,14 @@ const supportsLocalStorage = () =>
 const stripHashAndQuery = (value: string) =>
   value.replace(/[?#].*$/u, "").trim();
 
+const decodeWorkspacePathSegment = (value: string) => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
+
 const normalizeWorkspacePath = (value: string) => {
   const sanitized = stripHashAndQuery(value).replace(/\\/gu, "/");
 
@@ -66,6 +74,7 @@ const normalizeWorkspacePath = (value: string) => {
 
   const normalized = sanitized
     .split("/")
+    .map((segment) => decodeWorkspacePathSegment(segment))
     .filter((segment) => segment !== "" && segment !== ".")
     .reduce<string[] | null>((segments, segment) => {
       if (!segments) {
