@@ -102,6 +102,7 @@ type CollaborationRoomMetadata = {
 type CollaborationCreatePayload = {
   accessMode?: CollaborationAccessMode;
   appBaseUrl?: string | null;
+  fileName?: string | null;
   inviteToken?: string | null;
   password?: string | null;
 };
@@ -273,7 +274,8 @@ const createCollabJoinUrl = (
   env: ShareWorkerEnv,
   room: CollaborationRoomMetadata,
   inviteToken: string | null,
-  appBaseUrl: string | null | undefined
+  appBaseUrl: string | null | undefined,
+  fileName: string | null | undefined
 ) => {
   const appUrl = new URL(
     normalizeBaseUrl(appBaseUrl?.trim() || getBaseUrl(request, env))
@@ -287,6 +289,14 @@ const createCollabJoinUrl = (
     appUrl.searchParams.set("token", inviteToken);
   } else {
     appUrl.searchParams.delete("token");
+  }
+
+  const normalizedFileName = fileName?.trim() ?? "";
+
+  if (normalizedFileName) {
+    appUrl.searchParams.set("name", normalizedFileName);
+  } else {
+    appUrl.searchParams.delete("name");
   }
 
   return appUrl.toString();
@@ -582,7 +592,8 @@ const handleCreateCollaborationRoom = async (
         env,
         room,
         inviteToken,
-        body.appBaseUrl
+        body.appBaseUrl,
+        body.fileName
       ),
     },
   });

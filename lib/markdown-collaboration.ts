@@ -9,6 +9,7 @@ const COLLAB_QUERY_FLAG = "collab";
 const COLLAB_QUERY_ROOM = "room";
 const COLLAB_QUERY_MODE = "access";
 const COLLAB_QUERY_TOKEN = "token";
+const COLLAB_QUERY_FILE_NAME = "name";
 
 const colorPalette = [
   "#3B82F6",
@@ -61,6 +62,7 @@ export type ParsedCollaborationJoinParams = {
   roomId: string;
   accessMode: CollaborativeAccessMode;
   inviteToken: string | null;
+  fileName: string | null;
 };
 
 export const parseCollaborationJoinParams = (
@@ -73,6 +75,7 @@ export const parseCollaborationJoinParams = (
   const roomId = searchParams.get(COLLAB_QUERY_ROOM)?.trim() ?? "";
   const mode = searchParams.get(COLLAB_QUERY_MODE);
   const inviteToken = searchParams.get(COLLAB_QUERY_TOKEN)?.trim() ?? null;
+  const fileName = searchParams.get(COLLAB_QUERY_FILE_NAME)?.trim() ?? null;
 
   if (!roomId || !isCollaborativeAccessMode(mode)) {
     return null;
@@ -86,12 +89,14 @@ export const parseCollaborationJoinParams = (
     roomId,
     accessMode: mode,
     inviteToken,
+    fileName,
   };
 };
 
 type CreateCollaborationRoomPayload = {
   accessMode: CollaborativeAccessMode;
   appBaseUrl?: string | null;
+  fileName?: string | null;
   inviteToken?: string | null;
   password?: string | null;
 };

@@ -40,6 +40,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       accessMode?: "open" | "invite" | "password";
       appBaseUrl?: string | null;
+      fileName?: string | null;
       inviteToken?: string | null;
       password?: string | null;
     };
@@ -64,6 +65,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         accessMode,
         appBaseUrl,
+        fileName: body.fileName,
         inviteToken: body.inviteToken,
         password: body.password,
       }),

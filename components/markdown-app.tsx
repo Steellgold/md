@@ -564,7 +564,7 @@ export const MarkdownApp = () => {
     }
 
     if (!activeFile) {
-      openScratchDocument("Collaborative document.md");
+      openScratchDocument(parsedCollabJoin.fileName ?? "Collaborative document.md");
     }
 
     setCollabAccessMode(parsedCollabJoin.accessMode);
@@ -1301,6 +1301,7 @@ export const MarkdownApp = () => {
 
       const room = await createCollaborationRoom({
         accessMode: collabAccessMode,
+        fileName: activeFile.name,
         inviteToken: collabAccessMode === "invite" ? collabInviteToken : null,
         password: collabAccessMode === "password" ? collabPassword : null,
       });
