@@ -17,6 +17,7 @@ import { useScrollSync } from "@/hooks/use-scroll-sync";
 import { extractMarkdownDeepLink } from "@/lib/markdown-deep-link";
 import {
   insertBlockAction,
+  insertMarkdownTableAction,
   prefixLinesAction,
   wrapSelectionAction,
 } from "@/lib/markdown-editor";
@@ -1589,8 +1590,30 @@ export const MarkdownApp = () => {
     );
   }, []);
 
+  const alphaListAction = useCallback(() => {
+    prefixLinesAction(
+      editorRef.current,
+      (index) => {
+        let value = index;
+        let label = "";
+
+        do {
+          label = String.fromCharCode(97 + (value % 26)) + label;
+          value = Math.floor(value / 26) - 1;
+        } while (value >= 0);
+
+        return `${label}. `;
+      },
+      "List item"
+    );
+  }, []);
+
   const taskListAction = useCallback(() => {
     prefixLinesAction(editorRef.current, "- [ ] ", "Task item");
+  }, []);
+
+  const insertTableAction = useCallback((columns: number, rows: number) => {
+    insertMarkdownTableAction(editorRef.current, columns, rows);
   }, []);
 
   const togglePreviewDetached = useCallback(() => {
@@ -1749,7 +1772,9 @@ export const MarkdownApp = () => {
           codeBlockAction={codeBlockAction}
           bulletListAction={bulletListAction}
           orderedListAction={orderedListAction}
+          alphaListAction={alphaListAction}
           taskListAction={taskListAction}
+          insertTableAction={insertTableAction}
         />
       ) : (
         <div className="flex flex-1 flex-col">

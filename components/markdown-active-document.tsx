@@ -77,7 +77,9 @@ type MarkdownActiveDocumentProps = {
   codeBlockAction: () => void;
   bulletListAction: () => void;
   orderedListAction: () => void;
+  alphaListAction: () => void;
   taskListAction: () => void;
+  insertTableAction: (columns: number, rows: number) => void;
 };
 
 export const MarkdownActiveDocument = ({
@@ -138,7 +140,9 @@ export const MarkdownActiveDocument = ({
   codeBlockAction,
   bulletListAction,
   orderedListAction,
+  alphaListAction,
   taskListAction,
+  insertTableAction,
 }: MarkdownActiveDocumentProps) => {
   const [editorTopbarHeight, setEditorTopbarHeight] = useState(0);
   const displayedViewMode = previewDetached ? "editor" : viewMode;
@@ -213,7 +217,9 @@ export const MarkdownActiveDocument = ({
               codeBlockAction={codeBlockAction}
               bulletListAction={bulletListAction}
               orderedListAction={orderedListAction}
+              alphaListAction={alphaListAction}
               taskListAction={taskListAction}
+              insertTableAction={insertTableAction}
             />
           </ResizablePanel>
         ) : null}

@@ -11,6 +11,7 @@ import {
   oneDark,
   oneLight,
 } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { remarkAlphaOrderedLists } from "@/lib/remark-alpha-ordered-lists";
 import remarkGfm from "remark-gfm";
 import { type PluggableList } from "unified";
 
@@ -52,6 +53,11 @@ export const MarkdownPreview = ({
   const syntaxTheme = resolvedTheme === "dark" ? oneDark : oneLight;
   const shouldHighlightSelection =
     content.length <= MAX_SELECTION_HIGHLIGHT_CONTENT_LENGTH;
+  const remarkPlugins = useMemo<PluggableList>(
+    () => [remarkAlphaOrderedLists, remarkGfm],
+    []
+  );
+
   const rehypePlugins = useMemo<PluggableList>(
     () =>
       shouldHighlightSelection && editorSelection
@@ -63,8 +69,8 @@ export const MarkdownPreview = ({
   return (
     <div
       className={cn(
-        // Root: layout and body text
-        "markdown-preview min-h-full px-6 py-5 text-sm leading-7 wrap-break-word",
+        // Root: layout and body text (flex + gap so lists, hr, etc. don’t stack flush)
+        "markdown-preview flex min-h-full flex-col gap-4 px-6 py-5 text-sm leading-7 wrap-break-word",
 
         // Synced selection from the editor (caret + range)
         "[&_.md-viewer-caret]:mx-px [&_.md-viewer-caret]:inline-block [&_.md-viewer-caret]:h-[1em] [&_.md-viewer-caret]:w-[2px] [&_.md-viewer-caret]:rounded-full [&_.md-viewer-caret]:bg-primary [&_.md-viewer-caret]:align-[-0.1em]",
@@ -76,22 +82,23 @@ export const MarkdownPreview = ({
 
         // Block content
         "[&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-4 [&_blockquote]:text-muted-foreground",
-        "[&_p]:mb-4 [&_p:last-child]:mb-0",
-        "[&_hr]:my-6 [&_hr]:border-border",
+        "[&_hr]:shrink-0 [&_hr]:border-border",
 
         // Headings
-        "[&_h1]:mb-4 [&_h1]:text-3xl [&_h1]:font-semibold",
-        "[&_h2]:mt-8 [&_h2]:mb-3 [&_h2]:text-2xl [&_h2]:font-semibold",
-        "[&_h3]:mt-6 [&_h3]:mb-2 [&_h3]:text-xl [&_h3]:font-semibold",
+        "[&_h1]:text-3xl [&_h1]:font-semibold",
+        "[&_h2]:text-2xl [&_h2]:font-semibold",
+        "[&_h3]:text-xl [&_h3]:font-semibold",
 
         // Media
         "[&_img]:rounded-lg [&_img]:border [&_img]:border-border",
 
-        // Lists
-        "[&_li]:ml-5 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ul]:list-disc [&_ul]:space-y-1",
+        // Lists (only task li lose markers; mixed ul+task stays one list in mdast)
+        "[&_ol]:list-decimal [&_ol[type='a']]:list-[lower-alpha] [&_ol[type='A']]:list-[upper-alpha] [&_ol]:space-y-1 [&_ol]:pl-5",
+        "[&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5",
+        "[&_.task-list-item]:list-none",
 
         // Tables (GFM)
-        "[&_table]:mb-4 [&_table]:w-full [&_table]:border-collapse",
+        "[&_table]:w-full [&_table]:border-collapse",
         "[&_td]:border [&_td]:border-border [&_td]:p-2",
         "[&_th]:border [&_th]:border-border [&_th]:bg-muted [&_th]:p-2 [&_th]:text-left",
 
@@ -99,7 +106,7 @@ export const MarkdownPreview = ({
       )}
     >
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={remarkPlugins}
         rehypePlugins={rehypePlugins}
         components={{
           pre({ children }) {
@@ -124,7 +131,7 @@ export const MarkdownPreview = ({
                 style={syntaxTheme}
                 PreTag="div"
                 customStyle={{
-                  margin: "0 0 1rem 0",
+                  margin: 0,
                   padding: "1rem",
                   borderRadius: "0.75rem",
                   border: "1px solid var(--border)",

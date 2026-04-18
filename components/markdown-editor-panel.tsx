@@ -12,7 +12,11 @@ import {
   InputGroupAddon,
   InputGroupTextarea,
 } from "@/components/ui/input-group";
-import { continueListOnEnterAction } from "@/lib/markdown-editor";
+import { MarkdownTableInsertControl } from "@/components/markdown-table-insert-control";
+import {
+  continueListOnEnterAction,
+  indentListOnTabAction,
+} from "@/lib/markdown-editor";
 import { buildActiveDocumentMeta } from "@/lib/markdown-helpers";
 import {
   getTextareaCaretCoordinates,
@@ -68,7 +72,9 @@ type MarkdownEditorPanelProps = {
   codeBlockAction: () => void;
   bulletListAction: () => void;
   orderedListAction: () => void;
+  alphaListAction: () => void;
   taskListAction: () => void;
+  insertTableAction: (columns: number, rows: number) => void;
 };
 
 const quickActions = [
@@ -83,6 +89,7 @@ const quickActions = [
 const listActions = [
   { label: "Bullet list", icon: ListIcon, actionKey: "bulletListAction" },
   { label: "Numbered list", icon: ListOrderedIcon, actionKey: "orderedListAction" },
+  { label: "Lettered list", icon: ListOrderedIcon, actionKey: "alphaListAction" },
   { label: "Checklist", icon: ListTodoIcon, actionKey: "taskListAction" },
 ] as const;
 
@@ -118,7 +125,9 @@ export const MarkdownEditorPanel = ({
   codeBlockAction,
   bulletListAction,
   orderedListAction,
+  alphaListAction,
   taskListAction,
+  insertTableAction,
 }: MarkdownEditorPanelProps) => {
   const topbarRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
@@ -132,6 +141,7 @@ export const MarkdownEditorPanel = ({
     codeBlockAction,
     bulletListAction,
     orderedListAction,
+    alphaListAction,
     taskListAction,
   };
 
@@ -299,6 +309,20 @@ export const MarkdownEditorPanel = ({
   const handleEditorKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
       if (
+        event.key === "Tab" &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey
+      ) {
+        if (indentListOnTabAction(event.currentTarget, event.shiftKey)) {
+          event.preventDefault();
+          onSelectionChange(event.currentTarget);
+        }
+
+        return;
+      }
+
+      if (
         event.key !== "Enter" ||
         event.shiftKey ||
         event.ctrlKey ||
@@ -402,6 +426,8 @@ export const MarkdownEditorPanel = ({
                     })}
                   </DropdownMenuContent>
                 </DropdownMenu>
+
+                <MarkdownTableInsertControl onInsert={insertTableAction} />
 
                 {quickActions.map((item) => {
                   const Icon = item.icon;

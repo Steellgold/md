@@ -227,6 +227,14 @@
     background: var(--primary);
 }
 
+/* Task-only lists: flush left like before. Mixed bullet+task lists keep ul padding
+   so normal items keep their disc markers (see markdown-preview.tsx). */
+.markdown-preview
+  > ul.contains-task-list:not(:has(> li:not(.task-list-item))) {
+  margin-left: 0;
+  padding-left: 0;
+}
+
 .dark .markdown-preview .hljs {
     color: #e6edf3;
 }

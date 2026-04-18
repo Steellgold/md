@@ -1,5 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import { renderToStaticMarkup } from "react-dom/server";
+import { remarkAlphaOrderedLists } from "@/lib/remark-alpha-ordered-lists";
 import remarkGfm from "remark-gfm";
 
 const escapeHtml = (value: string) =>
@@ -169,7 +170,9 @@ export const buildMarkdownExportFileName = (
 
 export const buildMarkdownExportHtml = (title: string, content: string) => {
   const body = renderToStaticMarkup(
-    <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+    <ReactMarkdown remarkPlugins={[remarkAlphaOrderedLists, remarkGfm]}>
+      {content}
+    </ReactMarkdown>
   );
 
   return buildHtmlDocument(title, body);
