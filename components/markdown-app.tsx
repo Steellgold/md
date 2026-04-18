@@ -37,7 +37,7 @@ import { useMarkdownStore } from "@/lib/markdown-store";
 import { useMarkdownUiStore } from "@/lib/markdown-ui-store";
 import { cn } from "@/lib/utils";
 import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection";
-import { ArrowUpRightIcon, TriangleAlertIcon } from "lucide-react";
+import { ArrowUpRightIcon } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   type ChangeEvent,
@@ -51,7 +51,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Button } from "./ui/button";
+import { toast } from "sonner";
 
 const defaultDocumentTitle = ".MD";
 const LARGE_FILE_THRESHOLD = 20_000;
@@ -681,8 +681,14 @@ export const MarkdownApp = () => {
       return;
     }
 
+    clearError();
     await reopenRecentFile(activeFile.id);
-  }, [activeFile, flushPendingEditorContent, reopenRecentFile]);
+    if (!useMarkdownStore.getState().error) {
+      toast.success("File reopened.", {
+        description: activeFile.name,
+      });
+    }
+  }, [activeFile, clearError, flushPendingEditorContent, reopenRecentFile]);
 
   const openRecentFileAction = useCallback(
     (id: string) => {
@@ -690,19 +696,38 @@ export const MarkdownApp = () => {
         setPendingRecentFileId(id);
       }
 
-      void reopenRecentFile(id).finally(() => {
-        setPendingRecentFileId((currentValue) =>
-          currentValue === id ? null : currentValue
-        );
-      });
+      const selectedFileName =
+        recentFiles.find((file) => file.id === id)?.name ?? "Recent file";
+
+      clearError();
+
+      void reopenRecentFile(id)
+        .then(() => {
+          if (!useMarkdownStore.getState().error) {
+            toast.success("File reopened.", {
+              description: selectedFileName,
+            });
+          }
+        })
+        .finally(() => {
+          setPendingRecentFileId((currentValue) =>
+            currentValue === id ? null : currentValue
+          );
+        });
     },
-    [activeFile, reopenRecentFile]
+    [activeFile, clearError, recentFiles, reopenRecentFile]
   );
 
   const saveActiveFileAction = useCallback(async () => {
     flushPendingEditorContent();
+    clearError();
     await saveActiveFile();
-  }, [flushPendingEditorContent, saveActiveFile]);
+    if (!useMarkdownStore.getState().error && activeFile) {
+      toast.success("File saved.", {
+        description: activeFile.name,
+      });
+    }
+  }, [activeFile, clearError, flushPendingEditorContent, saveActiveFile]);
 
   const editSharedFileLocallyAction = useCallback(async () => {
     flushPendingEditorContent();
@@ -716,6 +741,7 @@ export const MarkdownApp = () => {
 
     try {
       await navigator.clipboard.writeText(shareDialogUrl);
+      toast.success("Link copied to clipboard.");
     } catch (error) {
       setUiError(getUnknownErrorMessage(error));
     }
@@ -737,6 +763,8 @@ export const MarkdownApp = () => {
     }
 
     const nextContent = flushPendingEditorContent();
+    const hadShare = Boolean(activeFile.share);
+    const wasShareUpdate = hadShare && (hasPendingShareChanges || sharePassword.trim() !== "");
 
     setIsShareBusy(true);
 
@@ -750,12 +778,25 @@ export const MarkdownApp = () => {
       setShareDialogUrl(result.share.url);
       setSharePassword("");
       setIsShareDialogOpen(true);
+      toast.success(
+        !hadShare
+          ? "Link created."
+          : wasShareUpdate
+            ? "Link updated."
+            : "Link refreshed."
+      );
     } catch (error) {
       setUiError(getUnknownErrorMessage(error));
     } finally {
       setIsShareBusy(false);
     }
-  }, [activeFile, flushPendingEditorContent, setDocumentShare, sharePassword]);
+  }, [
+    activeFile,
+    flushPendingEditorContent,
+    hasPendingShareChanges,
+    setDocumentShare,
+    sharePassword,
+  ]);
 
   const removeSharePasswordAction = useCallback(async () => {
     if (!activeFile?.share?.requiresPassword) {
@@ -776,6 +817,7 @@ export const MarkdownApp = () => {
       setShareDialogUrl(result.share.url);
       setSharePassword("");
       setIsShareDialogOpen(true);
+      toast.success("Password removed from shared link.");
     } catch (error) {
       setUiError(getUnknownErrorMessage(error));
     } finally {
@@ -932,13 +974,27 @@ export const MarkdownApp = () => {
     setPreviewDetached(false);
   }, []);
 
-  const clearUiError = useCallback(() => {
-    setUiError(null);
-  }, []);
-
   const showCommandPalette = useCallback(() => {
     setIsCommandPaletteOpen(true);
   }, []);
+
+  useEffect(() => {
+    if (!error) {
+      return;
+    }
+
+    toast.error(error);
+    clearError();
+  }, [clearError, error]);
+
+  useEffect(() => {
+    if (!uiError) {
+      return;
+    }
+
+    toast.error(uiError);
+    setUiError(null);
+  }, [uiError]);
 
   const showOpenUrlDialog = useCallback(() => {
     setIsCommandPaletteOpen(false);
@@ -994,36 +1050,6 @@ export const MarkdownApp = () => {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {error || uiError ? (
-        <div className="fixed right-4 bottom-4 z-50 flex max-w-[calc(100vw-2rem)] flex-col gap-3">
-          {error ? (
-            <div className="flex items-center gap-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive backdrop-blur-xl">
-              <div className="flex items-center gap-2">
-                <TriangleAlertIcon className="size-4" />
-                {error}
-              </div>
-
-              <Button variant="destructive" onClick={clearError}>
-                Close
-              </Button>
-            </div>
-          ) : null}
-
-          {uiError ? (
-            <div className="flex items-center gap-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive backdrop-blur-xl">
-              <div className="flex items-center gap-2">
-                <TriangleAlertIcon className="size-4" />
-                {uiError}
-              </div>
-
-              <Button variant="destructive" onClick={clearUiError}>
-                Close
-              </Button>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
       {activeFile && isSharedViewerMode ? (
         <MarkdownSharedViewer
           activeFile={activeFile}

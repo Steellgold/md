@@ -2,7 +2,14 @@
 
 import { useTheme } from "next-themes";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
-import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react";
+import {
+  CircleCheckIcon,
+  InfoIcon,
+  Loader2Icon,
+  OctagonXIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
+import type { CSSProperties } from "react";
 
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme();
@@ -30,15 +37,23 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }}
       style={
         {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
+          "--normal-bg": "var(--background)",
+          "--normal-text": "var(--foreground)",
           "--normal-border": "var(--border)",
           "--border-radius": "var(--radius)",
-        } as React.CSSProperties
+        } as CSSProperties
       }
       toastOptions={{
         classNames: {
-          toast: "cn-toast",
+          toast:
+            "group rounded-xl border border-border/80 bg-background/95 text-foreground shadow-lg backdrop-blur-xl",
+          title: "text-sm font-medium",
+          description: "text-sm text-muted-foreground",
+          actionButton:
+            "bg-primary text-primary-foreground hover:bg-primary/90",
+          cancelButton: "bg-muted text-muted-foreground hover:bg-muted/80",
+          closeButton:
+            "text-muted-foreground hover:text-foreground transition-colors",
         },
       }}
       {...props}
