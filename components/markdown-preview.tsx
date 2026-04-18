@@ -2,6 +2,7 @@
 
 import { rehypeMarkdownViewerSelection } from "@/lib/markdown-viewer-selection";
 import { remarkAlphaOrderedLists } from "@/lib/remark-alpha-ordered-lists";
+import { isInternalMarkdownLink } from "@/lib/markdown-file-system";
 import { cn } from "@/lib/utils";
 import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection";
 import { useTheme } from "next-themes";
@@ -18,6 +19,7 @@ import { type PluggableList } from "unified";
 type MarkdownPreviewProps = {
   content: string;
   editorSelection: MarkdownViewerSelection | null;
+  onOpenInternalLinkAction?: (href: string) => void;
   className?: string;
 };
 
@@ -47,6 +49,7 @@ const MAX_SELECTION_HIGHLIGHT_CONTENT_LENGTH = 20_000;
 export const MarkdownPreview = ({
   content,
   editorSelection,
+  onOpenInternalLinkAction,
   className,
 }: MarkdownPreviewProps) => {
   const { resolvedTheme } = useTheme();
@@ -110,6 +113,34 @@ export const MarkdownPreview = ({
         remarkPlugins={remarkPlugins}
         rehypePlugins={rehypePlugins}
         components={{
+          a({ href, children, node, ...props }) {
+            void node;
+            const resolvedHref = href ?? "";
+            const canOpenInternally =
+              Boolean(onOpenInternalLinkAction) &&
+              isInternalMarkdownLink(resolvedHref);
+
+            if (!canOpenInternally) {
+              return (
+                <a href={href} {...props}>
+                  {children}
+                </a>
+              );
+            }
+
+            return (
+              <a
+                href={href}
+                onClick={(event) => {
+                  event.preventDefault();
+                  onOpenInternalLinkAction?.(resolvedHref);
+                }}
+                {...props}
+              >
+                {children}
+              </a>
+            );
+          },
           pre({ children }) {
             return <>{children}</>;
           },

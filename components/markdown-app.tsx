@@ -17,6 +17,7 @@ import { useScrollSync } from "@/hooks/use-scroll-sync";
 import { extractMarkdownDeepLink } from "@/lib/markdown-deep-link";
 import {
   insertBlockAction,
+  insertMarkdownLinkAction,
   insertMarkdownTableAction,
   prefixLinesAction,
   wrapSelectionAction,
@@ -26,7 +27,11 @@ import {
   buildMarkdownExportHtml,
   downloadTextFile,
 } from "@/lib/markdown-export";
-import { shareRecentMarkdownFile } from "@/lib/markdown-file-system";
+import {
+  buildRelativeWorkspaceLink,
+  resolveWorkspaceRelativePath,
+  shareRecentMarkdownFile,
+} from "@/lib/markdown-file-system";
 import {
   createCollaborationRoom,
   createCollaborationRoomId,
@@ -114,6 +119,7 @@ export const MarkdownApp = () => {
     activeDocumentId,
     content,
     activeFile,
+    workspace,
     pendingRemoteOpen,
     recentFiles,
     hydrated,
@@ -125,6 +131,8 @@ export const MarkdownApp = () => {
     clearError,
     setContent,
     setDocumentContent,
+    openFolder,
+    openWorkspacePageByPath,
     openWithPicker,
     openFromUrl,
     openDeepLinkUrl,
@@ -235,8 +243,20 @@ export const MarkdownApp = () => {
       openDocuments.find((document) => document.id === activeDocumentId) ?? null,
     [activeDocumentId, openDocuments]
   );
+  const isWorkspaceDocument = activeFile?.source === "folder";
+  const internalLinkTargets = useMemo(() => {
+    if (!workspace || !activeFile?.relativePath) {
+      return [] as string[];
+    }
+
+    return workspace.pages
+      .map((page) => page.relativePath)
+      .filter((relativePath) => relativePath !== activeFile.relativePath);
+  }, [activeFile?.relativePath, workspace]);
   const canSaveActiveFile =
-    activeFile?.source === "picker" || activeFile?.source === "drop";
+    activeFile?.source === "picker" ||
+    activeFile?.source === "drop" ||
+    activeFile?.source === "folder";
   const isPageBusy = (isBusy && busyMessage !== null) || isCollabBusy;
   const effectiveBusyMessage = busyMessage ?? (isCollabBusy ? "Connecting..." : null);
 
@@ -452,6 +472,10 @@ export const MarkdownApp = () => {
       return;
     }
 
+    if (isWorkspaceDocument) {
+      return;
+    }
+
     if (!hydrated || activeFile) {
       return;
     }
@@ -473,7 +497,14 @@ export const MarkdownApp = () => {
         router.replace(buildEditRoute(openedDocumentId), { scroll: false });
       }
     })();
-  }, [activeFile, hydrated, openDeepLinkUrl, parsedDeepLink, router]);
+  }, [
+    activeFile,
+    hydrated,
+    isWorkspaceDocument,
+    openDeepLinkUrl,
+    parsedDeepLink,
+    router,
+  ]);
 
   useEffect(() => {
     if (pathname === "/") {
@@ -487,11 +518,17 @@ export const MarkdownApp = () => {
       return;
     }
 
+    if (isWorkspaceDocument) {
+      return;
+    }
+
     if (!hydrated) {
       return;
     }
 
-    if (activeDocumentId === routeDocumentId) {
+    const currentState = useMarkdownStore.getState();
+
+    if (currentState.activeDocumentId === routeDocumentId) {
       attemptedRouteDocumentIdRef.current = null;
       return;
     }
@@ -500,7 +537,17 @@ export const MarkdownApp = () => {
       return;
     }
 
-    if (!activeDocumentId && navigatingHomeRef.current) {
+    if (!currentState.activeDocumentId && navigatingHomeRef.current) {
+      return;
+    }
+
+    const existingOpenDocument = currentState.openDocuments.find(
+      (document) => document.id === routeDocumentId
+    );
+
+    if (existingOpenDocument) {
+      setActiveDocument(routeDocumentId);
+      attemptedRouteDocumentIdRef.current = null;
       return;
     }
 
@@ -511,10 +558,22 @@ export const MarkdownApp = () => {
       .then(() => {
         const nextState = useMarkdownStore.getState();
 
+        if (nextState.error) {
+          router.replace("/", { scroll: false });
+          return;
+        }
+
         if (
-          nextState.error ||
+          nextState.activeDocumentId &&
           nextState.activeDocumentId !== routeDocumentId
         ) {
+          router.replace(buildEditRoute(nextState.activeDocumentId), {
+            scroll: false,
+          });
+          return;
+        }
+
+        if (!nextState.activeDocumentId) {
           router.replace("/", { scroll: false });
         }
       })
@@ -524,16 +583,21 @@ export const MarkdownApp = () => {
         }
       });
   }, [
-    activeDocumentId,
     clearError,
     hydrated,
+    isWorkspaceDocument,
     reopenRecentFile,
     routeDocumentId,
     router,
+    setActiveDocument,
   ]);
 
   useEffect(() => {
     if (!hydrated) {
+      return;
+    }
+
+    if (isWorkspaceDocument) {
       return;
     }
 
@@ -556,7 +620,15 @@ export const MarkdownApp = () => {
     }
 
     router.replace(targetPath, { scroll: false });
-  }, [activeDocumentId, hydrated, parsedDeepLink, pathname, routeDocumentId, router]);
+  }, [
+    activeDocumentId,
+    hydrated,
+    isWorkspaceDocument,
+    parsedDeepLink,
+    pathname,
+    routeDocumentId,
+    router,
+  ]);
 
   useEffect(() => {
     if (!hydrated || !parsedCollabJoin) {
@@ -1455,6 +1527,14 @@ export const MarkdownApp = () => {
     clearDocument();
   }, [clearDocument, flushPendingEditorContent]);
 
+  const openWorkspacePageAction = useCallback(
+    (relativePath: string) => {
+      flushPendingEditorContent();
+      void openWorkspacePageByPath(relativePath);
+    },
+    [flushPendingEditorContent, openWorkspacePageByPath]
+  );
+
   const setActiveDocumentAction = useCallback(
     (id: string) => {
       flushPendingEditorContent();
@@ -1653,6 +1733,75 @@ export const MarkdownApp = () => {
     setIsOpenUrlDialogOpen(true);
   }, []);
 
+  const openFolderAction = useCallback(() => {
+    setIsCommandPaletteOpen(false);
+    clearError();
+    void openFolder();
+  }, [clearError, openFolder]);
+
+  const insertInternalLinkToPathAction = useCallback(
+    (targetPath: string) => {
+      if (!activeFile?.relativePath) {
+        return;
+      }
+
+      const relativeLink = buildRelativeWorkspaceLink(
+        activeFile.relativePath,
+        targetPath
+      );
+
+      if (!relativeLink) {
+        setUiError("Unable to build a relative link for this page.");
+        return;
+      }
+
+      const defaultLabel = targetPath
+        .split("/")
+        .at(-1)
+        ?.replace(/\.md$/iu, "")
+        ?.trim();
+
+      insertMarkdownLinkAction(
+        editorRef.current,
+        relativeLink,
+        defaultLabel && defaultLabel.length > 0 ? defaultLabel : "page"
+      );
+    },
+    [activeFile?.relativePath]
+  );
+
+  const openInternalPreviewLinkAction = useCallback(
+    (href: string) => {
+      if (!workspace || !activeFile?.relativePath) {
+        return;
+      }
+
+      flushPendingEditorContent();
+
+      const targetPath = resolveWorkspaceRelativePath(
+        activeFile.relativePath,
+        href
+      );
+
+      if (!targetPath) {
+        setUiError("This internal link could not be resolved.");
+        return;
+      }
+
+      void openWorkspacePageByPath(targetPath).then((opened) => {
+        if (!opened) {
+          toast.error(`No page found for "${targetPath}".`);
+        }
+      });
+    },
+    [
+      activeFile?.relativePath,
+      flushPendingEditorContent,
+      openWorkspacePageByPath,
+      workspace,
+    ]
+  );
+
   const exportMarkdownFile = useCallback(() => {
     if (!activeFile) {
       return;
@@ -1721,6 +1870,7 @@ export const MarkdownApp = () => {
           isBusy={isBusy || isShareBusy}
           content={content}
           stats={activeDocumentStats}
+          workspace={workspace}
           previewContent={previewContent}
           editorRef={editorRef}
           previewRef={previewRef}
@@ -1730,6 +1880,11 @@ export const MarkdownApp = () => {
           onEditorScroll={handleEditorScroll}
           collaboratorSelections={collaboration.participants}
           onPreviewScroll={handlePreviewScroll}
+          onOpenInternalLinkAction={
+            workspace && activeFile?.relativePath
+              ? openInternalPreviewLinkAction
+              : undefined
+          }
           previewSelection={deferredPreviewSelection}
           viewMode={viewMode}
           setViewModeAction={setViewMode}
@@ -1761,6 +1916,7 @@ export const MarkdownApp = () => {
           refreshFileAction={handleRefresh}
           clearDocumentAction={clearDocumentAction}
           setActiveDocumentAction={setActiveDocumentAction}
+          openWorkspacePageAction={openWorkspacePageAction}
           closeDocumentAction={closeDocumentAction}
           openRecentAction={openRecentFileAction}
           clearRecentAction={clearRecentFiles}
@@ -1798,6 +1954,7 @@ export const MarkdownApp = () => {
                 isBusy={isBusy}
                 canPersistFiles={canPersistFiles}
                 openFileAction={openWithPicker}
+                openFolderAction={openFolderAction}
                 showOpenUrlDialogAction={showOpenUrlDialog}
                 createNewAction={createNewFile}
               />
@@ -1956,13 +2113,16 @@ export const MarkdownApp = () => {
         recentFiles={recentFiles}
         viewMode={viewMode}
         canSaveActiveFile={
-          activeFile?.source === "picker" || activeFile?.source === "drop"
+          activeFile?.source === "picker" ||
+          activeFile?.source === "drop" ||
+          activeFile?.source === "folder"
         }
         hasActiveFile={Boolean(activeFile)}
         isBusy={isBusy || isShareBusy}
         openFileAction={() => {
           void openWithPicker();
         }}
+        openFolderAction={openFolderAction}
         openUrlDialogAction={showOpenUrlDialog}
         createNewAction={() => {
           void createNewFile();
@@ -1979,6 +2139,8 @@ export const MarkdownApp = () => {
         exportHtmlAction={exportHtmlFile}
         goHomeAction={goHomeAction}
         closeDocumentAction={clearDocumentAction}
+        internalLinkTargets={internalLinkTargets}
+        insertInternalLinkAction={insertInternalLinkToPathAction}
         openRecentAction={(id) => {
           openRecentFileAction(id);
         }}

@@ -8,10 +8,13 @@ import {
 } from "@/lib/markdown-helpers";
 import {
   type DataTransferItemWithHandle,
+  type MarkdownDirectoryHandle,
   type MarkdownFileHandle,
   type MarkdownShare,
   type MarkdownShareOptions,
   type MarkdownShareResult,
+  type MarkdownWorkspace,
+  type MarkdownWorkspacePage,
   type OpenFilePickerOptions,
   type PendingMarkdownImport,
   type PermissionMode,
@@ -32,6 +35,11 @@ declare global {
     showSaveFilePicker?: (
       options?: import("@/types/markdown").SaveFilePickerOptions
     ) => Promise<FileSystemFileHandle>;
+    showDirectoryPicker?: (options?: {
+      id?: string;
+      mode?: PermissionMode;
+      startIn?: string;
+    }) => Promise<FileSystemDirectoryHandle>;
   }
 }
 
@@ -40,8 +48,56 @@ const isBrowser = () => typeof window !== "undefined";
 const supportsOpenFilePicker = () =>
   isBrowser() && typeof window.showOpenFilePicker === "function";
 
+const supportsDirectoryPicker = () =>
+  isBrowser() && typeof window.showDirectoryPicker === "function";
+
 const supportsLocalStorage = () =>
   isBrowser() && typeof window.localStorage !== "undefined";
+
+const stripHashAndQuery = (value: string) =>
+  value.replace(/[?#].*$/u, "").trim();
+
+const normalizeWorkspacePath = (value: string) => {
+  const sanitized = stripHashAndQuery(value).replace(/\\/gu, "/");
+
+  if (!sanitized) {
+    return null;
+  }
+
+  const normalized = sanitized
+    .split("/")
+    .filter((segment) => segment !== "" && segment !== ".")
+    .reduce<string[] | null>((segments, segment) => {
+      if (!segments) {
+        return null;
+      }
+
+      if (segment === "..") {
+        if (segments.length === 0) {
+          return null;
+        }
+
+        return segments.slice(0, -1);
+      }
+
+      return segments.concat(segment);
+    }, []);
+
+  if (!normalized || normalized.length === 0) {
+    return null;
+  }
+
+  return normalized.join("/");
+};
+
+const basename = (value: string) => {
+  const normalized = value.replace(/\\/gu, "/");
+  const segments = normalized.split("/");
+  return segments.at(-1) ?? normalized;
+};
+
+const normalizeMarkdownContent = (content: string) =>
+  content.replace(/\r\n/gu, "\n");
 
 const openDatabase = () => {
   return new Promise<IDBDatabase>((resolve, reject) => {
@@ -112,7 +168,7 @@ const writeRecentFilesToStorage = (files: RecentMarkdownFile[]) => {
   window.localStorage.setItem(RECENT_FILES_KEY, JSON.stringify(files));
 };
 
-const saveHandle = async (id: string, handle: FileSystemFileHandle) => {
+const saveHandle = async (id: string, handle: FileSystemHandle) => {
   await withStore("readwrite", (store) => store.put(handle, id));
 };
 
@@ -121,13 +177,13 @@ const deleteHandle = async (id: string) => {
 };
 
 const getHandle = async (id: string) => {
-  return withStore<FileSystemFileHandle | undefined>("readonly", (store) =>
+  return withStore<FileSystemHandle | undefined>("readonly", (store) =>
     store.get(id)
   );
 };
 
 const ensurePermission = async (
-  handle: MarkdownFileHandle,
+  handle: MarkdownFileHandle | MarkdownDirectoryHandle,
   mode: PermissionMode = "read"
 ) => {
   if (!handle.queryPermission || !handle.requestPermission) {
@@ -146,7 +202,101 @@ const ensurePermission = async (
 
 const readContent = async (handle: FileSystemFileHandle) => {
   const file = await handle.getFile();
-  return file.text();
+  return normalizeMarkdownContent(await file.text());
+};
+
+export const isInternalMarkdownLink = (href: string) => {
+  const normalizedHref = href.trim();
+
+  if (!normalizedHref) {
+    return false;
+  }
+
+  if (
+    normalizedHref.startsWith("#") ||
+    /^[a-z][a-z\d+\-.]*:/iu.test(normalizedHref) ||
+    normalizedHref.startsWith("//")
+  ) {
+    return false;
+  }
+
+  const normalizedPath = normalizeWorkspacePath(normalizedHref);
+  return normalizedPath !== null && normalizedPath.toLowerCase().endsWith(".md");
+};
+
+export const resolveWorkspaceRelativePath = (
+  fromRelativePath: string,
+  href: string
+) => {
+  if (!isInternalMarkdownLink(href)) {
+    return null;
+  }
+
+  const cleanHref = stripHashAndQuery(href).replace(/\\/gu, "/");
+  const fromPath = normalizeWorkspacePath(fromRelativePath);
+
+  if (!fromPath) {
+    return null;
+  }
+
+  const currentDirectory =
+    fromPath.lastIndexOf("/") >= 0
+      ? fromPath.slice(0, fromPath.lastIndexOf("/"))
+      : "";
+  const targetCandidate = cleanHref.startsWith("/")
+    ? cleanHref.slice(1)
+    : currentDirectory
+      ? `${currentDirectory}/${cleanHref}`
+      : cleanHref;
+
+  const normalizedPath = normalizeWorkspacePath(targetCandidate);
+
+  if (!normalizedPath || !normalizedPath.toLowerCase().endsWith(".md")) {
+    return null;
+  }
+
+  return normalizedPath;
+};
+
+export const buildRelativeWorkspaceLink = (
+  fromRelativePath: string,
+  toRelativePath: string
+) => {
+  const fromPath = normalizeWorkspacePath(fromRelativePath);
+  const toPath = normalizeWorkspacePath(toRelativePath);
+
+  if (!fromPath || !toPath) {
+    return null;
+  }
+
+  const fromDirectorySegments = fromPath.split("/").slice(0, -1);
+  const toSegments = toPath.split("/");
+  let sharedIndex = 0;
+
+  while (
+    sharedIndex < fromDirectorySegments.length &&
+    sharedIndex < toSegments.length &&
+    fromDirectorySegments[sharedIndex] === toSegments[sharedIndex]
+  ) {
+    sharedIndex += 1;
+  }
+
+  const upwardSegments = Array.from(
+    { length: fromDirectorySegments.length - sharedIndex },
+    () => ".."
+  );
+  const downwardSegments = toSegments.slice(sharedIndex);
+  const relativePath = upwardSegments.concat(downwardSegments).join("/");
+
+  if (!relativePath || relativePath === basename(toPath)) {
+    return `./${basename(toPath)}`;
+  }
+
+  if (relativePath.startsWith("..")) {
+    return relativePath;
+  }
+
+  return `./${relativePath}`;
 };
 
 const normalizeRemoteUrl = (value: string | null | undefined) => {
@@ -267,7 +417,7 @@ const requestMarkdownFromUrl = async (
 
   return {
     status: "opened",
-    content: payload.content,
+    content: normalizeMarkdownContent(payload.content),
     name: payload.name,
     selectedFileName:
       typeof payload.selectedFileName === "string"
@@ -363,16 +513,22 @@ const reopenLocalRecentFile = async (knownEntry: RecentMarkdownFile) => {
     throw new Error("This recent file is no longer available in the browser.");
   }
 
-  const hasPermission = await ensurePermission(handle as MarkdownFileHandle);
+  if (handle.kind !== "file") {
+    throw new Error("The saved file handle is invalid.");
+  }
+
+  const fileHandle = handle as MarkdownFileHandle;
+
+  const hasPermission = await ensurePermission(fileHandle);
 
   if (!hasPermission) {
     throw new Error("Permission is required to reopen this file.");
   }
 
-  const content = await readContent(handle);
+  const content = await readContent(fileHandle);
   const nextEntry = {
     ...knownEntry,
-    name: handle.name,
+    name: fileHandle.name,
     lastOpenedAt: new Date().toISOString(),
     stats: getMarkdownDocumentStats(content),
   } satisfies RecentMarkdownFile;
@@ -397,6 +553,251 @@ const createEntryFromFile = (
     source,
     stats: getMarkdownDocumentStats(content),
   } satisfies RecentMarkdownFile;
+};
+
+const buildWorkspacePageId = (workspaceId: string, relativePath: string) =>
+  `workspace:${workspaceId}:${relativePath}`;
+
+const createEntryFromWorkspacePage = (
+  page: MarkdownWorkspacePage,
+  workspaceId: string,
+  content: string,
+  existingEntry: RecentMarkdownFile | null = null
+) => {
+  return {
+    id: page.id,
+    name: page.name,
+    path: page.relativePath,
+    relativePath: page.relativePath,
+    workspaceId,
+    share: existingEntry?.share ?? null,
+    url: null,
+    urlFileName: null,
+    lastOpenedAt: new Date().toISOString(),
+    source: "folder",
+    stats: getMarkdownDocumentStats(content),
+  } satisfies RecentMarkdownFile;
+};
+
+const createWorkspaceRecentEntry = (
+  workspace: MarkdownWorkspace,
+  existingEntry: RecentMarkdownFile | null = null
+) => {
+  return {
+    id: workspace.id,
+    name: workspace.name,
+    path: workspace.name,
+    relativePath: null,
+    workspaceId: workspace.id,
+    share: existingEntry?.share ?? null,
+    url: null,
+    urlFileName: null,
+    lastOpenedAt: new Date().toISOString(),
+    source: "workspace",
+    stats: {
+      characterCount: 0,
+      wordCount: 0,
+      lineCount: 0,
+      fileCount: workspace.pages.length,
+    },
+  } satisfies RecentMarkdownFile;
+};
+
+const listWorkspaceMarkdownPages = async (
+  directoryHandle: FileSystemDirectoryHandle,
+  parentPath = ""
+): Promise<MarkdownWorkspacePage[]> => {
+  const pages: MarkdownWorkspacePage[] = [];
+  const entries = (
+    directoryHandle as FileSystemDirectoryHandle & {
+      entries?: () => AsyncIterable<[string, FileSystemHandle]>;
+    }
+  ).entries;
+
+  if (!entries) {
+    throw new Error(
+      "Directory iteration is not supported in this browser version."
+    );
+  }
+
+  for await (const [name, handle] of entries.call(directoryHandle)) {
+    if (handle.kind === "directory") {
+      const nestedPath = parentPath ? `${parentPath}/${name}` : name;
+      const nestedPages = await listWorkspaceMarkdownPages(
+        handle as FileSystemDirectoryHandle,
+        nestedPath
+      );
+      pages.push(...nestedPages);
+      continue;
+    }
+
+    if (!name.toLowerCase().endsWith(".md")) {
+      continue;
+    }
+
+    const relativePath = parentPath ? `${parentPath}/${name}` : name;
+
+    pages.push({
+      id: "",
+      name,
+      relativePath,
+      handle: handle as FileSystemFileHandle,
+      content: "",
+    });
+  }
+
+  return pages.sort((left, right) =>
+    left.relativePath.localeCompare(right.relativePath)
+  );
+};
+
+const loadWorkspaceMarkdownPages = async (
+  directoryHandle: FileSystemDirectoryHandle,
+  workspaceId: string
+) => {
+  const storedRecentFiles = readRecentFilesFromStorage();
+  const recentFilesById = new Map(
+    storedRecentFiles.map((file) => [file.id, file] as const)
+  );
+  const pages = await listWorkspaceMarkdownPages(directoryHandle);
+
+  if (pages.length === 0) {
+    throw new Error("No Markdown files were found in the selected folder.");
+  }
+
+  const permissionResults = await Promise.all(
+    pages.map((page) => ensurePermission(page.handle as MarkdownFileHandle))
+  );
+
+  if (permissionResults.some((hasPermission) => !hasPermission)) {
+    throw new Error("Read permission was denied for the selected folder.");
+  }
+
+  const pagesWithContent = await Promise.all(
+    pages.map(async (page) => {
+      const content = await readContent(page.handle);
+
+      return {
+        ...page,
+        id: buildWorkspacePageId(workspaceId, page.relativePath),
+        content,
+      };
+    })
+  );
+
+  const documents = pagesWithContent.map((page) => ({
+    entry: createEntryFromWorkspacePage(
+      page,
+      workspaceId,
+      page.content,
+      recentFilesById.get(page.id) ?? null
+    ),
+    content: page.content,
+  }));
+
+  return { pages: pagesWithContent, documents };
+};
+
+export const openMarkdownFolder = async () => {
+  if (!supportsDirectoryPicker()) {
+    throw new Error(
+      "This browser does not support local folder access for Markdown workspaces."
+    );
+  }
+
+  const directoryHandle = await window.showDirectoryPicker!({
+    id: "markdown-folder-open",
+    mode: "readwrite",
+  });
+  const workspaceId = crypto.randomUUID();
+  const { pages, documents } = await loadWorkspaceMarkdownPages(
+    directoryHandle,
+    workspaceId
+  );
+  const firstDocument = documents[0];
+  const workspace: MarkdownWorkspace = {
+    id: workspaceId,
+    name: directoryHandle.name,
+    pages,
+  };
+  const recentWorkspaceEntry = createWorkspaceRecentEntry(workspace);
+
+  await saveHandle(workspaceId, directoryHandle);
+  await Promise.all(
+    pages.map((page) => saveHandle(page.id, page.handle))
+  );
+
+  const recentFiles = persistRecentEntry(recentWorkspaceEntry);
+
+  return {
+    workspace,
+    entry: firstDocument.entry,
+    content: firstDocument.content,
+    documents,
+    recentFiles,
+  };
+};
+
+export const openWorkspaceMarkdownPage = async (
+  page: MarkdownWorkspacePage,
+  workspaceId: string
+) => {
+  const content = page.content;
+  const entry = createEntryFromWorkspacePage(page, workspaceId, content);
+
+  return {
+    entry,
+    content,
+    recentFiles: getRecentMarkdownFiles(),
+  };
+};
+
+const reopenRecentWorkspace = async (knownEntry: RecentMarkdownFile) => {
+  const handle = await getHandle(knownEntry.id);
+
+  if (!handle) {
+    throw new Error("This recent folder is no longer available in the browser.");
+  }
+
+  if (handle.kind !== "directory") {
+    throw new Error("The saved folder handle is invalid.");
+  }
+
+  const directoryHandle = handle as MarkdownDirectoryHandle;
+  const hasPermission = await ensurePermission(directoryHandle);
+
+  if (!hasPermission) {
+    throw new Error("Permission is required to reopen this folder.");
+  }
+
+  const workspaceId = knownEntry.workspaceId ?? knownEntry.id;
+  const { pages, documents } = await loadWorkspaceMarkdownPages(
+    directoryHandle,
+    workspaceId
+  );
+
+  const workspace: MarkdownWorkspace = {
+    id: workspaceId,
+    name: directoryHandle.name,
+    pages,
+  };
+  const recentWorkspaceEntry = createWorkspaceRecentEntry(workspace, knownEntry);
+
+  await saveHandle(workspaceId, directoryHandle);
+  await Promise.all(
+    pages.map((page) => saveHandle(page.id, page.handle))
+  );
+
+  const recentFiles = persistRecentEntry(recentWorkspaceEntry);
+  const firstDocument = documents[0];
+
+  return {
+    workspace,
+    entry: firstDocument.entry,
+    content: firstDocument.content,
+    documents,
+    recentFiles,
+  };
 };
 
 export const openMarkdownWithPicker = async (options: PickerOptions = {}) => {
@@ -562,11 +963,12 @@ export const openDroppedMarkdownFiles = async (
   for (const [index, file] of files.entries()) {
     const handle = handles[index] ?? null;
     const content = await file.text();
+    const normalizedContent = normalizeMarkdownContent(content);
 
     if (!handle) {
       documents.push({
-        entry: createEntryFromFile(file, content, "drop"),
-        content,
+        entry: createEntryFromFile(file, normalizedContent, "drop"),
+        content: normalizedContent,
       });
       continue;
     }
@@ -582,7 +984,7 @@ export const openDroppedMarkdownFiles = async (
       ...(await createEntryFromHandle(
         handle,
         "drop",
-        content,
+        normalizedContent,
         existingEntry?.id,
         existingEntry?.share ?? null
       )),
@@ -590,7 +992,7 @@ export const openDroppedMarkdownFiles = async (
     } satisfies RecentMarkdownFile;
 
     await saveHandle(entry.id, handle);
-    documents.push({ entry, content });
+    documents.push({ entry, content: normalizedContent });
   }
 
   const recentFiles = persistRecentEntries(
@@ -653,6 +1055,10 @@ export const reopenRecentMarkdownFile = async (id: string) => {
     return result;
   }
 
+  if (knownEntry.source === "workspace") {
+    return reopenRecentWorkspace(knownEntry);
+  }
+
   return reopenLocalRecentFile(knownEntry);
 };
 
@@ -709,7 +1115,8 @@ export const saveRecentMarkdownFile = async (id: string, content: string) => {
 export const getRecentMarkdownFiles = () =>
   sortRecentFiles(readRecentFilesFromStorage());
 
-export const canUsePersistentLocalFiles = () => supportsOpenFilePicker();
+export const canUsePersistentLocalFiles = () =>
+  supportsOpenFilePicker() || supportsDirectoryPicker();
 
 export const createNewMarkdownFile = async (
   initialContent = "",

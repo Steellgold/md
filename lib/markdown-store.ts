@@ -6,8 +6,10 @@ import {
   createNewMarkdownFile,
   getRecentMarkdownFiles,
   openDroppedMarkdownFiles,
+  openMarkdownFolder,
   openMarkdownFromUrl,
   openMarkdownWithPicker,
+  openWorkspaceMarkdownPage,
   removeRecentMarkdownFile,
   reopenRecentMarkdownFile,
   saveRecentMarkdownFile,
@@ -21,6 +23,7 @@ import {
   type CollaborationSession,
   type MarkdownShare,
   type MarkdownStore,
+  type MarkdownWorkspace,
   type OpenMarkdownDocument,
   type PendingMarkdownImport,
   type RecentMarkdownFile,
@@ -146,6 +149,12 @@ const buildDocumentState = (
   };
 };
 
+const findWorkspacePage = (
+  workspace: MarkdownWorkspace,
+  relativePath: string
+) =>
+  workspace.pages.find((page) => page.relativePath === relativePath) ?? null;
+
 const getErrorState = (error: unknown) => ({
   error: getUnknownErrorMessage(error),
   isBusy: false,
@@ -159,6 +168,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
   activeDocumentId: null,
   content: "",
   activeFile: null,
+  workspace: null,
   pendingImports: [],
   pendingRemoteOpen: null,
   recentFiles: [],
@@ -204,6 +214,79 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
         content: activeDocument.content,
       };
     }),
+  openFolder: async () => {
+    set(getBusyState("Opening folder..."));
+
+    try {
+      const result = await openMarkdownFolder();
+
+      set((state) =>
+        buildDocumentState(
+          upsertOpenDocuments(state.openDocuments, result.documents),
+          result.entry.id,
+          result.recentFiles,
+          { workspace: result.workspace }
+        )
+      );
+    } catch (error) {
+      set(getErrorState(error));
+    }
+  },
+  openWorkspacePageByPath: async (relativePath) => {
+    const state = useMarkdownStore.getState();
+
+    if (!state.workspace) {
+      set(getErrorState(new Error("No workspace is currently open.")));
+      return false;
+    }
+
+    const page = findWorkspacePage(state.workspace, relativePath);
+
+    if (!page) {
+      set(
+        getErrorState(
+          new Error(`No page found for workspace path "${relativePath}".`)
+        )
+      );
+      return false;
+    }
+
+    const existingDocument =
+      state.openDocuments.find((document) => document.id === page.id) ?? null;
+
+    if (existingDocument) {
+      set((currentState) =>
+        buildDocumentState(
+          currentState.openDocuments,
+          existingDocument.id,
+          currentState.recentFiles,
+          { workspace: currentState.workspace }
+        )
+      );
+      return true;
+    }
+
+    try {
+      const result = await openWorkspaceMarkdownPage(page, state.workspace.id);
+
+      set((currentState) =>
+        buildDocumentState(
+          upsertOpenDocument(
+            currentState.openDocuments,
+            result.entry,
+            result.content
+          ),
+          result.entry.id,
+          result.recentFiles,
+          { workspace: currentState.workspace }
+        )
+      );
+      return true;
+    } catch (error) {
+      set(getErrorState(error));
+      return false;
+    }
+  },
   openWithPicker: async () => {
     set(getBusyState("Opening file..."));
 
@@ -469,6 +552,18 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
         }
       }
 
+      if ("workspace" in result && "documents" in result) {
+        set((state) =>
+          buildDocumentState(
+            upsertOpenDocuments(state.openDocuments, result.documents),
+            result.entry.id,
+            result.recentFiles,
+            { workspace: result.workspace }
+          )
+        );
+        return;
+      }
+
       const { entry, content, recentFiles } = result;
 
       set((state) =>
@@ -563,12 +658,13 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
             : document
         );
 
-        return buildDocumentState(
-          nextDocuments,
-          activeDocument.id,
-          recentFiles
-        );
-      });
+          return buildDocumentState(
+            nextDocuments,
+            activeDocument.id,
+            recentFiles,
+            { workspace: currentState.workspace }
+          );
+        });
     } catch (error) {
       set(getErrorState(error));
     }
@@ -664,20 +760,23 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
         isDirty: true,
       };
 
-      return buildDocumentState(
-        upsertOpenDocument(state.openDocuments, file, ""),
-        scratchDocument.id,
-        state.recentFiles
-      );
-    }),
+        return buildDocumentState(
+          upsertOpenDocument(state.openDocuments, file, ""),
+          scratchDocument.id,
+          state.recentFiles,
+          { workspace: null }
+        );
+      }),
   goHome: () =>
     set((state) => {
       state.openDocuments.forEach((document) => {
         void syncRecentMarkdownFileSnapshot(document.id, document.content);
       });
 
-      return buildDocumentState([], null, state.recentFiles);
-    }),
+        return buildDocumentState([], null, state.recentFiles, {
+          workspace: null,
+        });
+      }),
   closeDocument: (id) =>
     set((state) => {
       const documentToClose =
@@ -705,8 +804,10 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
           ? (fallbackDocument?.id ?? null)
           : state.activeDocumentId;
 
-      return buildDocumentState(nextDocuments, preferredId, state.recentFiles);
-    }),
+        return buildDocumentState(nextDocuments, preferredId, state.recentFiles, {
+          workspace: state.workspace,
+        });
+      }),
   removeRecentFile: async (id) => {
     try {
       const recentFiles = await removeRecentMarkdownFile(id);

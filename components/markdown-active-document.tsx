@@ -1,5 +1,6 @@
 import { DetachedWindowPortal } from "@/components/detached-window-portal";
 import { MarkdownDocumentTabs } from "@/components/markdown-document-tabs";
+import { MarkdownWorkspaceTree } from "@/components/markdown-workspace-tree";
 import { MarkdownToolbar } from "@/components/markdown-toolbar";
 import {
   ResizableHandle,
@@ -11,10 +12,20 @@ import {
   type MarkdownDocumentStats,
   type OpenMarkdownDocument,
   type RecentMarkdownFile,
+  type MarkdownWorkspace,
 } from "@/types/markdown";
 import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection";
-import { GripVerticalIcon } from "lucide-react";
-import { ChangeEvent, RefObject, useState } from "react";
+import {
+  ChevronDownIcon,
+  ChevronUpIcon,
+  GripVerticalIcon,
+} from "lucide-react";
+import { usePanelRef } from "react-resizable-panels";
+import {
+  ChangeEvent,
+  RefObject,
+  useState,
+} from "react";
 import { type ViewMode } from "../types/view-mode";
 import { MarkdownEditorPanel } from "./markdown-editor-panel";
 import { MarkdownPreviewPanel } from "./markdown-preview-panel";
@@ -27,6 +38,7 @@ type MarkdownActiveDocumentProps = {
   isBusy: boolean;
   content: string;
   stats: MarkdownDocumentStats;
+  workspace: MarkdownWorkspace | null;
   previewContent: string;
   editorRef: RefObject<HTMLTextAreaElement | null>;
   previewRef: RefObject<HTMLDivElement | null>;
@@ -36,6 +48,7 @@ type MarkdownActiveDocumentProps = {
   onEditorScroll: () => void;
   collaboratorSelections: CollaborationParticipant[];
   onPreviewScroll: () => void;
+  onOpenInternalLinkAction?: (href: string) => void;
   previewSelection: MarkdownViewerSelection | null;
   viewMode: ViewMode;
   setViewModeAction: (value: ViewMode) => void;
@@ -65,6 +78,7 @@ type MarkdownActiveDocumentProps = {
   refreshFileAction: () => void;
   clearDocumentAction: () => void;
   setActiveDocumentAction: (id: string) => void;
+  openWorkspacePageAction: (relativePath: string) => void;
   closeDocumentAction: (id: string) => void;
   openRecentAction: (id: string) => void;
   clearRecentAction: () => void;
@@ -82,6 +96,12 @@ type MarkdownActiveDocumentProps = {
   insertTableAction: (columns: number, rows: number) => void;
 };
 
+const clampPanelSize = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
+
+const WORKSPACE_TREE_HEADER_ONLY_SIZE = "56px";
+const WORKSPACE_TREE_DEFAULT_SIZE = "176px";
+
 export const MarkdownActiveDocument = ({
   activeFile,
   openDocuments,
@@ -90,6 +110,7 @@ export const MarkdownActiveDocument = ({
   isBusy,
   content,
   stats,
+  workspace,
   previewContent,
   editorRef,
   previewRef,
@@ -99,6 +120,7 @@ export const MarkdownActiveDocument = ({
   onEditorScroll,
   collaboratorSelections,
   onPreviewScroll,
+  onOpenInternalLinkAction,
   previewSelection,
   viewMode,
   setViewModeAction,
@@ -128,6 +150,7 @@ export const MarkdownActiveDocument = ({
   refreshFileAction,
   clearDocumentAction,
   setActiveDocumentAction,
+  openWorkspacePageAction,
   closeDocumentAction,
   openRecentAction,
   clearRecentAction,
@@ -145,8 +168,26 @@ export const MarkdownActiveDocument = ({
   insertTableAction,
 }: MarkdownActiveDocumentProps) => {
   const [editorTopbarHeight, setEditorTopbarHeight] = useState(0);
+  const [isWorkspaceTreeCollapsed, setIsWorkspaceTreeCollapsed] = useState(false);
+  const workspaceTreePanelRef = usePanelRef();
   const displayedViewMode = previewDetached ? "editor" : viewMode;
 
+  const toggleWorkspaceTreeCollapsed = () => {
+    const panel = workspaceTreePanelRef.current;
+
+    if (!panel) {
+      return;
+    }
+
+    if (isWorkspaceTreeCollapsed) {
+      panel.resize(WORKSPACE_TREE_DEFAULT_SIZE);
+      setIsWorkspaceTreeCollapsed(false);
+      return;
+    }
+
+    panel.resize(WORKSPACE_TREE_HEADER_ONLY_SIZE);
+    setIsWorkspaceTreeCollapsed(true);
+  };
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <MarkdownToolbar
@@ -187,66 +228,189 @@ export const MarkdownActiveDocument = ({
         setActiveDocumentAction={setActiveDocumentAction}
         closeDocumentAction={closeDocumentAction}
       />
+      {workspace ? (
+        <ResizablePanelGroup
+          orientation="horizontal"
+          className="min-h-0 flex-1 bg-background"
+        >
+          <ResizablePanel defaultSize={65} minSize={35}>
+            <div className="min-h-0 h-full">
+              <ResizablePanelGroup
+                orientation="vertical"
+                className="min-h-0 h-full"
+              >
+                <ResizablePanel
+                  minSize={35}
+                >
+                  <MarkdownEditorPanel
+                    activeFile={activeFile}
+                    content={content}
+                    stats={stats}
+                    editorRef={editorRef}
+                    onTopbarHeightChange={setEditorTopbarHeight}
+                    onChange={onEditorChange}
+                    onBlur={onEditorBlur}
+                    onSelectionChange={onEditorSelectionChange}
+                    onScroll={onEditorScroll}
+                    collaboratorSelections={collaboratorSelections}
+                    undoAction={undoAction}
+                    redoAction={redoAction}
+                    boldAction={boldAction}
+                    italicAction={italicAction}
+                    headingAction={headingAction}
+                    inlineCodeAction={inlineCodeAction}
+                    codeBlockAction={codeBlockAction}
+                    bulletListAction={bulletListAction}
+                    orderedListAction={orderedListAction}
+                    alphaListAction={alphaListAction}
+                    taskListAction={taskListAction}
+                    insertTableAction={insertTableAction}
+                  />
+                </ResizablePanel>
 
-      <ResizablePanelGroup
-        orientation="horizontal"
-        className="min-h-0 flex-1 bg-background"
-      >
-        {displayedViewMode !== "preview" ? (
-          <ResizablePanel
-            defaultSize={displayedViewMode === "editor" ? 100 : 50}
-            minSize={30}
-          >
-            <MarkdownEditorPanel
-              activeFile={activeFile}
-              content={content}
-              stats={stats}
-              editorRef={editorRef}
-              onTopbarHeightChange={setEditorTopbarHeight}
-              onChange={onEditorChange}
-              onBlur={onEditorBlur}
-              onSelectionChange={onEditorSelectionChange}
-              onScroll={onEditorScroll}
-              collaboratorSelections={collaboratorSelections}
-              undoAction={undoAction}
-              redoAction={redoAction}
-              boldAction={boldAction}
-              italicAction={italicAction}
-              headingAction={headingAction}
-              inlineCodeAction={inlineCodeAction}
-              codeBlockAction={codeBlockAction}
-              bulletListAction={bulletListAction}
-              orderedListAction={orderedListAction}
-              alphaListAction={alphaListAction}
-              taskListAction={taskListAction}
-              insertTableAction={insertTableAction}
-            />
+                <ResizableHandle withHandle className="bg-border/80" />
+
+                <ResizablePanel
+                  panelRef={workspaceTreePanelRef}
+                  defaultSize={WORKSPACE_TREE_DEFAULT_SIZE}
+                  minSize={WORKSPACE_TREE_HEADER_ONLY_SIZE}
+                  onResize={() => {
+                    const panelSizeInPixels =
+                      workspaceTreePanelRef.current?.getSize().inPixels ?? 0;
+
+                    setIsWorkspaceTreeCollapsed(
+                      panelSizeInPixels <= 60
+                    );
+                  }}
+                >
+                  <div className="flex h-full min-h-0 flex-col border-t border-border/70">
+                    <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Workspace files
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {workspace.pages.length} pages
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border/70 bg-background/80 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        onClick={toggleWorkspaceTreeCollapsed}
+                        aria-label={
+                          isWorkspaceTreeCollapsed
+                            ? "Expand workspace files"
+                            : "Collapse workspace files"
+                        }
+                        title={
+                          isWorkspaceTreeCollapsed
+                            ? "Expand workspace files"
+                            : "Collapse workspace files"
+                        }
+                      >
+                        {isWorkspaceTreeCollapsed ? (
+                          <ChevronUpIcon className="size-4" />
+                        ) : (
+                          <ChevronDownIcon className="size-4" />
+                        )}
+                      </button>
+                    </div>
+
+                    {!isWorkspaceTreeCollapsed ? (
+                      <div className="min-h-0 flex-1 p-2">
+                        <MarkdownWorkspaceTree
+                          workspace={workspace}
+                          activeRelativePath={activeFile.relativePath ?? null}
+                          openWorkspacePageAction={openWorkspacePageAction}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                </ResizablePanel>
+              </ResizablePanelGroup>
+            </div>
           </ResizablePanel>
-        ) : null}
 
-        {displayedViewMode === "split" ? (
           <ResizableHandle withHandle className="bg-border/80">
             <GripVerticalIcon />
           </ResizableHandle>
-        ) : null}
 
-        {displayedViewMode !== "editor" ? (
-          <ResizablePanel
-            defaultSize={displayedViewMode === "preview" ? 100 : 50}
-            minSize={30}
-          >
+          <ResizablePanel defaultSize={35} minSize={25}>
             <MarkdownPreviewPanel
               content={previewContent}
               previewRef={previewRef}
               editorSelection={previewSelection}
+              onOpenInternalLinkAction={onOpenInternalLinkAction}
               topOverlayHeight={editorTopbarHeight}
               onScroll={onPreviewScroll}
               previewDetached={previewDetached}
               togglePreviewDetachedAction={togglePreviewDetachedAction}
             />
           </ResizablePanel>
-        ) : null}
-      </ResizablePanelGroup>
+        </ResizablePanelGroup>
+      ) : (
+        <ResizablePanelGroup
+          orientation="horizontal"
+          className="min-h-0 flex-1 bg-background"
+        >
+          {displayedViewMode !== "preview" ? (
+            <ResizablePanel
+              defaultSize={displayedViewMode === "editor" ? 100 : 50}
+              minSize={30}
+            >
+              <MarkdownEditorPanel
+                activeFile={activeFile}
+                content={content}
+                stats={stats}
+                editorRef={editorRef}
+                onTopbarHeightChange={setEditorTopbarHeight}
+                onChange={onEditorChange}
+                onBlur={onEditorBlur}
+                onSelectionChange={onEditorSelectionChange}
+                onScroll={onEditorScroll}
+                collaboratorSelections={collaboratorSelections}
+                undoAction={undoAction}
+                redoAction={redoAction}
+                boldAction={boldAction}
+                italicAction={italicAction}
+                headingAction={headingAction}
+                inlineCodeAction={inlineCodeAction}
+                codeBlockAction={codeBlockAction}
+                bulletListAction={bulletListAction}
+                orderedListAction={orderedListAction}
+                alphaListAction={alphaListAction}
+                taskListAction={taskListAction}
+                insertTableAction={insertTableAction}
+              />
+            </ResizablePanel>
+          ) : null}
+
+          {displayedViewMode === "split" ? (
+            <ResizableHandle withHandle className="bg-border/80">
+              <GripVerticalIcon />
+            </ResizableHandle>
+          ) : null}
+
+          {displayedViewMode !== "editor" ? (
+            <ResizablePanel
+              defaultSize={displayedViewMode === "preview" ? 100 : 50}
+              minSize={30}
+            >
+              <MarkdownPreviewPanel
+                content={previewContent}
+                previewRef={previewRef}
+                editorSelection={previewSelection}
+                onOpenInternalLinkAction={onOpenInternalLinkAction}
+                topOverlayHeight={editorTopbarHeight}
+                onScroll={onPreviewScroll}
+                previewDetached={previewDetached}
+                togglePreviewDetachedAction={togglePreviewDetachedAction}
+              />
+            </ResizablePanel>
+          ) : null}
+        </ResizablePanelGroup>
+      )}
 
       <DetachedWindowPortal
         open={previewDetached}
@@ -258,6 +422,7 @@ export const MarkdownActiveDocument = ({
           content={previewContent}
           previewRef={previewRef}
           editorSelection={previewSelection}
+          onOpenInternalLinkAction={onOpenInternalLinkAction}
           onScroll={onPreviewScroll}
           previewDetached={previewDetached}
           togglePreviewDetachedAction={togglePreviewDetachedAction}

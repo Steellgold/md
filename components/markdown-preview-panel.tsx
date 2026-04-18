@@ -15,6 +15,7 @@ type MarkdownPreviewPanelProps = {
   content: string;
   previewRef: RefObject<HTMLDivElement | null>;
   editorSelection: MarkdownViewerSelection | null;
+  onOpenInternalLinkAction?: (href: string) => void;
   topOverlayHeight?: number;
   onScroll: () => void;
   previewDetached: boolean;
@@ -25,6 +26,7 @@ export const MarkdownPreviewPanel = ({
   content,
   previewRef,
   editorSelection,
+  onOpenInternalLinkAction,
   topOverlayHeight,
   onScroll,
   previewDetached,
@@ -73,7 +75,11 @@ export const MarkdownPreviewPanel = ({
           className="min-h-0 flex-1 overflow-y-auto outline-none"
         >
           {content.trim() ? (
-            <MarkdownPreview content={content} editorSelection={editorSelection} />
+            <MarkdownPreview
+              content={content}
+              editorSelection={editorSelection}
+              onOpenInternalLinkAction={onOpenInternalLinkAction}
+            />
           ) : (
             <div className="flex h-full items-center justify-center px-6 py-8 text-sm text-muted-foreground">
               The preview will appear here as soon as markdown is present.

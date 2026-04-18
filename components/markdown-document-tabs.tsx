@@ -44,6 +44,7 @@ export const MarkdownDocumentTabs = ({
                 type="button"
                 className="flex h-full min-w-0 flex-1 items-center gap-2 text-left"
                 onClick={() => setActiveDocumentAction(document.id)}
+                title={document.file.relativePath ?? document.file.name}
               >
                 <SourceIcon className="size-4 shrink-0 text-muted-foreground" />
                 <span className="max-w-56 truncate text-sm font-medium">
@@ -63,7 +64,11 @@ export const MarkdownDocumentTabs = ({
                 size="icon-xs"
                 className="h-7 w-7 shrink-0 rounded-none"
                 aria-label={`Close ${document.file.name}`}
-                title={`Close ${document.file.name}`}
+                title={
+                  document.file.relativePath
+                    ? `Close ${document.file.relativePath}`
+                    : `Close ${document.file.name}`
+                }
                 onClick={() => closeDocumentAction(document.id)}
               >
                 <XIcon />

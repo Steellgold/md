@@ -53,12 +53,17 @@ export const getMarkdownDocumentStats = (
 
 const numberFormatter = new Intl.NumberFormat();
 
-export const formatMarkdownDocumentStats = (stats: MarkdownDocumentStats) =>
-  [
+export const formatMarkdownDocumentStats = (stats: MarkdownDocumentStats) => {
+  if (typeof stats.fileCount === "number") {
+    return `${numberFormatter.format(stats.fileCount)} files`;
+  }
+
+  return [
     `${numberFormatter.format(stats.characterCount)} chars`,
     `${numberFormatter.format(stats.wordCount)} words`,
     `${numberFormatter.format(stats.lineCount)} lines`,
   ].join(" • ");
+};
 
 export const buildActiveDocumentMeta = (
   stats: MarkdownDocumentStats,
@@ -82,7 +87,8 @@ export const buildActiveDocumentMeta = (
 };
 
 export const buildRecentFileMeta = (file: RecentMarkdownFile) => {
-  const locationLabel = file.url ?? file.path;
+  const locationLabel =
+    file.source === "workspace" ? "Folder" : (file.url ?? file.path);
 
   if (file.stats) {
     return locationLabel

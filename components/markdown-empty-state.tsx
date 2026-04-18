@@ -27,6 +27,7 @@ type MarkdownEmptyStateProps = {
   isBusy: boolean;
   canPersistFiles: boolean;
   openFileAction: () => void;
+  openFolderAction: () => void;
   showOpenUrlDialogAction: () => void;
   createNewAction: () => void;
 };
@@ -36,6 +37,7 @@ export const MarkdownEmptyState = ({
   isBusy,
   canPersistFiles,
   openFileAction,
+  openFolderAction,
   showOpenUrlDialogAction,
   createNewAction,
 }: MarkdownEmptyStateProps) => {
@@ -88,6 +90,19 @@ export const MarkdownEmptyState = ({
                 >
                   <FolderOpenIcon />
                   Open file
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    if (!canPersistFiles) {
+                      return;
+                    }
+
+                    openFolderAction();
+                  }}
+                  disabled={!canPersistFiles}
+                >
+                  <FolderOpenIcon />
+                  Open folder
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={showOpenUrlDialogAction}>
                   <LinkIcon />

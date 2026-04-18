@@ -147,22 +147,40 @@ export const MarkdownRecentFiles = ({
 
                       {file.stats ? (
                         <div className="mt-1 flex flex-wrap gap-1 overflow-hidden">
-                          <Badge variant="outline">
-                            {compactNumberFormatter.format(
-                              file.stats.characterCount
-                            )}{" "}
-                            chars
-                          </Badge>
+                          {file.source === "workspace" ? (
+                            <>
+                              <Badge variant="outline">Folder</Badge>
+                              <Badge variant="outline">
+                                {compactNumberFormatter.format(
+                                  file.stats.fileCount ?? 0
+                                )}{" "}
+                                files
+                              </Badge>
+                            </>
+                          ) : (
+                            <>
+                              <Badge variant="outline">
+                                {compactNumberFormatter.format(
+                                  file.stats.characterCount
+                                )}{" "}
+                                chars
+                              </Badge>
 
-                          <Badge variant="outline">
-                            {compactNumberFormatter.format(file.stats.wordCount)}{" "}
-                            words
-                          </Badge>
+                              <Badge variant="outline">
+                                {compactNumberFormatter.format(
+                                  file.stats.wordCount
+                                )}{" "}
+                                words
+                              </Badge>
 
-                          <Badge variant="outline">
-                            {compactNumberFormatter.format(file.stats.lineCount)}{" "}
-                            lines
-                          </Badge>
+                              <Badge variant="outline">
+                                {compactNumberFormatter.format(
+                                  file.stats.lineCount
+                                )}{" "}
+                                lines
+                              </Badge>
+                            </>
+                          )}
                         </div>
                       ) : null}
                     </ItemContent>

@@ -44,6 +44,7 @@ type MarkdownCommandPaletteProps = {
   hasActiveFile: boolean;
   isBusy: boolean;
   openFileAction: () => void;
+  openFolderAction: () => void;
   openUrlDialogAction: () => void;
   createNewAction: () => void;
   saveFileAction: () => void;
@@ -54,6 +55,8 @@ type MarkdownCommandPaletteProps = {
   exportHtmlAction: () => void;
   goHomeAction: () => void;
   closeDocumentAction: () => void;
+  internalLinkTargets: string[];
+  insertInternalLinkAction: (relativePath: string) => void;
   openRecentAction: (id: string) => void;
   setActiveDocumentAction: (id: string) => void;
   setViewModeAction: (value: "split" | "editor" | "preview") => void;
@@ -94,6 +97,7 @@ export const MarkdownCommandPalette = ({
   hasActiveFile,
   isBusy,
   openFileAction,
+  openFolderAction,
   openUrlDialogAction,
   createNewAction,
   saveFileAction,
@@ -104,6 +108,8 @@ export const MarkdownCommandPalette = ({
   exportHtmlAction,
   goHomeAction,
   closeDocumentAction,
+  internalLinkTargets,
+  insertInternalLinkAction,
   openRecentAction,
   setActiveDocumentAction,
   setViewModeAction,
@@ -133,6 +139,13 @@ export const MarkdownCommandPalette = ({
             >
               <FolderOpenIcon />
               Open file
+            </CommandItem>
+            <CommandItem
+              onSelect={() => runAction(openFolderAction)}
+              disabled={isBusy}
+            >
+              <FolderOpenIcon />
+              Open folder
             </CommandItem>
             <CommandItem
               onSelect={() => runAction(openUrlDialogAction)}
@@ -199,6 +212,28 @@ export const MarkdownCommandPalette = ({
               Close current tab
             </CommandItem>
           </CommandGroup>
+
+          {internalLinkTargets.length > 0 ? (
+            <>
+              <CommandSeparator />
+              <CommandGroup heading="Insert internal link">
+                {internalLinkTargets.slice(0, 30).map((relativePath) => (
+                  <CommandItem
+                    key={relativePath}
+                    onSelect={() =>
+                      runAction(() => {
+                        insertInternalLinkAction(relativePath);
+                      })
+                    }
+                    disabled={!hasActiveFile || isBusy}
+                  >
+                    <LinkIcon />
+                    {relativePath}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </>
+          ) : null}
 
           <CommandSeparator />
 

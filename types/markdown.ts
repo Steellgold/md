@@ -2,7 +2,13 @@
 
 export type PermissionMode = "read" | "readwrite";
 
-export type RecentMarkdownFileSource = "picker" | "drop" | "url" | "collab";
+export type RecentMarkdownFileSource =
+  | "picker"
+  | "drop"
+  | "url"
+  | "collab"
+  | "folder"
+  | "workspace";
 
 export type CollaborativeAccessMode = "open" | "invite" | "password";
 
@@ -31,6 +37,7 @@ export type MarkdownDocumentStats = {
   characterCount: number;
   wordCount: number;
   lineCount: number;
+  fileCount?: number;
 };
 
 export type MarkdownShare = {
@@ -41,10 +48,26 @@ export type MarkdownShare = {
   requiresPassword: boolean;
 };
 
+export type MarkdownWorkspacePage = {
+  id: string;
+  name: string;
+  relativePath: string;
+  handle: FileSystemFileHandle;
+  content: string;
+};
+
+export type MarkdownWorkspace = {
+  id: string;
+  name: string;
+  pages: MarkdownWorkspacePage[];
+};
+
 export type RecentMarkdownFile = {
   id: string;
   name: string;
   path: string | null;
+  relativePath?: string | null;
+  workspaceId?: string | null;
   url: string | null;
   urlFileName: string | null;
   share: MarkdownShare | null;
@@ -133,6 +156,16 @@ export type MarkdownFileHandle = FileSystemFileHandle & {
   }>;
 };
 
+export type MarkdownDirectoryHandle = FileSystemDirectoryHandle & {
+  requestPermission?: (descriptor?: {
+    mode?: PermissionMode;
+  }) => Promise<PermissionState>;
+  queryPermission?: (descriptor?: {
+    mode?: PermissionMode;
+  }) => Promise<PermissionState>;
+  isSameEntry?: (other: FileSystemHandle) => Promise<boolean>;
+};
+
 export type DataTransferItemWithHandle = DataTransferItem & {
   getAsFileSystemHandle?: () => Promise<FileSystemHandle | null>;
 };
@@ -142,6 +175,7 @@ export type MarkdownStore = {
   activeDocumentId: string | null;
   content: string;
   activeFile: RecentMarkdownFile | null;
+  workspace: MarkdownWorkspace | null;
   pendingImports: PendingMarkdownImport[];
   pendingRemoteOpen: PendingRemoteMarkdownOpen | null;
   recentFiles: RecentMarkdownFile[];
@@ -155,6 +189,8 @@ export type MarkdownStore = {
   setContent: (content: string) => void;
   setDocumentContent: (id: string, content: string) => void;
   setActiveDocument: (id: string) => void;
+  openFolder: () => Promise<void>;
+  openWorkspacePageByPath: (relativePath: string) => Promise<boolean>;
   openWithPicker: () => Promise<void>;
   openFromUrl: (
     url: string,

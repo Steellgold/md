@@ -156,6 +156,26 @@ export const insertBlockAction = (
   editor.dispatchEvent(new Event("input", { bubbles: true }));
 };
 
+export const insertMarkdownLinkAction = (
+  editor: HTMLTextAreaElement | null,
+  href: string,
+  defaultLabel = "link"
+) => {
+  if (!focusEditor(editor) || !editor) {
+    return;
+  }
+
+  const { selectionStart, selectionEnd, value } = editor;
+  const selectedText = value.slice(selectionStart, selectionEnd).trim();
+  const linkLabel = selectedText || defaultLabel;
+  const markdownLink = `[${linkLabel}](${href})`;
+  const labelStart = selectionStart + 1;
+  const labelEnd = labelStart + linkLabel.length;
+
+  applySelection(editor, markdownLink, labelStart, labelEnd);
+  editor.dispatchEvent(new Event("input", { bubbles: true }));
+};
+
 export const buildMarkdownTableMarkdown = (
   columns: number,
   rowCount: number
