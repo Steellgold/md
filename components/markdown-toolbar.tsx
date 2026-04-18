@@ -158,66 +158,6 @@ export const MarkdownToolbar = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {collaborators.length > 0 ? (
-            <TooltipProvider delayDuration={150}>
-              <AvatarGroup>
-                {visibleCollaborators.map((participant) => (
-                  <Tooltip key={participant.id}>
-                    <TooltipTrigger asChild>
-                      <Avatar size="sm">
-                        <AvatarImage
-                          src={participant.avatarUrl}
-                          alt={participant.name}
-                        />
-                        <AvatarFallback>
-                          {getInitials(participant.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                    </TooltipTrigger>
-                    <TooltipContent sideOffset={6}>
-                      {participant.isLocal
-                        ? `${participant.name} (You)`
-                        : participant.name}
-                    </TooltipContent>
-                  </Tooltip>
-                ))}
-                {remainingCollaborators > 0 ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <AvatarGroupCount>+{remainingCollaborators}</AvatarGroupCount>
-                    </TooltipTrigger>
-                    <TooltipContent sideOffset={6}>
-                      {overflowCollaborators
-                        .map((participant) =>
-                          participant.isLocal
-                            ? `${participant.name} (You)`
-                            : participant.name
-                        )
-                        .join(", ")}
-                    </TooltipContent>
-                  </Tooltip>
-                ) : null}
-              </AvatarGroup>
-            </TooltipProvider>
-          ) : null}
-
-          <ButtonGroup className="flex-wrap">
-            {viewOptions.map((option) => {
-              const Icon = option.icon;
-
-              return (
-                <Button
-                  key={option.value}
-                  variant={viewMode === option.value ? "default" : "outline"}
-                  onClick={() => setViewModeAction(option.value)}
-                >
-                  <Icon data-icon="inline-start" />
-                  {option.label}
-                </Button>
-              );
-            })}
-          </ButtonGroup>
-
           <ConfirmDialog
             open={isClearHistoryConfirmOpen}
             onOpenChange={setIsClearHistoryConfirmOpen}
@@ -347,23 +287,70 @@ export const MarkdownToolbar = ({
             Save
           </Button>
 
-          <Button
-            variant="outline"
-            onClick={shareFileAction}
-            disabled={!activeFile || isBusy}
-          >
-            <LinkIcon data-icon="inline-start" />
-            {shareActionLabel}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" disabled={!activeFile || isBusy}>
+                <LinkIcon data-icon="inline-start" />
+                Share
+                <ChevronDownIcon data-icon="inline-end" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>Sharing</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={shareFileAction}>
+                <LinkIcon />
+                {shareActionLabel}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={collaborateFileAction}>
+                <UsersIcon />
+                {collaborateActionLabel}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-          <Button
-            variant="outline"
-            onClick={collaborateFileAction}
-            disabled={!activeFile || isBusy}
-          >
-            <UsersIcon data-icon="inline-start" />
-            {collaborateActionLabel}
-          </Button>
+          {collaborators.length > 0 ? (
+            <TooltipProvider delayDuration={150}>
+              <AvatarGroup>
+                {visibleCollaborators.map((participant) => (
+                  <Tooltip key={participant.id}>
+                    <TooltipTrigger asChild>
+                      <Avatar size="sm">
+                        <AvatarImage
+                          src={participant.avatarUrl}
+                          alt={participant.name}
+                        />
+                        <AvatarFallback>
+                          {getInitials(participant.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                    </TooltipTrigger>
+                    <TooltipContent sideOffset={6}>
+                      {participant.isLocal
+                        ? `${participant.name} (You)`
+                        : participant.name}
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+                {remainingCollaborators > 0 ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <AvatarGroupCount>+{remainingCollaborators}</AvatarGroupCount>
+                    </TooltipTrigger>
+                    <TooltipContent sideOffset={6}>
+                      {overflowCollaborators
+                        .map((participant) =>
+                          participant.isLocal
+                            ? `${participant.name} (You)`
+                            : participant.name
+                        )
+                        .join(", ")}
+                    </TooltipContent>
+                  </Tooltip>
+                ) : null}
+              </AvatarGroup>
+            </TooltipProvider>
+          ) : null}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -373,6 +360,32 @@ export const MarkdownToolbar = ({
             </DropdownMenuTrigger>
 
             <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>View</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <PanelLeftIcon />
+                  View mode
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-44">
+                  {viewOptions.map((option) => {
+                    const Icon = option.icon;
+
+                    return (
+                      <DropdownMenuCheckboxItem
+                        key={option.value}
+                        checked={viewMode === option.value}
+                        onSelect={() => setViewModeAction(option.value)}
+                      >
+                        <Icon />
+                        {option.label}
+                      </DropdownMenuCheckboxItem>
+                    );
+                  })}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+
+              <DropdownMenuSeparator />
               <DropdownMenuLabel>Document actions</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem

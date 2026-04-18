@@ -1,6 +1,6 @@
 "use client";
 
-import { getCollaborationColor } from "@/lib/markdown-collaboration";
+import { assignUniqueCollaborationColors } from "@/lib/markdown-collaboration";
 import {
   type CollaborationParticipant,
   type CollaborationSelection,
@@ -120,11 +120,15 @@ export const useMarkdownCollaboration = ({
     });
     providerRef.current = provider;
 
+    const localUserColor =
+      assignUniqueCollaborationColors([localUserId]).get(localUserId) ??
+      "#3B82F6";
+
     const localUserState: AwarenessUserState = {
       id: localUserId,
       name: normalizedUserName,
       avatarUrl: userAvatarUrl,
-      color: getCollaborationColor(localUserId),
+      color: localUserColor,
     };
 
     provider.awareness.setLocalState({
@@ -134,17 +138,44 @@ export const useMarkdownCollaboration = ({
 
     const syncParticipants = () => {
       const currentStates = Array.from(provider.awareness.getStates().values());
-      const nextParticipants = currentStates
+      const awarenessStates = currentStates
         .map((state) => state as AwarenessState)
-        .filter((state) => Boolean(state.user))
-        .map((state) => ({
-          id: state.user!.id,
-          name: state.user!.name,
-          avatarUrl: state.user!.avatarUrl,
-          color: state.user!.color,
-          selection: state.selection ?? null,
-          isLocal: state.user!.id === localUserId,
-        }))
+        .filter((state) => Boolean(state.user));
+      const colorsById = assignUniqueCollaborationColors(
+        awarenessStates.map((state) => state.user!.id)
+      );
+      const resolvedLocalColor = colorsById.get(localUserId);
+      const currentLocalState = provider.awareness.getLocalState() as
+        | AwarenessState
+        | null;
+
+      if (
+        resolvedLocalColor &&
+        currentLocalState?.user &&
+        currentLocalState.user.color !== resolvedLocalColor
+      ) {
+        provider.awareness.setLocalState({
+          ...currentLocalState,
+          user: {
+            ...currentLocalState.user,
+            color: resolvedLocalColor,
+          },
+        });
+      }
+
+      const nextParticipants = awarenessStates
+        .map((state) => {
+          const user = state.user!;
+
+          return {
+            id: user.id,
+            name: user.name,
+            avatarUrl: user.avatarUrl,
+            color: colorsById.get(user.id) ?? user.color,
+            selection: state.selection ?? null,
+            isLocal: user.id === localUserId,
+          };
+        })
         .sort((left, right) =>
           left.isLocal === right.isLocal
             ? left.name.localeCompare(right.name)

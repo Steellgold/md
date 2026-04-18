@@ -178,3 +178,43 @@ const hashToPaletteIndex = (value: string) => {
 
 export const getCollaborationColor = (id: string) =>
   colorPalette[hashToPaletteIndex(id)]!;
+
+const getCollaborationColorByIndex = (index: number) => {
+  if (index < colorPalette.length) {
+    return colorPalette[index]!;
+  }
+
+  const extraIndex = index - colorPalette.length;
+  const hue = (extraIndex * 47) % 360;
+  const saturation = 68 + ((Math.floor(extraIndex / 24) % 2) * 8);
+  const lightness = 46 + ((Math.floor(extraIndex / 48) % 3) * 8);
+
+  return `hsl(${hue} ${saturation}% ${lightness}%)`;
+};
+
+export const assignUniqueCollaborationColors = (ids: string[]) => {
+  const uniqueSortedIds = Array.from(new Set(ids.filter(Boolean))).sort(
+    (left, right) => left.localeCompare(right)
+  );
+  const colorsById = new Map<string, string>();
+  const usedColors = new Set<string>();
+
+  for (const id of uniqueSortedIds) {
+    const startIndex = hashToPaletteIndex(id);
+    let offset = 0;
+
+    while (offset <= uniqueSortedIds.length + colorPalette.length) {
+      const candidateColor = getCollaborationColorByIndex(startIndex + offset);
+
+      if (!usedColors.has(candidateColor)) {
+        usedColors.add(candidateColor);
+        colorsById.set(id, candidateColor);
+        break;
+      }
+
+      offset += 1;
+    }
+  }
+
+  return colorsById;
+};
