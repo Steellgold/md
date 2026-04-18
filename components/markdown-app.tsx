@@ -20,6 +20,7 @@ import {
   buildMarkdownExportHtml,
   downloadTextFile,
 } from "@/lib/markdown-export";
+import { getMarkdownDocumentStats } from "@/lib/markdown-helpers";
 import { useMarkdownStore } from "@/lib/markdown-store";
 import { useMarkdownUiStore } from "@/lib/markdown-ui-store";
 import { cn } from "@/lib/utils";
@@ -39,7 +40,6 @@ import {
   useState,
 } from "react";
 import { Button } from "./ui/button";
-import { getMarkdownDocumentStats } from "@/lib/markdown-helpers";
 
 const defaultDocumentTitle = ".MD";
 const LARGE_FILE_THRESHOLD = 20_000;
@@ -69,6 +69,7 @@ export const MarkdownApp = () => {
     recentFiles,
     hydrated,
     isBusy,
+    busyMessage,
     error,
     canPersistFiles,
     hydrate,
@@ -109,6 +110,9 @@ export const MarkdownApp = () => {
   const [isDragActive, setIsDragActive] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isOpenUrlDialogOpen, setIsOpenUrlDialogOpen] = useState(false);
+  const [pendingRecentFileId, setPendingRecentFileId] = useState<string | null>(
+    null
+  );
   const [previewDetached, setPreviewDetached] = useState(false);
   const [previewRenderContent, setPreviewRenderContent] = useState(content);
   const [uiError, setUiError] = useState<string | null>(null);
@@ -139,6 +143,9 @@ export const MarkdownApp = () => {
     () => getMarkdownDocumentStats(deferredStatsContent),
     [deferredStatsContent]
   );
+  const pendingRecentFile =
+    recentFiles.find((file) => file.id === pendingRecentFileId) ?? null;
+  const isPageBusy = isBusy && busyMessage !== null;
 
   const parsedDeepLink = useMemo(
     () =>
@@ -608,6 +615,21 @@ export const MarkdownApp = () => {
     await reopenRecentFile(activeFile.id);
   }, [activeFile, flushPendingEditorContent, reopenRecentFile]);
 
+  const openRecentFileAction = useCallback(
+    (id: string) => {
+      if (!activeFile) {
+        setPendingRecentFileId(id);
+      }
+
+      void reopenRecentFile(id).finally(() => {
+        setPendingRecentFileId((currentValue) =>
+          currentValue === id ? null : currentValue
+        );
+      });
+    },
+    [activeFile, reopenRecentFile]
+  );
+
   const saveActiveFileAction = useCallback(async () => {
     flushPendingEditorContent();
     await saveActiveFile();
@@ -929,7 +951,9 @@ export const MarkdownApp = () => {
 
               <MarkdownRecentFiles
                 recentFiles={recentFiles}
-                openRecentAction={reopenRecentFile}
+                isBusy={isBusy}
+                openingRecentFileId={pendingRecentFileId}
+                openRecentAction={openRecentFileAction}
                 removeRecentAction={removeRecentFile}
                 clearRecentAction={clearRecentFiles}
               />
@@ -967,6 +991,27 @@ export const MarkdownApp = () => {
           </footer>
         </div>
       )}
+
+      {isPageBusy ? (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-background/80 px-4 backdrop-blur-md">
+          <div className="flex w-full max-w-sm flex-col items-center gap-3 rounded-2xl border bg-background/95 px-6 py-5 text-center shadow-xl">
+            <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Spinner className="size-5" />
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">
+                {busyMessage}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {pendingRecentFile && !activeFile
+                  ? "Loading the document into the editor."
+                  : "Please wait a moment."}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <MarkdownRemoteSelectionDialog
         isBusy={isBusy}
@@ -1011,7 +1056,7 @@ export const MarkdownApp = () => {
         goHomeAction={goHomeAction}
         closeDocumentAction={clearDocumentAction}
         openRecentAction={(id) => {
-          void reopenRecentFile(id);
+          openRecentFileAction(id);
         }}
         setActiveDocumentAction={setActiveDocumentAction}
         setViewModeAction={setViewMode}

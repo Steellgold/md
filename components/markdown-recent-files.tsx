@@ -1,5 +1,6 @@
 "use client";
 
+import { Spinner } from "@/components/ui/spinner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +27,8 @@ import {
 
 type MarkdownRecentFilesProps = {
   recentFiles: RecentMarkdownFile[];
+  isBusy: boolean;
+  openingRecentFileId: string | null;
   openRecentAction: (id: string) => void;
   removeRecentAction: (id: string) => void;
   clearRecentAction: () => void;
@@ -41,6 +44,8 @@ const expandedRecentFilesCount = 9;
 
 export const MarkdownRecentFiles = ({
   recentFiles,
+  isBusy,
+  openingRecentFileId,
   openRecentAction,
   removeRecentAction,
 }: MarkdownRecentFilesProps) => {
@@ -115,13 +120,24 @@ export const MarkdownRecentFiles = ({
                 <Item
                   key={file.id}
                   variant="muted"
-                  className="items-start border border-transparent bg-muted/40 hover:border-border hover:bg-muted"
+                  className={cn(
+                    "items-start border border-transparent bg-muted/40 hover:border-border hover:bg-muted",
+                    openingRecentFileId === file.id &&
+                      "border-primary/30 bg-primary/5"
+                  )}
                 >
                   <button
                     type="button"
-                    className="flex min-w-0 flex-1 items-start gap-2 overflow-hidden text-left"
+                    className="flex min-w-0 flex-1 items-start gap-2 overflow-hidden text-left disabled:cursor-wait disabled:opacity-80"
                     onClick={() => openRecentAction(file.id)}
+                    disabled={isBusy}
                   >
+                    {openingRecentFileId === file.id ? (
+                      <div className="pt-0.5 text-primary">
+                        <Spinner />
+                      </div>
+                    ) : null}
+
                     <ItemContent className="min-w-0 overflow-hidden">
                       <ItemHeader className="min-w-0">
                         <ItemTitle className="block w-full min-w-0 truncate">
@@ -159,6 +175,7 @@ export const MarkdownRecentFiles = ({
                       aria-label={`Remove ${file.name} from recent files`}
                       title={`Remove ${file.name}`}
                       onClick={() => removeRecentAction(file.id)}
+                      disabled={isBusy}
                     >
                       <XIcon />
                     </Button>

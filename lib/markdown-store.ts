@@ -26,7 +26,11 @@ import {
   type RecentMarkdownFile,
 } from "@/types/markdown";
 
-const getBusyState = () => ({ isBusy: true, error: null });
+const getBusyState = (busyMessage: string) => ({
+  isBusy: true,
+  busyMessage,
+  error: null,
+});
 
 const updateDocumentContent = (
   state: MarkdownStore,
@@ -136,6 +140,7 @@ const buildDocumentState = (
     pendingRemoteOpen: null,
     recentFiles,
     isBusy: false,
+    busyMessage: null,
     error: null,
     ...overrides,
   };
@@ -144,6 +149,7 @@ const buildDocumentState = (
 const getErrorState = (error: unknown) => ({
   error: getUnknownErrorMessage(error),
   isBusy: false,
+  busyMessage: null,
   pendingImports: [],
   pendingRemoteOpen: null,
 });
@@ -158,6 +164,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
   recentFiles: [],
   hydrated: false,
   isBusy: false,
+  busyMessage: null,
   error: null,
   canPersistFiles: canUsePersistentLocalFiles(),
   hydrate: () =>
@@ -167,6 +174,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       pendingRemoteOpen: null,
       recentFiles: getRecentMarkdownFiles(),
       canPersistFiles: canUsePersistentLocalFiles(),
+      busyMessage: null,
     }),
   clearError: () => set({ error: null }),
   setContent: (content) =>
@@ -197,7 +205,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       };
     }),
   openWithPicker: async () => {
-    set(getBusyState());
+    set(getBusyState("Opening file..."));
 
     try {
       const result = await openMarkdownWithPicker();
@@ -225,7 +233,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
     }
   },
   openFromUrl: async (url, fileName) => {
-    set(getBusyState());
+    set(getBusyState("Loading document..."));
 
     try {
       const result = await openMarkdownFromUrl(url, { fileName });
@@ -235,6 +243,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
           pendingImports: [],
           pendingRemoteOpen: null,
           isBusy: false,
+          busyMessage: null,
           error: null,
         });
 
@@ -255,7 +264,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
     }
   },
   openDeepLinkUrl: async (url) => {
-    set(getBusyState());
+    set(getBusyState("Loading document..."));
 
     try {
       const result = await openMarkdownFromUrl(url);
@@ -268,6 +277,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
             files: result.files,
           },
           isBusy: false,
+          busyMessage: null,
           error: null,
         });
         return;
@@ -285,7 +295,9 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
     }
   },
   openDroppedFiles: async (files, items) => {
-    set(getBusyState());
+    set(
+      getBusyState(files.length > 1 ? "Loading files..." : "Loading file...")
+    );
 
     try {
       const result = await openDroppedMarkdownFiles(files, items);
@@ -322,7 +334,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       return;
     }
 
-    set(getBusyState());
+    set(getBusyState(`Opening ${fileName}...`));
 
     try {
       const result = await openMarkdownFromUrl(pendingRemoteOpen.url, {
@@ -336,6 +348,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
             files: result.files,
           },
           isBusy: false,
+          busyMessage: null,
           error: null,
         });
         return;
@@ -356,12 +369,17 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       set({
         error: getUnknownErrorMessage(error),
         isBusy: false,
+        busyMessage: null,
       });
     }
   },
   clearPendingRemoteOpen: () => set({ pendingRemoteOpen: null }),
   reopenRecentFile: async (id) => {
-    set(getBusyState());
+    const knownEntry =
+      useMarkdownStore.getState().recentFiles.find((file) => file.id === id) ??
+      null;
+
+    set(getBusyState(`Opening ${knownEntry?.name ?? "file"}...`));
 
     try {
       const { entry, content, recentFiles } =
@@ -379,7 +397,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
     }
   },
   createNewFile: async () => {
-    set(getBusyState());
+    set(getBusyState("Creating file..."));
 
     try {
       const { entry, content, recentFiles } = await createNewMarkdownFile("");
@@ -406,7 +424,7 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       return;
     }
 
-    set(getBusyState());
+    set(getBusyState("Saving changes..."));
 
     try {
       const { entry, recentFiles } = await saveRecentMarkdownFile(
@@ -474,13 +492,22 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
       return buildDocumentState(nextDocuments, preferredId, state.recentFiles);
     }),
   removeRecentFile: async (id) => {
-    set(getBusyState());
+    const knownEntry =
+      useMarkdownStore.getState().recentFiles.find((file) => file.id === id) ??
+      null;
+
+    set(
+      getBusyState(
+        `Removing ${knownEntry?.name ?? "file"} from recent files...`
+      )
+    );
 
     try {
       const recentFiles = await removeRecentMarkdownFile(id);
       set((state) => ({
         recentFiles,
         isBusy: false,
+        busyMessage: null,
         pendingImports: [],
         pendingRemoteOpen: null,
         error: null,
@@ -494,13 +521,14 @@ export const useMarkdownStore = create<MarkdownStore>((set) => ({
     }
   },
   clearRecentFiles: async () => {
-    set(getBusyState());
+    set(getBusyState("Clearing recent files..."));
 
     try {
       await clearRecentMarkdownFiles();
       set((state) => ({
         recentFiles: [],
         isBusy: false,
+        busyMessage: null,
         pendingImports: [],
         pendingRemoteOpen: null,
         error: null,

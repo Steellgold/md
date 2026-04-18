@@ -110,6 +110,7 @@ export type MarkdownStore = {
   recentFiles: RecentMarkdownFile[];
   hydrated: boolean;
   isBusy: boolean;
+  busyMessage: string | null;
   error: string | null;
   canPersistFiles: boolean;
   hydrate: () => void;
