@@ -96,7 +96,7 @@ export const MarkdownPreview = ({
         "[&_ol]:list-decimal [&_ol[type='a']]:list-[lower-alpha] [&_ol[type='A']]:list-[upper-alpha] [&_ol]:space-y-1 [&_ol]:pl-5",
         "[&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5",
         "[&_.task-list-item]:list-none",
-        "[&_.task-list-item>input]:mr-1 [&_.task-list-item>input]:shrink-0",
+        "[&_.task-list-item_input]:mr-2 [&_.task-list-item_input]:shrink-0",
 
         // Tables (GFM)
         "[&_table]:w-full [&_table]:border-collapse",
