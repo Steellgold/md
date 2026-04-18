@@ -18,14 +18,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { type CollaborativeAccessMode } from "@/types/markdown";
-import { CopyIcon, RefreshCcwIcon, UsersIcon } from "lucide-react";
+import { CopyIcon, UsersIcon } from "lucide-react";
 import { type FormEventHandler } from "react";
 
 type MarkdownCollaborationDialogProps = {
   open: boolean;
   isBusy: boolean;
   roomId: string;
-  displayName: string;
   accessMode: CollaborativeAccessMode;
   inviteToken: string;
   password: string;
@@ -33,8 +32,6 @@ type MarkdownCollaborationDialogProps = {
   connected: boolean;
   participantsCount: number;
   onOpenChangeAction: (open: boolean) => void;
-  onDisplayNameChangeAction: (value: string) => void;
-  onGenerateDisplayNameAction: () => void;
   onAccessModeChangeAction: (value: CollaborativeAccessMode) => void;
   onInviteTokenChangeAction: (value: string) => void;
   onPasswordChangeAction: (value: string) => void;
@@ -47,7 +44,6 @@ export const MarkdownCollaborationDialog = ({
   open,
   isBusy,
   roomId,
-  displayName,
   accessMode,
   inviteToken,
   password,
@@ -55,8 +51,6 @@ export const MarkdownCollaborationDialog = ({
   connected,
   participantsCount,
   onOpenChangeAction,
-  onDisplayNameChangeAction,
-  onGenerateDisplayNameAction,
   onAccessModeChangeAction,
   onInviteTokenChangeAction,
   onPasswordChangeAction,
@@ -79,34 +73,6 @@ export const MarkdownCollaborationDialog = ({
               Edit the same document in real time with multiple people.
             </DialogDescription>
           </DialogHeader>
-
-          <Field>
-            <FieldLabel htmlFor="collab-display-name">Display name</FieldLabel>
-            <FieldContent>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="collab-display-name"
-                  value={displayName}
-                  onChange={(event) =>
-                    onDisplayNameChangeAction(event.target.value)
-                  }
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={onGenerateDisplayNameAction}
-                  aria-label="Generate random display name"
-                  title="Generate random display name"
-                >
-                  <RefreshCcwIcon />
-                </Button>
-              </div>
-              <FieldDescription>
-                This name is saved locally and used in collaborative sessions.
-              </FieldDescription>
-            </FieldContent>
-          </Field>
 
           <Field>
             <FieldLabel htmlFor="collab-access-mode">Access mode</FieldLabel>

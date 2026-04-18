@@ -184,6 +184,7 @@ export const MarkdownApp = () => {
   const [collabJoinUrl, setCollabJoinUrl] = useState<string | null>(null);
   const [collabWsBaseUrl, setCollabWsBaseUrl] = useState<string | null>(null);
   const [collabAuthToken, setCollabAuthToken] = useState<string | null>(null);
+  const [collaborationStartedAt, setCollaborationStartedAt] = useState<string | null>(null);
   const [pendingJoinRoomId, setPendingJoinRoomId] = useState<string | null>(null);
   const [contentHash, setContentHash] = useState<string | null>(null);
   const [editorSelection, setEditorSelection] = useState<MarkdownViewerSelection | null>(null);
@@ -494,6 +495,15 @@ export const MarkdownApp = () => {
   }, [activeFile]);
 
   useEffect(() => {
+    if (!collabAuthToken) {
+      setCollaborationStartedAt(null);
+      return;
+    }
+
+    setCollaborationStartedAt((currentValue) => currentValue ?? new Date().toISOString());
+  }, [collabAuthToken]);
+
+  useEffect(() => {
     if (!activeFile) {
       setContentHash(null);
       setIsShareDialogOpen(false);
@@ -501,6 +511,7 @@ export const MarkdownApp = () => {
       setShareDialogUrl(null);
       setCollabWsBaseUrl(null);
       setCollabAuthToken(null);
+      setCollaborationStartedAt(null);
       setPendingJoinRoomId(null);
       setCollabJoinUrl(null);
       setCollabPassword("");
@@ -1530,6 +1541,13 @@ export const MarkdownApp = () => {
           shareFileAction={openShareDialogAction}
           collaborateActionLabel={collaborateActionLabel}
           collaborateFileAction={openCollabDialogAction}
+          collaborationActive={Boolean(collabAuthToken)}
+          collaborationStartedAt={collaborationStartedAt}
+          displayName={collaborativeUserName}
+          onDisplayNameChangeAction={setCollaborationDisplayName}
+          onGenerateDisplayNameAction={
+            regenerateCollaborationDisplayNameAction
+          }
           collaborators={collaboration.participants}
           collaborationConnected={collaboration.isConnected}
           refreshFileAction={handleRefresh}
@@ -1697,7 +1715,6 @@ export const MarkdownApp = () => {
         open={isCollabDialogOpen}
         isBusy={isCollabBusy}
         roomId={collabRoomId}
-        displayName={collaborativeUserName}
         accessMode={collabAccessMode}
         inviteToken={collabInviteToken}
         password={collabPassword}
@@ -1705,10 +1722,6 @@ export const MarkdownApp = () => {
         connected={collaboration.isConnected}
         participantsCount={collaboration.participants.length}
         onOpenChangeAction={setIsCollabDialogOpen}
-        onDisplayNameChangeAction={setCollaborationDisplayName}
-        onGenerateDisplayNameAction={
-          regenerateCollaborationDisplayNameAction
-        }
         onAccessModeChangeAction={setCollabAccessMode}
         onInviteTokenChangeAction={setCollabInviteToken}
         onPasswordChangeAction={setCollabPassword}

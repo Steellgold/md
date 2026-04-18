@@ -54,6 +54,11 @@ type MarkdownActiveDocumentProps = {
   shareFileAction: () => void;
   collaborateActionLabel: string;
   collaborateFileAction: () => void;
+  collaborationActive: boolean;
+  collaborationStartedAt: string | null;
+  displayName: string;
+  onDisplayNameChangeAction: (value: string) => void;
+  onGenerateDisplayNameAction: () => void;
   collaborators: CollaborationParticipant[];
   collaborationConnected: boolean;
   refreshFileAction: () => void;
@@ -109,6 +114,11 @@ export const MarkdownActiveDocument = ({
   shareFileAction,
   collaborateActionLabel,
   collaborateFileAction,
+  collaborationActive,
+  collaborationStartedAt,
+  displayName,
+  onDisplayNameChangeAction,
+  onGenerateDisplayNameAction,
   collaborators,
   collaborationConnected,
   refreshFileAction,
@@ -135,7 +145,6 @@ export const MarkdownActiveDocument = ({
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <MarkdownToolbar
         activeFile={activeFile}
-        stats={stats}
         openDocumentsCount={openDocuments.length}
         recentFiles={recentFiles}
         isBusy={isBusy}
@@ -148,6 +157,11 @@ export const MarkdownActiveDocument = ({
         shareFileAction={shareFileAction}
         collaborateActionLabel={collaborateActionLabel}
         collaborateFileAction={collaborateFileAction}
+        collaborationActive={collaborationActive}
+        collaborationStartedAt={collaborationStartedAt}
+        displayName={displayName}
+        onDisplayNameChangeAction={onDisplayNameChangeAction}
+        onGenerateDisplayNameAction={onGenerateDisplayNameAction}
         collaborators={collaborators}
         collaborationConnected={collaborationConnected}
         refreshFileAction={refreshFileAction}
