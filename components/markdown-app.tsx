@@ -59,6 +59,7 @@ const LARGE_FILE_SYNC_DELAY_MS = 180;
 const LARGE_FILE_PREVIEW_SYNC_DELAY_MS = 80;
 const LARGE_FILE_HISTORY_GROUP_WINDOW_MS = 800;
 const MAX_HISTORY_ENTRIES = 100;
+const editPathPrefix = "/edit/";
 
 type EditorHistoryEntry = {
   content: string;
@@ -70,6 +71,28 @@ type EditorHistoryState = {
   entries: EditorHistoryEntry[];
   index: number;
 };
+
+const decodePathSegment = (value: string) => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
+
+const getRouteDocumentId = (pathname: string) => {
+  if (!pathname.startsWith(editPathPrefix)) {
+    return null;
+  }
+
+  const rawDocumentId = pathname.slice(editPathPrefix.length).split("/")[0] ?? "";
+  const normalizedDocumentId = decodePathSegment(rawDocumentId).trim();
+
+  return normalizedDocumentId === "" ? null : normalizedDocumentId;
+};
+
+const buildEditRoute = (documentId: string) =>
+  `${editPathPrefix}${encodeURIComponent(documentId)}`;
 
 export const MarkdownApp = () => {
   const {
@@ -136,6 +159,7 @@ export const MarkdownApp = () => {
   const [editorSelection, setEditorSelection] = useState<MarkdownViewerSelection | null>(null);
 
   const attemptedDeepLinkRef = useRef<string | null>(null);
+  const attemptedRouteDocumentIdRef = useRef<string | null>(null);
   const historyRef = useRef<Map<string, EditorHistoryState>>(new Map());
   const contentSyncTimeoutRef = useRef<number | null>(null);
   const previewSyncTimeoutRef = useRef<number | null>(null);
@@ -188,6 +212,7 @@ export const MarkdownApp = () => {
       extractMarkdownDeepLink(pathname, new URLSearchParams(searchParamsKey)),
     [pathname, searchParamsKey]
   );
+  const routeDocumentId = useMemo(() => getRouteDocumentId(pathname), [pathname]);
 
   useEffect(() => {
     hydrate();
@@ -253,9 +278,87 @@ export const MarkdownApp = () => {
 
     void (async () => {
       await openDeepLinkUrl(parsedDeepLink.targetUrl);
-      router.replace("/", { scroll: false });
+
+      const openedDocumentId = useMarkdownStore.getState().activeDocumentId;
+
+      if (openedDocumentId) {
+        router.replace(buildEditRoute(openedDocumentId), { scroll: false });
+      }
     })();
   }, [activeFile, hydrated, openDeepLinkUrl, parsedDeepLink, router]);
+
+  useEffect(() => {
+    if (!routeDocumentId) {
+      attemptedRouteDocumentIdRef.current = null;
+      return;
+    }
+
+    if (!hydrated) {
+      return;
+    }
+
+    if (activeDocumentId === routeDocumentId) {
+      attemptedRouteDocumentIdRef.current = null;
+      return;
+    }
+
+    if (attemptedRouteDocumentIdRef.current === routeDocumentId) {
+      return;
+    }
+
+    attemptedRouteDocumentIdRef.current = routeDocumentId;
+    clearError();
+
+    void reopenRecentFile(routeDocumentId)
+      .then(() => {
+        const nextState = useMarkdownStore.getState();
+
+        if (
+          nextState.error ||
+          nextState.activeDocumentId !== routeDocumentId
+        ) {
+          router.replace("/", { scroll: false });
+        }
+      })
+      .finally(() => {
+        if (attemptedRouteDocumentIdRef.current === routeDocumentId) {
+          attemptedRouteDocumentIdRef.current = null;
+        }
+      });
+  }, [
+    activeDocumentId,
+    clearError,
+    hydrated,
+    reopenRecentFile,
+    routeDocumentId,
+    router,
+  ]);
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+
+    if (!activeDocumentId && parsedDeepLink) {
+      return;
+    }
+
+    if (
+      !activeDocumentId &&
+      routeDocumentId &&
+      attemptedRouteDocumentIdRef.current === routeDocumentId
+    ) {
+      return;
+    }
+
+    const targetPath = activeDocumentId ? buildEditRoute(activeDocumentId) : "/";
+
+    if (pathname === targetPath) {
+      return;
+    }
+
+    router.replace(targetPath, { scroll: false });
+  }, [activeDocumentId, hydrated, parsedDeepLink, pathname, routeDocumentId, router]);
 
   useEffect(() => {
     document.title = activeFile
@@ -1097,7 +1200,7 @@ export const MarkdownApp = () => {
           clearDocumentAction={clearDocumentAction}
           setActiveDocumentAction={setActiveDocumentAction}
           closeDocumentAction={closeDocumentAction}
-          openRecentAction={reopenRecentFile}
+          openRecentAction={openRecentFileAction}
           clearRecentAction={clearRecentFiles}
           undoAction={undoAction}
           redoAction={redoAction}
