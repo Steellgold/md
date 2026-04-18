@@ -24,7 +24,7 @@ export const MarkdownSharedViewer = ({
   return (
     <div className="flex min-h-svh flex-col bg-background">
       <div className="border-b bg-background/95">
-        <div className="mx-auto w-full max-w-5xl px-4 py-4 sm:px-6">
+        <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
           <div className="flex flex-col gap-3 rounded-2xl border bg-muted/40 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <p className="text-sm font-medium text-foreground">
@@ -45,7 +45,7 @@ export const MarkdownSharedViewer = ({
       </div>
 
       <div className="mx-auto flex w-full max-w-5xl flex-1 px-4 py-6 sm:px-6">
-        <Card className="min-h-0 flex-1 overflow-hidden border bg-card shadow-sm">
+        <Card className="min-h-0 flex-1 p-0 overflow-hidden border bg-card shadow-sm">
           <CardContent className="h-full p-0">
             <div ref={previewRef} className="h-full overflow-y-auto">
               {content.trim() ? (
