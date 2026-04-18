@@ -7,11 +7,9 @@ import { FC, PropsWithChildren } from "react";
 import "./globals.css";
 
 const appName = "MD";
-const appDescription =
-  "A focused Markdown editor with split preview, local file access, recent files, and remote GitHub or Gist opening.";
+const appDescription = "A focused Markdown editor with split preview, local file access, recent files, and remote GitHub or Gist opening.";
 const ogTitle = "MD, a true focused Markdown editor";
-const ogDescription =
-  "Write, preview, and reopen Markdown files fast with local access, recent history, and GitHub or Gist URL support.";
+const ogDescription = "Write, preview, and reopen Markdown files fast with local access, recent history, and GitHub or Gist URL support.";
 const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
 const metadataBase = appUrl ? new URL(appUrl) : undefined;
