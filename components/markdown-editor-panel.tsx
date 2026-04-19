@@ -12,12 +12,15 @@ import {
   InputGroupAddon,
   InputGroupTextarea,
 } from "@/components/ui/input-group";
+import { Input } from "@/components/ui/input";
 import { MarkdownTableInsertControl } from "@/components/markdown-table-insert-control";
 import {
   continueListOnEnterAction,
   indentListOnTabAction,
+  replaceRangeAction,
 } from "@/lib/markdown-editor";
 import { buildActiveDocumentMeta } from "@/lib/markdown-helpers";
+import { cn } from "@/lib/utils";
 import {
   getTextareaCaretCoordinates,
   getTextareaRangeCoordinates,
@@ -40,8 +43,10 @@ import {
   ListOrderedIcon,
   ListTodoIcon,
   PencilIcon,
+  SearchIcon,
   Redo2Icon,
   Undo2Icon,
+  XIcon,
 } from "lucide-react";
 import {
   ChangeEvent,
@@ -50,6 +55,7 @@ import {
   SyntheticEvent,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -93,8 +99,16 @@ const quickActions = [
 
 const listActions = [
   { label: "Bullet list", icon: ListIcon, actionKey: "bulletListAction" },
-  { label: "Numbered list", icon: ListOrderedIcon, actionKey: "orderedListAction" },
-  { label: "Lettered list", icon: ListOrderedIcon, actionKey: "alphaListAction" },
+  {
+    label: "Numbered list",
+    icon: ListOrderedIcon,
+    actionKey: "orderedListAction",
+  },
+  {
+    label: "Lettered list",
+    icon: ListOrderedIcon,
+    actionKey: "alphaListAction",
+  },
   { label: "Checklist", icon: ListTodoIcon, actionKey: "taskListAction" },
 ] as const;
 
@@ -108,6 +122,72 @@ type RemoteMarker = {
   left: number;
   height: number;
   selectionRects: TextareaRangeCoordinates[];
+};
+
+type SearchMatch = {
+  start: number;
+  end: number;
+};
+
+const buildSearchMatches = (value: string, query: string): SearchMatch[] => {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+
+  if (!normalizedQuery) {
+    return [];
+  }
+
+  const normalizedValue = value.toLocaleLowerCase();
+  const matches: SearchMatch[] = [];
+  let searchIndex = 0;
+
+  while (searchIndex < normalizedValue.length) {
+    const matchIndex = normalizedValue.indexOf(normalizedQuery, searchIndex);
+
+    if (matchIndex === -1) {
+      break;
+    }
+
+    matches.push({
+      start: matchIndex,
+      end: matchIndex + normalizedQuery.length,
+    });
+    searchIndex = matchIndex + Math.max(normalizedQuery.length, 1);
+  }
+
+  return matches;
+};
+
+const findSelectedMatchIndex = (
+  matches: SearchMatch[],
+  selectionStart: number,
+  selectionEnd: number
+) =>
+  matches.findIndex(
+    (match) => match.start === selectionStart && match.end === selectionEnd
+  );
+
+const findNearestMatchIndex = (
+  matches: SearchMatch[],
+  selectionStart: number,
+  selectionEnd: number
+) => {
+  const exactIndex = findSelectedMatchIndex(
+    matches,
+    selectionStart,
+    selectionEnd
+  );
+
+  if (exactIndex >= 0) {
+    return exactIndex;
+  }
+
+  const nextIndex = matches.findIndex((match) => match.start >= selectionEnd);
+
+  if (nextIndex >= 0) {
+    return nextIndex;
+  }
+
+  return matches.length > 0 ? 0 : -1;
 };
 
 export const MarkdownEditorPanel = ({
@@ -139,7 +219,15 @@ export const MarkdownEditorPanel = ({
 }: MarkdownEditorPanelProps) => {
   const topbarRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const replaceInputRef = useRef<HTMLInputElement | null>(null);
   const [remoteMarkers, setRemoteMarkers] = useState<RemoteMarker[]>([]);
+  const [searchableContent, setSearchableContent] = useState(content);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isReplaceOpen, setIsReplaceOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [replaceValue, setReplaceValue] = useState("");
+  const [activeSearchMatchIndex, setActiveSearchMatchIndex] = useState(-1);
   const actionMap = {
     undoAction,
     redoAction,
@@ -152,6 +240,12 @@ export const MarkdownEditorPanel = ({
     alphaListAction,
     taskListAction,
   };
+  const searchMatches = useMemo(
+    () => buildSearchMatches(searchableContent, searchQuery),
+    [searchQuery, searchableContent]
+  );
+  const activeSearchMatch =
+    activeSearchMatchIndex >= 0 ? searchMatches[activeSearchMatchIndex] : null;
 
   useEffect(() => {
     const topbarElement = topbarRef.current;
@@ -196,7 +290,8 @@ export const MarkdownEditorPanel = ({
     while (
       prefixLength < previousLength &&
       prefixLength < nextLength &&
-      previousContent.charCodeAt(prefixLength) === content.charCodeAt(prefixLength)
+      previousContent.charCodeAt(prefixLength) ===
+        content.charCodeAt(prefixLength)
     ) {
       prefixLength += 1;
     }
@@ -235,8 +330,205 @@ export const MarkdownEditorPanel = ({
     editorElement.scrollLeft = previousScrollLeft;
   }, [content, editorRef]);
 
+  useEffect(() => {
+    setSearchableContent(content);
+  }, [content]);
+
+  const focusSearchField = useCallback((replace = false) => {
+    window.requestAnimationFrame(() => {
+      const target = replace ? replaceInputRef.current : searchInputRef.current;
+      target?.focus();
+      target?.select();
+    });
+  }, []);
+
+  const openSearch = useCallback(
+    (options?: { openReplace?: boolean }) => {
+      const editorElement = editorRef.current;
+      const selectedText = editorElement
+        ? editorElement.value
+            .slice(editorElement.selectionStart, editorElement.selectionEnd)
+            .trim()
+        : "";
+
+      setIsSearchOpen(true);
+      setIsReplaceOpen((currentValue) =>
+        options?.openReplace ? true : currentValue
+      );
+
+      if (selectedText) {
+        setSearchQuery(selectedText);
+      }
+
+      focusSearchField(Boolean(options?.openReplace));
+    },
+    [editorRef, focusSearchField]
+  );
+
+  const closeSearch = useCallback(() => {
+    setIsSearchOpen(false);
+    setIsReplaceOpen(false);
+    setActiveSearchMatchIndex(-1);
+    editorRef.current?.focus();
+  }, [editorRef]);
+
+  const selectSearchMatch = useCallback(
+    (matchIndex: number) => {
+      const editorElement = editorRef.current;
+      const match = searchMatches[matchIndex];
+
+      if (!editorElement || !match) {
+        return;
+      }
+
+      editorElement.focus();
+      editorElement.setSelectionRange(match.start, match.end);
+      setActiveSearchMatchIndex(matchIndex);
+      onSelectionChange(editorElement);
+    },
+    [editorRef, onSelectionChange, searchMatches]
+  );
+
+  const jumpToSearchMatch = useCallback(
+    (direction: "next" | "previous") => {
+      const editorElement = editorRef.current;
+
+      if (!editorElement || searchMatches.length === 0) {
+        return;
+      }
+
+      const baseIndex = findNearestMatchIndex(
+        searchMatches,
+        editorElement.selectionStart,
+        editorElement.selectionEnd
+      );
+
+      let nextIndex = baseIndex;
+
+      if (direction === "next") {
+        nextIndex = baseIndex >= 0 ? (baseIndex + 1) % searchMatches.length : 0;
+      } else {
+        nextIndex =
+          baseIndex >= 0
+            ? (baseIndex - 1 + searchMatches.length) % searchMatches.length
+            : searchMatches.length - 1;
+      }
+
+      selectSearchMatch(nextIndex);
+    },
+    [editorRef, searchMatches, selectSearchMatch]
+  );
+
+  const replaceCurrentSearchMatch = useCallback(() => {
+    const editorElement = editorRef.current;
+
+    if (!editorElement || searchMatches.length === 0) {
+      return;
+    }
+
+    const matchIndex = findNearestMatchIndex(
+      searchMatches,
+      editorElement.selectionStart,
+      editorElement.selectionEnd
+    );
+    const match = searchMatches[matchIndex];
+
+    if (!match) {
+      return;
+    }
+
+    replaceRangeAction(editorElement, match.start, match.end, replaceValue, {
+      start: match.start,
+      end: match.start + replaceValue.length,
+    });
+    setActiveSearchMatchIndex(matchIndex);
+  }, [editorRef, replaceValue, searchMatches]);
+
+  const replaceAllSearchMatches = useCallback(() => {
+    const editorElement = editorRef.current;
+
+    if (!editorElement || searchMatches.length === 0) {
+      return;
+    }
+
+    const currentValue = editorElement.value;
+    let nextValue = "";
+    let cursor = 0;
+
+    searchMatches.forEach((match) => {
+      nextValue += currentValue.slice(cursor, match.start);
+      nextValue += replaceValue;
+      cursor = match.end;
+    });
+
+    nextValue += currentValue.slice(cursor);
+
+    replaceRangeAction(editorElement, 0, currentValue.length, nextValue, {
+      start: searchMatches[0]!.start,
+      end: searchMatches[0]!.start + replaceValue.length,
+    });
+    setActiveSearchMatchIndex(searchMatches.length > 0 ? 0 : -1);
+  }, [editorRef, replaceValue, searchMatches]);
+
+  useEffect(() => {
+    if (!isSearchOpen) {
+      return;
+    }
+
+    const editorElement = editorRef.current;
+
+    if (!editorElement) {
+      return;
+    }
+
+    if (searchMatches.length === 0) {
+      setActiveSearchMatchIndex(-1);
+      return;
+    }
+
+    const nextIndex = findNearestMatchIndex(
+      searchMatches,
+      editorElement.selectionStart,
+      editorElement.selectionEnd
+    );
+
+    setActiveSearchMatchIndex((currentValue) =>
+      currentValue === nextIndex ? currentValue : nextIndex
+    );
+  }, [editorRef, isSearchOpen, searchMatches]);
+
+  useEffect(() => {
+    const handleWindowKeyDown = (event: globalThis.KeyboardEvent) => {
+      const isPrimaryModifier = event.ctrlKey || event.metaKey;
+
+      if (!isPrimaryModifier || event.altKey) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+
+      if (key === "f") {
+        event.preventDefault();
+        openSearch();
+        return;
+      }
+
+      if (key === "h") {
+        event.preventDefault();
+        openSearch({ openReplace: true });
+      }
+    };
+
+    window.addEventListener("keydown", handleWindowKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleWindowKeyDown);
+    };
+  }, [openSearch]);
+
   const handleEditorChange = useCallback(
     (event: ChangeEvent<HTMLTextAreaElement>) => {
+      setSearchableContent(event.currentTarget.value);
       onChange(event);
       onSelectionChange(event.currentTarget);
     },
@@ -245,9 +537,19 @@ export const MarkdownEditorPanel = ({
 
   const handleEditorSelectionChange = useCallback(
     (event: SyntheticEvent<HTMLTextAreaElement>) => {
+      if (isSearchOpen) {
+        setActiveSearchMatchIndex(
+          findSelectedMatchIndex(
+            searchMatches,
+            event.currentTarget.selectionStart,
+            event.currentTarget.selectionEnd
+          )
+        );
+      }
+
       onSelectionChange(event.currentTarget);
     },
-    [onSelectionChange]
+    [isSearchOpen, onSelectionChange, searchMatches]
   );
 
   const recomputeRemoteMarkers = useCallback(() => {
@@ -271,7 +573,10 @@ export const MarkdownEditorPanel = ({
       )
       .map((participant) => {
         const selection = participant.selection!;
-        const marker = getTextareaCaretCoordinates(editorElement, selection.end);
+        const marker = getTextareaCaretCoordinates(
+          editorElement,
+          selection.end
+        );
 
         return {
           id: participant.id,
@@ -317,6 +622,26 @@ export const MarkdownEditorPanel = ({
   const handleEditorKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
       if (
+        (event.ctrlKey || event.metaKey) &&
+        !event.altKey &&
+        event.key.toLowerCase() === "f"
+      ) {
+        event.preventDefault();
+        openSearch();
+        return;
+      }
+
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        !event.altKey &&
+        event.key.toLowerCase() === "h"
+      ) {
+        event.preventDefault();
+        openSearch({ openReplace: true });
+        return;
+      }
+
+      if (
         event.key === "Tab" &&
         !event.ctrlKey &&
         !event.metaKey &&
@@ -347,7 +672,7 @@ export const MarkdownEditorPanel = ({
       event.preventDefault();
       onSelectionChange(event.currentTarget);
     },
-    [onSelectionChange]
+    [onSelectionChange, openSearch]
   );
 
   return (
@@ -362,140 +687,303 @@ export const MarkdownEditorPanel = ({
         </div>
       </CardHeader>
 
-      <CardContent className="relative flex-1 min-h-0 p-0">
+      <CardContent className="relative min-h-0 flex-1 p-0">
         <InputGroup
           ref={overlayRef}
-          className="h-full! flex-1 min-h-0 flex-col items-stretch overflow-hidden rounded-none border-0 bg-transparent has-[[data-slot=input-group-control]:focus-visible]:border-input has-[[data-slot=input-group-control]:focus-visible]:ring-0"
+          className="h-full! min-h-0 flex-1 flex-col items-stretch overflow-hidden rounded-none border-0 bg-transparent has-[[data-slot=input-group-control]:focus-visible]:border-input has-[[data-slot=input-group-control]:focus-visible]:ring-0"
         >
           <InputGroupAddon
             ref={topbarRef}
             align="block-start"
             className="cursor-default border-b px-6 py-3"
           >
-            <div className="flex w-full flex-wrap items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="truncate text-sm font-medium">
-                  {activeFile.name}
+            <div className="flex w-full flex-col gap-3">
+              <div className="flex w-full flex-wrap items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">
+                    {activeFile.name}
+                  </div>
+                  <div className="truncate text-xs text-muted-foreground">
+                    {buildActiveDocumentMeta(stats, activeFile)}
+                  </div>
                 </div>
-                <div className="truncate text-xs text-muted-foreground">
-                  {buildActiveDocumentMeta(stats, activeFile)}
-                </div>
-              </div>
 
-              <ButtonGroup className="max-w-full flex-wrap">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      title="Heading level"
-                      aria-label="Heading level"
-                    >
-                      <Heading1Icon />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-40">
-                    {headingLevels.map((level) => (
-                      <DropdownMenuItem
-                        key={level}
-                        onSelect={() => headingAction(level)}
+                <ButtonGroup className="max-w-full flex-wrap">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        title="Heading level"
+                        aria-label="Heading level"
                       >
                         <Heading1Icon />
-                        Heading {level}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      title="List type"
-                      aria-label="List type"
-                    >
-                      <ListIcon />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-44">
-                    {listActions.map((item) => {
-                      const Icon = item.icon;
-
-                      return (
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-40">
+                      {headingLevels.map((level) => (
                         <DropdownMenuItem
-                          key={item.label}
-                          onSelect={actionMap[item.actionKey]}
+                          key={level}
+                          onSelect={() => headingAction(level)}
                         >
-                          <Icon />
-                          {item.label}
+                          <Heading1Icon />
+                          Heading {level}
                         </DropdownMenuItem>
-                      );
-                    })}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
-                <MarkdownTableInsertControl onInsert={insertTableAction} />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        title="List type"
+                        aria-label="List type"
+                      >
+                        <ListIcon />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-44">
+                      {listActions.map((item) => {
+                        const Icon = item.icon;
 
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  title="Insert external link"
-                  aria-label="Insert external link"
-                  onClick={insertExternalLinkAction}
-                >
-                  <LinkIcon />
-                </Button>
+                        return (
+                          <DropdownMenuItem
+                            key={item.label}
+                            onSelect={actionMap[item.actionKey]}
+                          >
+                            <Icon />
+                            {item.label}
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      title="Insert workspace page link"
-                      aria-label="Insert workspace page link"
-                      disabled={internalLinkTargets.length === 0}
-                    >
-                      <ChevronDownIcon />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-64">
-                    {internalLinkTargets.length > 0 ? (
-                      internalLinkTargets.map((relativePath) => (
-                        <DropdownMenuItem
-                          key={relativePath}
-                          onSelect={() => insertInternalLinkAction(relativePath)}
-                        >
+                  <MarkdownTableInsertControl onInsert={insertTableAction} />
+
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    title="Insert external link"
+                    aria-label="Insert external link"
+                    onClick={insertExternalLinkAction}
+                  >
+                    <LinkIcon />
+                  </Button>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        title="Insert workspace page link"
+                        aria-label="Insert workspace page link"
+                        disabled={internalLinkTargets.length === 0}
+                      >
+                        <ChevronDownIcon />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-64">
+                      {internalLinkTargets.length > 0 ? (
+                        internalLinkTargets.map((relativePath) => (
+                          <DropdownMenuItem
+                            key={relativePath}
+                            onSelect={() =>
+                              insertInternalLinkAction(relativePath)
+                            }
+                          >
+                            <LinkIcon />
+                            <span className="truncate">{relativePath}</span>
+                          </DropdownMenuItem>
+                        ))
+                      ) : (
+                        <DropdownMenuItem disabled>
                           <LinkIcon />
-                          <span className="truncate">{relativePath}</span>
+                          No other workspace pages
                         </DropdownMenuItem>
-                      ))
-                    ) : (
-                      <DropdownMenuItem disabled>
-                        <LinkIcon />
-                        No other workspace pages
-                      </DropdownMenuItem>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
-                {quickActions.map((item) => {
-                  const Icon = item.icon;
+                  <Button
+                    variant={isSearchOpen ? "secondary" : "ghost"}
+                    size="icon-sm"
+                    onClick={() => {
+                      if (isSearchOpen) {
+                        closeSearch();
+                        return;
+                      }
 
-                  return (
+                      openSearch();
+                    }}
+                    title="Find"
+                    aria-label="Find"
+                  >
+                    <SearchIcon />
+                  </Button>
+
+                  {quickActions.map((item) => {
+                    const Icon = item.icon;
+
+                    return (
+                      <Button
+                        key={item.label}
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={actionMap[item.actionKey]}
+                        title={item.label}
+                        aria-label={item.label}
+                      >
+                        <Icon />
+                      </Button>
+                    );
+                  })}
+                </ButtonGroup>
+              </div>
+
+              {isSearchOpen ? (
+                <div className="flex w-full flex-col gap-2 rounded-lg border bg-background/80 p-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative min-w-[220px] flex-1">
+                      <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        ref={searchInputRef}
+                        value={searchQuery}
+                        onChange={(event) => {
+                          setSearchQuery(event.target.value);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            jumpToSearchMatch(
+                              event.shiftKey ? "previous" : "next"
+                            );
+                            return;
+                          }
+
+                          if (event.key === "Escape") {
+                            event.preventDefault();
+                            closeSearch();
+                          }
+                        }}
+                        placeholder="Find in document..."
+                        className="pl-8"
+                      />
+                    </div>
+
+                    <div className="min-w-14 text-center text-xs text-muted-foreground">
+                      {searchQuery.trim()
+                        ? searchMatches.length > 0 && activeSearchMatch
+                          ? `${activeSearchMatchIndex + 1}/${searchMatches.length}`
+                          : `0/${searchMatches.length}`
+                        : "0/0"}
+                    </div>
+
                     <Button
-                      key={item.label}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => jumpToSearchMatch("previous")}
+                      disabled={searchMatches.length === 0}
+                    >
+                      Prev
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => jumpToSearchMatch("next")}
+                      disabled={searchMatches.length === 0}
+                    >
+                      Next
+                    </Button>
+
+                    <Button
+                      variant={isReplaceOpen ? "secondary" : "outline"}
+                      size="sm"
+                      onClick={() => {
+                        setIsReplaceOpen((currentValue) => !currentValue);
+
+                        if (!isReplaceOpen) {
+                          focusSearchField(true);
+                        }
+                      }}
+                    >
+                      Replace
+                    </Button>
+
+                    <Button
                       variant="ghost"
                       size="icon-sm"
-                      onClick={actionMap[item.actionKey]}
-                      title={item.label}
-                      aria-label={item.label}
+                      onClick={closeSearch}
+                      aria-label="Close find bar"
+                      title="Close find bar"
                     >
-                      <Icon />
+                      <XIcon />
                     </Button>
-                  );
-                })}
-              </ButtonGroup>
+                  </div>
+
+                  {isReplaceOpen ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Input
+                        ref={replaceInputRef}
+                        value={replaceValue}
+                        onChange={(event) => {
+                          setReplaceValue(event.target.value);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            replaceCurrentSearchMatch();
+                            return;
+                          }
+
+                          if (event.key === "Escape") {
+                            event.preventDefault();
+                            closeSearch();
+                          }
+                        }}
+                        placeholder="Replace with..."
+                        className="min-w-[220px] flex-1"
+                      />
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={replaceCurrentSearchMatch}
+                        disabled={searchMatches.length === 0}
+                      >
+                        Replace
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={replaceAllSearchMatches}
+                        disabled={searchMatches.length === 0}
+                      >
+                        Replace all
+                      </Button>
+                    </div>
+                  ) : null}
+
+                  <div
+                    className={cn(
+                      "text-xs",
+                      searchQuery.trim() && searchMatches.length === 0
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-muted-foreground"
+                    )}
+                  >
+                    {searchQuery.trim()
+                      ? searchMatches.length === 0
+                        ? "No match found in the current document."
+                        : "Use Enter or the buttons to jump between matches."
+                      : "Use Ctrl/Cmd + F to search and Ctrl/Cmd + H to open replace."}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </InputGroupAddon>
 
