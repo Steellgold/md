@@ -1,3 +1,4 @@
+import { MarkdownTableInsertControl } from "@/components/markdown-table-insert-control";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,25 +8,24 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupTextarea,
 } from "@/components/ui/input-group";
-import { Input } from "@/components/ui/input";
-import { MarkdownTableInsertControl } from "@/components/markdown-table-insert-control";
 import {
   continueListOnEnterAction,
   indentListOnTabAction,
   replaceRangeAction,
 } from "@/lib/markdown-editor";
 import { buildActiveDocumentMeta } from "@/lib/markdown-helpers";
-import { cn } from "@/lib/utils";
 import {
   getTextareaCaretCoordinates,
   getTextareaRangeCoordinates,
   type TextareaRangeCoordinates,
 } from "@/lib/textarea-caret";
+import { cn } from "@/lib/utils";
 import {
   type CollaborationParticipant,
   type MarkdownDocumentStats,
@@ -43,8 +43,8 @@ import {
   ListOrderedIcon,
   ListTodoIcon,
   PencilIcon,
-  SearchIcon,
   Redo2Icon,
+  SearchIcon,
   Undo2Icon,
   XIcon,
 } from "lucide-react";
@@ -1029,7 +1029,7 @@ export const MarkdownEditorPanel = ({
             marker.selectionRects.map((selectionRect, index) => (
               <div
                 key={`${marker.id}-selection-${index}`}
-                className="pointer-events-none absolute z-[9] rounded-sm opacity-25"
+                className="pointer-events-none absolute z-9 rounded-sm opacity-25"
                 style={{
                   top: `${selectionRect.top}px`,
                   left: `${selectionRect.left}px`,
