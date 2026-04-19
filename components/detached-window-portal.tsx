@@ -7,7 +7,7 @@ type DetachedWindowPortalProps = {
   open: boolean;
   title: string;
   onCloseAction: () => void;
-  onBlocked?: (message: string) => void;
+  onBlockedAction?: (message: string) => void;
   children: ReactNode;
 };
 
@@ -61,7 +61,7 @@ export const DetachedWindowPortal = ({
   open,
   title,
   onCloseAction,
-  onBlocked,
+  onBlockedAction,
   children,
 }: DetachedWindowPortalProps) => {
   const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(
@@ -81,7 +81,7 @@ export const DetachedWindowPortal = ({
     );
 
     if (!detachedWindow) {
-      onBlocked?.(
+      onBlockedAction?.(
         "Unable to open the preview window. Allow pop-ups for this site and try again."
       );
       onCloseAction();
@@ -149,7 +149,7 @@ export const DetachedWindowPortal = ({
         detachedWindow.close();
       }
     };
-  }, [onBlocked, onCloseAction, open, title]);
+  }, [onBlockedAction, onCloseAction, open, title]);
 
   if (!open || !portalContainer) {
     return null;

@@ -428,7 +428,7 @@ export const MarkdownActiveDocument = ({
         open={previewDetached}
         title={`${activeFile.name} Preview | .MD`}
         onCloseAction={closePreviewDetachedAction}
-        onBlocked={onDetachedPreviewBlocked}
+        onBlockedAction={onDetachedPreviewBlocked}
       >
         <MarkdownPreviewPanel
           content={previewContent}

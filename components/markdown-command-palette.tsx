@@ -34,7 +34,7 @@ import {
 
 type MarkdownCommandPaletteProps = {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onOpenChangeAction: (open: boolean) => void;
   activeDocumentId: string | null;
   activeFileName: string | null;
   openDocuments: OpenMarkdownDocument[];
@@ -87,7 +87,7 @@ const viewOptions = [
 
 export const MarkdownCommandPalette = ({
   open,
-  onOpenChange,
+  onOpenChangeAction,
   activeDocumentId,
   activeFileName,
   openDocuments,
@@ -115,14 +115,14 @@ export const MarkdownCommandPalette = ({
   setViewModeAction,
 }: MarkdownCommandPaletteProps) => {
   const runAction = (action: () => void) => {
-    onOpenChange(false);
+    onOpenChangeAction(false);
     action();
   };
 
   return (
     <CommandDialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={onOpenChangeAction}
       title="Quick switcher"
       description="Search for files, views, and editor actions."
       className="max-w-2xl"

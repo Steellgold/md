@@ -14,18 +14,18 @@ const MAX_COLS = 10;
 const MAX_ROWS = 10;
 
 type MarkdownTableInsertControlProps = {
-  onInsert: (columns: number, rows: number) => void;
+  onInsertAction: (columns: number, rows: number) => void;
 };
 
 export const MarkdownTableInsertControl = ({
-  onInsert,
+  onInsertAction,
 }: MarkdownTableInsertControlProps) => {
   const [open, setOpen] = useState(false);
   const [hoverCol, setHoverCol] = useState(0);
   const [hoverRow, setHoverRow] = useState(0);
 
   const handleInsert = (columns: number, rows: number) => {
-    onInsert(columns, rows);
+    onInsertAction(columns, rows);
     setOpen(false);
     setHoverCol(0);
     setHoverRow(0);

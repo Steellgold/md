@@ -16,14 +16,14 @@ import { FormEvent, useState } from "react";
 type MarkdownRemotePasswordDialogProps = {
   isBusy: boolean;
   isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
+  onOpenChangeAction: (open: boolean) => void;
   openProtectedFileAction: (password: string) => void;
 };
 
 export const MarkdownRemotePasswordDialog = ({
   isBusy,
   isOpen,
-  onOpenChange,
+  onOpenChangeAction,
   openProtectedFileAction,
 }: MarkdownRemotePasswordDialogProps) => {
   const [password, setPassword] = useState("");
@@ -38,7 +38,7 @@ export const MarkdownRemotePasswordDialog = ({
       setPassword("");
     }
 
-    onOpenChange(open);
+    onOpenChangeAction(open);
   };
 
   return (

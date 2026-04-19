@@ -1,28 +1,14 @@
 "use client";
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarGroup,
-  AvatarGroupCount,
-  AvatarImage,
-} from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { ButtonGroup } from "@/components/ui/button-group";
+import { MarkdownCollaboratorAvatars } from "@/components/markdown-collaborator-avatars";
+import { MarkdownToolbarOpenMenu } from "@/components/markdown-toolbar-open-menu";
+import { MarkdownToolbarProfileDialog } from "@/components/markdown-toolbar-profile-dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -31,31 +17,13 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  buildRecentFileMeta,
-} from "@/lib/markdown-helpers";
 import {
   type CollaborationParticipant,
   type RecentMarkdownFile,
 } from "@/types/markdown";
 import {
   ChevronDownIcon, EllipsisIcon,
-  FolderOpenIcon,
-  HistoryIcon,
   HouseIcon,
   LinkIcon,
   MonitorUpIcon,
@@ -63,7 +31,6 @@ import {
   PanelRightIcon,
   RefreshCcwIcon,
   SaveIcon,
-  Trash2Icon,
   TypeIcon,
   UserRoundIcon,
   UsersIcon,
@@ -160,11 +127,6 @@ export const MarkdownToolbar = ({
     activeFile?.source === "folder";
   const refreshLabel = activeFile?.source === "url" ? "Reload URL" : "Reopen file";
   const closeLabel = openDocumentsCount > 1 ? "Close tab" : "Close document";
-  const visibleRecentFiles = recentFiles.slice(0, 6);
-  const overflowRecentFiles = recentFiles.slice(6);
-  const visibleCollaborators = collaborators.slice(0, 4);
-  const remainingCollaborators = collaborators.length - visibleCollaborators.length;
-  const overflowCollaborators = collaborators.slice(4);
   const collaborationStartDate = useMemo(
     () => (collaborationStartedAt ? new Date(collaborationStartedAt) : null),
     [collaborationStartedAt]
@@ -214,14 +176,6 @@ export const MarkdownToolbar = ({
       "0"
     )}:${String(seconds).padStart(2, "0")}`;
   }, [collaborationActive, collaborationStartDate, nowTimestamp]);
-
-  const getInitials = (value: string) =>
-    value
-      .split(" ")
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? "")
-      .join("");
 
   const currentHomeConfirmFileName =
     homeConfirmIndex === null ? null : dirtyOpenDocumentNames[homeConfirmIndex] ?? null;
@@ -315,164 +269,22 @@ export const MarkdownToolbar = ({
             onConfirm={clearRecentAction}
           />
 
-          <Dialog open={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Profile</DialogTitle>
-                <DialogDescription>
-                  Set your name for collaborative sessions.
-                </DialogDescription>
-              </DialogHeader>
+          <MarkdownToolbarProfileDialog
+            displayName={displayName}
+            onDisplayNameChangeAction={onDisplayNameChangeAction}
+            onGenerateDisplayNameAction={onGenerateDisplayNameAction}
+            onOpenChangeAction={setIsProfileDialogOpen}
+            open={isProfileDialogOpen}
+          />
 
-              <Field>
-                <FieldLabel htmlFor="collab-display-name">Display name</FieldLabel>
-                <FieldContent>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="collab-display-name"
-                      value={displayName}
-                      onChange={(event) =>
-                        onDisplayNameChangeAction(event.target.value)
-                      }
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={onGenerateDisplayNameAction}
-                      aria-label="Generate random display name"
-                      title="Generate random display name"
-                    >
-                      <RefreshCcwIcon />
-                    </Button>
-                  </div>
-                  <FieldDescription>
-                    This name is saved locally.
-                  </FieldDescription>
-                </FieldContent>
-              </Field>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  onClick={() => setIsProfileDialogOpen(false)}
-                >
-                  Done
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          <ButtonGroup>
-            <Button
-              variant="outline"
-              onClick={openFileAction}
-              disabled={isBusy}
-            >
-              <FolderOpenIcon data-icon="inline-start" />
-              Open file
-            </Button>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  disabled={isBusy}
-                  aria-label="Open options"
-                >
-                  <ChevronDownIcon />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-72">
-                <DropdownMenuItem onSelect={openFileAction}>
-                  <FolderOpenIcon />
-                  Open file
-                </DropdownMenuItem>
-
-                <DropdownMenuItem onSelect={showOpenUrlDialogAction}>
-                  <LinkIcon />
-                  Open URL
-                </DropdownMenuItem>
-
-                <DropdownMenuSeparator />
-
-                <DropdownMenuLabel>Recent</DropdownMenuLabel>
-
-                {visibleRecentFiles.length > 0 ? (
-                  <DropdownMenuGroup>
-                    {visibleRecentFiles.map((file) => {
-                      const itemLabel = buildRecentFileMeta(file);
-
-                      return (
-                        <DropdownMenuItem
-                          key={file.id}
-                          className="justify-between gap-3"
-                          onSelect={() => openRecentAction(file.id)}
-                        >
-                          <div className="flex min-w-0 items-start gap-2">
-                            <HistoryIcon />
-                            <div className="flex min-w-0 flex-col">
-                              <span className="truncate">{file.name}</span>
-                              <span className="truncate text-xs text-muted-foreground">
-                                {itemLabel}
-                              </span>
-                            </div>
-                          </div>
-                        </DropdownMenuItem>
-                      );
-                    })}
-                  </DropdownMenuGroup>
-                ) : (
-                  <DropdownMenuItem disabled>No recent files</DropdownMenuItem>
-                )}
-
-                {overflowRecentFiles.length > 0 ? (
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>
-                      <HistoryIcon />
-                      See more
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="w-72">
-                      {overflowRecentFiles.map((file) => {
-                        const itemLabel = buildRecentFileMeta(file);
-
-                        return (
-                          <DropdownMenuItem
-                            key={file.id}
-                            className="justify-between gap-3"
-                            onSelect={() => openRecentAction(file.id)}
-                          >
-                            <div className="flex min-w-0 items-start gap-2">
-                              <HistoryIcon />
-                              <div className="flex min-w-0 flex-col">
-                                <span className="truncate">{file.name}</span>
-                                <span className="truncate text-xs text-muted-foreground">
-                                  {itemLabel}
-                                </span>
-                              </div>
-                            </div>
-                          </DropdownMenuItem>
-                        );
-                      })}
-                    </DropdownMenuSubContent>
-                  </DropdownMenuSub>
-                ) : null}
-
-                {recentFiles.length > 0 ? (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onSelect={() => setIsClearHistoryConfirmOpen(true)}
-                      variant="destructive"
-                    >
-                      <Trash2Icon />
-                      Clear history
-                    </DropdownMenuItem>
-                  </>
-                ) : null}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </ButtonGroup>
+          <MarkdownToolbarOpenMenu
+            isBusy={isBusy}
+            onClearHistoryAction={() => setIsClearHistoryConfirmOpen(true)}
+            onOpenFileAction={openFileAction}
+            onOpenRecentAction={openRecentAction}
+            onOpenUrlAction={showOpenUrlDialogAction}
+            recentFiles={recentFiles}
+          />
 
           {canSaveFile || !collaborationActive ? (
             <Button
@@ -546,54 +358,7 @@ export const MarkdownToolbar = ({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {collaborators.length > 0 ? (
-            <TooltipProvider delayDuration={150}>
-              <AvatarGroup className="bg-card rounded-full ring-1 ring-border px-0.5 py-0.5">
-                {visibleCollaborators.map((participant) => (
-                  <Tooltip key={participant.id}>
-                    <TooltipTrigger asChild>
-                      <Avatar
-                        size="sm"
-                        style={{
-                          outline: `2px solid ${participant.color}`,
-                          outlineOffset: "-1px",
-                        }}
-                      >
-                        <AvatarImage
-                          src={participant.avatarUrl}
-                          alt={participant.name}
-                        />
-                        <AvatarFallback>
-                          {getInitials(participant.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                    </TooltipTrigger>
-                    <TooltipContent sideOffset={6}>
-                      {participant.isLocal
-                        ? `${participant.name} (You)`
-                        : participant.name}
-                    </TooltipContent>
-                  </Tooltip>
-                ))}
-                {remainingCollaborators > 0 ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <AvatarGroupCount>+{remainingCollaborators}</AvatarGroupCount>
-                    </TooltipTrigger>
-                    <TooltipContent sideOffset={6}>
-                      {overflowCollaborators
-                        .map((participant) =>
-                          participant.isLocal
-                            ? `${participant.name} (You)`
-                            : participant.name
-                        )
-                        .join(", ")}
-                    </TooltipContent>
-                  </Tooltip>
-                ) : null}
-              </AvatarGroup>
-            </TooltipProvider>
-          ) : null}
+          <MarkdownCollaboratorAvatars collaborators={collaborators} />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

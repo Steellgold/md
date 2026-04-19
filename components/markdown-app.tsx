@@ -1,68 +1,39 @@
 "use client";
 
 import { MarkdownActiveDocument } from "@/components/markdown-active-document";
-import { MarkdownCollaborationDialog } from "@/components/markdown-collaboration-dialog";
-import { MarkdownCommandPalette } from "@/components/markdown-command-palette";
-import { MarkdownEmptyState } from "@/components/markdown-empty-state";
-import { MarkdownOpenUrlDialog } from "@/components/markdown-open-url-dialog";
-import { MarkdownRecentFiles } from "@/components/markdown-recent-files";
-import { MarkdownRemotePasswordDialog } from "@/components/markdown-remote-password-dialog";
-import { MarkdownRemoteSelectionDialog } from "@/components/markdown-remote-selection-dialog";
-import { MarkdownShareDialog } from "@/components/markdown-share-dialog";
+import { MarkdownAppDialogs } from "@/components/markdown-app-dialogs";
+import { MarkdownAppEmptyHome } from "@/components/markdown-app-empty-home";
+import { MarkdownBusyOverlay } from "@/components/markdown-busy-overlay";
 import { MarkdownSharedViewer } from "@/components/markdown-shared-viewer";
 import { Spinner } from "@/components/ui/spinner";
+import { useMarkdownDragDrop } from "@/hooks/use-markdown-drag-drop";
 import { useMarkdownHotkeys } from "@/hooks/use-markdown-hotkeys";
 import { useMarkdownCollaboration } from "@/hooks/use-markdown-collaboration";
+import { useMarkdownEditorActions } from "@/hooks/use-markdown-editor-actions";
+import { useMarkdownEditorController } from "@/hooks/use-markdown-editor-controller";
+import { useMarkdownPreviewState } from "@/hooks/use-markdown-preview-state";
+import { useMarkdownCollabFlow } from "@/hooks/use-markdown-collab-flow";
+import { useMarkdownRouteSync } from "@/hooks/use-markdown-route-sync";
+import { useMarkdownShellActions } from "@/hooks/use-markdown-shell-actions";
+import { useMarkdownShareFlow } from "@/hooks/use-markdown-share-flow";
 import { useScrollSync } from "@/hooks/use-scroll-sync";
 import { extractMarkdownDeepLink } from "@/lib/markdown-deep-link";
-import {
-  insertBlockAction,
-  insertMarkdownLinkAction,
-  insertMarkdownTableAction,
-  prefixLinesAction,
-  wrapSelectionAction,
-} from "@/lib/markdown-editor";
-import {
-  buildMarkdownExportFileName,
-  buildMarkdownExportHtml,
-  downloadTextFile,
-} from "@/lib/markdown-export";
-import {
-  buildRelativeWorkspaceLink,
-  resolveWorkspaceRelativePath,
-  shareRecentMarkdownFile,
-} from "@/lib/markdown-file-system";
-import {
-  createCollaborationRoom,
-  createCollaborationRoomId,
-  createCollaborationToken,
-  joinCollaborationRoom,
-  parseCollaborationJoinParams,
-} from "@/lib/markdown-collaboration";
-import {
-  getMarkdownDocumentStats,
-  getUnknownErrorMessage,
-} from "@/lib/markdown-helpers";
+import { parseCollaborationJoinParams } from "@/lib/markdown-collaboration";
+import { getMarkdownDocumentStats } from "@/lib/markdown-helpers";
 import {
   computeMarkdownContentHash,
-  hasPendingMarkdownShareChanges,
   isMarkdownShareDirectUrl,
 } from "@/lib/markdown-share";
 import { useMarkdownStore } from "@/lib/markdown-store";
 import { useMarkdownUiStore } from "@/lib/markdown-ui-store";
 import { cn } from "@/lib/utils";
-import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection";
 import { faker } from "@faker-js/faker";
-import { ArrowUpRightIcon } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
-  type ChangeEvent,
-  type DragEvent as ReactDragEvent,
   startTransition,
   useCallback,
   useDeferredValue,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -79,17 +50,6 @@ const COLLAB_AUTOSAVE_DEBOUNCE_MS = 1200;
 const COLLAB_SAVE_REMINDER_AFTER_MS = 2.5 * 60 * 1000;
 const COLLAB_SAVE_REMINDER_CHANGE_THRESHOLD = 100;
 const editPathPrefix = "/edit/";
-
-type EditorHistoryEntry = {
-  content: string;
-  selection: MarkdownViewerSelection;
-  timestamp: number;
-};
-
-type EditorHistoryState = {
-  entries: EditorHistoryEntry[];
-  index: number;
-};
 
 const decodePathSegment = (value: string) => {
   try {
@@ -174,63 +134,41 @@ export const MarkdownApp = () => {
     (state) => state.toggleSyncScroll
   );
 
-  const [isDragActive, setIsDragActive] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isOpenUrlDialogOpen, setIsOpenUrlDialogOpen] = useState(false);
-  const [isShareBusy, setIsShareBusy] = useState(false);
-  const [isCollabBusy, setIsCollabBusy] = useState(false);
   const [isSaveBusy, setIsSaveBusy] = useState(false);
-  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
-  const [isCollabDialogOpen, setIsCollabDialogOpen] = useState(false);
   const [pendingRecentFileId, setPendingRecentFileId] = useState<string | null>(null);
-  const [previewDetached, setPreviewDetached] = useState(false);
-  const [previewRenderContent, setPreviewRenderContent] = useState(content);
-  const [sharePassword, setSharePassword] = useState("");
-  const [shareDialogUrl, setShareDialogUrl] = useState<string | null>(null);
   const [uiError, setUiError] = useState<string | null>(null);
-  const [collabAccessMode, setCollabAccessMode] = useState<
-    "open" | "invite" | "password"
-  >("open");
-  const [collabRoomId, setCollabRoomId] = useState("");
-  const [collabInviteToken, setCollabInviteToken] = useState("");
-  const [collabPassword, setCollabPassword] = useState("");
-  const [collabJoinUrl, setCollabJoinUrl] = useState<string | null>(null);
-  const [collabWsBaseUrl, setCollabWsBaseUrl] = useState<string | null>(null);
-  const [collabAuthToken, setCollabAuthToken] = useState<string | null>(null);
-  const [collabAutosaveEnabled, setCollabAutosaveEnabled] = useState(false);
-  const [collaborationStartedAt, setCollaborationStartedAt] = useState<string | null>(null);
-  const [pendingJoinRoomId, setPendingJoinRoomId] = useState<string | null>(null);
   const [contentHash, setContentHash] = useState<string | null>(null);
-  const [editorSelection, setEditorSelection] = useState<MarkdownViewerSelection | null>(null);
   const [collabUnsavedChangeCount, setCollabUnsavedChangeCount] = useState(0);
   const [collabUnsavedSince, setCollabUnsavedSince] = useState<string | null>(
     null
   );
 
-  const attemptedDeepLinkRef = useRef<string | null>(null);
-  const attemptedRouteDocumentIdRef = useRef<string | null>(null);
-  const navigatingHomeRef = useRef(false);
-  const historyRef = useRef<Map<string, EditorHistoryState>>(new Map());
-  const contentSyncTimeoutRef = useRef<number | null>(null);
-  const previewSyncTimeoutRef = useRef<number | null>(null);
   const collabAutosaveTimeoutRef = useRef<number | null>(null);
   const collabAutosaveInFlightRef = useRef(false);
   const collabAutosaveQueuedRef = useRef(false);
   const collabSaveReminderShownRef = useRef(false);
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
-  const pendingSelectionRef = useRef<MarkdownViewerSelection | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const searchParamsKey = searchParams.toString();
   const isLargeDocument = content.length >= LARGE_FILE_THRESHOLD;
-  const isPreviewVisible = previewDetached || viewMode !== "editor";
-  const shouldTrackPreviewSelection = !isLargeDocument && (previewDetached || viewMode !== "editor");
+  const {
+    closePreviewDetached,
+    isPreviewVisible,
+    previewContent,
+    previewDetached,
+    setPreviewDetached,
+    syncPreviewContent,
+  } = useMarkdownPreviewState({
+    content,
+    isLargeDocument,
+    largeFilePreviewSyncDelayMs: LARGE_FILE_PREVIEW_SYNC_DELAY_MS,
+    viewMode,
+  });
+  const shouldTrackPreviewSelection =
+    !isLargeDocument && (previewDetached || viewMode !== "editor");
   const deferredStatsContent = useDeferredValue(content);
-  const deferredPreviewContent = useDeferredValue(previewRenderContent);
-  const previewContent = isLargeDocument ? previewRenderContent : deferredPreviewContent;
-
-  const deferredPreviewSelection = useDeferredValue(
-    shouldTrackPreviewSelection ? editorSelection : null
-  );
 
   const activeDocumentStats = useMemo(
     () => getMarkdownDocumentStats(deferredStatsContent),
@@ -257,30 +195,8 @@ export const MarkdownApp = () => {
     activeFile?.source === "picker" ||
     activeFile?.source === "drop" ||
     activeFile?.source === "folder";
-  const isPageBusy = (isBusy && busyMessage !== null) || isCollabBusy;
-  const effectiveBusyMessage = busyMessage ?? (isCollabBusy ? "Connecting..." : null);
-
-  const hasPendingShareChanges = hasPendingMarkdownShareChanges(
-    activeFile?.share ?? null,
-    contentHash
-  );
-
-  const isSharedViewerMode = activeFile?.source === "url" && isMarkdownShareDirectUrl(activeFile.url);
-
-  const shareActionLabel = isShareBusy
-    ? "Sharing..."
-    : !activeFile?.share
-      ? "Share"
-      : hasPendingShareChanges
-        ? "Share changes"
-        : "Share";
-
-  const shareDialogSubmitLabel = !activeFile?.share
-    ? "Create link"
-    : hasPendingShareChanges || sharePassword.trim() !== ""
-      ? "Update share"
-      : "Refresh link";
-  const collaborateActionLabel = collabAuthToken ? "Collaborating" : "Collaborate";
+  const isSharedViewerMode =
+    activeFile?.source === "url" && isMarkdownShareDirectUrl(activeFile.url);
 
   const parsedDeepLink = useMemo(
     () =>
@@ -318,14 +234,6 @@ export const MarkdownApp = () => {
 
   useEffect(() => {
     return () => {
-      if (contentSyncTimeoutRef.current) {
-        window.clearTimeout(contentSyncTimeoutRef.current);
-      }
-
-      if (previewSyncTimeoutRef.current) {
-        window.clearTimeout(previewSyncTimeoutRef.current);
-      }
-
       if (collabAutosaveTimeoutRef.current) {
         window.clearTimeout(collabAutosaveTimeoutRef.current);
       }
@@ -337,6 +245,40 @@ export const MarkdownApp = () => {
     setCollabUnsavedSince(null);
     collabSaveReminderShownRef.current = false;
   }, []);
+
+  const {
+    collabAccessMode,
+    collabAuthToken,
+    collabAutosaveEnabled,
+    collabInviteToken,
+    collabJoinUrl,
+    collabPassword,
+    collabRoomId,
+    collabWsBaseUrl,
+    collaborationStartedAt,
+    copyCollaborationLinkAction,
+    isCollabBusy,
+    isCollabDialogOpen,
+    openCollabDialogAction,
+    pendingJoinRoomId,
+    setCollabAccessMode,
+    setCollabAutosaveEnabled,
+    setCollabInviteToken,
+    setCollabPassword,
+    setIsCollabDialogOpen,
+    startCollaborationAction,
+    stopCollaborationAction,
+  } = useMarkdownCollabFlow({
+    activeFile,
+    canSaveActiveFile,
+    onErrorAction: setUiError,
+    onResetUnsavedTrackingAction: resetCollabUnsavedTracking,
+    onSetDocumentCollaborationAction: setDocumentCollaboration,
+    parsedCollabJoin,
+  });
+  const isPageBusy = (isBusy && busyMessage !== null) || isCollabBusy;
+  const effectiveBusyMessage = busyMessage ?? (isCollabBusy ? "Connecting..." : null);
+  const collaborateActionLabel = collabAuthToken ? "Collaborating" : "Collaborate";
 
   const canCollaborativeAutosave =
     Boolean(collabAuthToken) && collabAutosaveEnabled && canSaveActiveFile;
@@ -403,34 +345,6 @@ export const MarkdownApp = () => {
     }, COLLAB_AUTOSAVE_DEBOUNCE_MS);
   }, [canCollaborativeAutosave, runCollabAutosave]);
 
-  const syncPreviewContent = useCallback(
-    (nextValue: string, options?: { immediate?: boolean }) => {
-      if (previewSyncTimeoutRef.current) {
-        window.clearTimeout(previewSyncTimeoutRef.current);
-        previewSyncTimeoutRef.current = null;
-      }
-
-      const applyPreviewContent = () => {
-        startTransition(() => {
-          setPreviewRenderContent((currentValue) =>
-            currentValue === nextValue ? currentValue : nextValue
-          );
-        });
-      };
-
-      if (!isPreviewVisible || options?.immediate || !isLargeDocument) {
-        applyPreviewContent();
-        return;
-      }
-
-      previewSyncTimeoutRef.current = window.setTimeout(() => {
-        applyPreviewContent();
-        previewSyncTimeoutRef.current = null;
-      }, LARGE_FILE_PREVIEW_SYNC_DELAY_MS);
-    },
-    [isLargeDocument, isPreviewVisible]
-  );
-
   const collaboration = useMarkdownCollaboration({
     enabled: Boolean(activeFile && collabRoomId && collabWsBaseUrl && collabAuthToken),
     roomId: collabRoomId || null,
@@ -466,202 +380,167 @@ export const MarkdownApp = () => {
     },
   });
 
-  useEffect(() => {
-    if (!parsedDeepLink) {
-      attemptedDeepLinkRef.current = null;
-      return;
-    }
-
-    if (isWorkspaceDocument) {
-      return;
-    }
-
-    if (!hydrated || activeFile) {
-      return;
-    }
-
-    const deepLinkKey = `${parsedDeepLink.source}:${parsedDeepLink.targetUrl}`;
-
-    if (attemptedDeepLinkRef.current === deepLinkKey) {
-      return;
-    }
-
-    attemptedDeepLinkRef.current = deepLinkKey;
-
-    void (async () => {
-      await openDeepLinkUrl(parsedDeepLink.targetUrl);
-
-      const openedDocumentId = useMarkdownStore.getState().activeDocumentId;
-
-      if (openedDocumentId) {
-        router.replace(buildEditRoute(openedDocumentId), { scroll: false });
+  const commitDocumentContent = useCallback(
+    (documentId: string | null, nextContent: string) => {
+      if (documentId) {
+        setDocumentContent(documentId, nextContent);
+        return;
       }
-    })();
-  }, [
-    activeFile,
-    hydrated,
-    isWorkspaceDocument,
-    openDeepLinkUrl,
-    parsedDeepLink,
-    router,
-  ]);
 
-  useEffect(() => {
-    if (pathname === "/") {
-      navigatingHomeRef.current = false;
-    }
-  }, [pathname]);
+      setContent(nextContent);
+    },
+    [setContent, setDocumentContent]
+  );
 
-  useEffect(() => {
-    if (!routeDocumentId) {
-      attemptedRouteDocumentIdRef.current = null;
-      return;
-    }
-
-    if (isWorkspaceDocument) {
-      return;
-    }
-
-    if (!hydrated) {
-      return;
-    }
-
-    const currentState = useMarkdownStore.getState();
-
-    if (currentState.activeDocumentId === routeDocumentId) {
-      attemptedRouteDocumentIdRef.current = null;
-      return;
-    }
-
-    if (attemptedRouteDocumentIdRef.current === routeDocumentId) {
-      return;
-    }
-
-    if (!currentState.activeDocumentId && navigatingHomeRef.current) {
-      return;
-    }
-
-    const existingOpenDocument = currentState.openDocuments.find(
-      (document) => document.id === routeDocumentId
-    );
-
-    if (existingOpenDocument) {
-      setActiveDocument(routeDocumentId);
-      attemptedRouteDocumentIdRef.current = null;
-      return;
-    }
-
-    attemptedRouteDocumentIdRef.current = routeDocumentId;
-    clearError();
-
-    void reopenRecentFile(routeDocumentId)
-      .then(() => {
-        const nextState = useMarkdownStore.getState();
-
-        if (nextState.error) {
-          router.replace("/", { scroll: false });
-          return;
-        }
-
-        if (
-          nextState.activeDocumentId &&
-          nextState.activeDocumentId !== routeDocumentId
-        ) {
-          router.replace(buildEditRoute(nextState.activeDocumentId), {
-            scroll: false,
-          });
-          return;
-        }
-
-        if (!nextState.activeDocumentId) {
-          router.replace("/", { scroll: false });
-        }
-      })
-      .finally(() => {
-        if (attemptedRouteDocumentIdRef.current === routeDocumentId) {
-          attemptedRouteDocumentIdRef.current = null;
-        }
-      });
-  }, [
-    clearError,
-    hydrated,
-    isWorkspaceDocument,
-    reopenRecentFile,
-    routeDocumentId,
-    router,
-    setActiveDocument,
-  ]);
-
-  useEffect(() => {
-    if (!hydrated) {
-      return;
-    }
-
-    if (isWorkspaceDocument) {
-      return;
-    }
-
-    if (!activeDocumentId && parsedDeepLink) {
-      return;
-    }
-
-    if (
-      !activeDocumentId &&
-      routeDocumentId &&
-      attemptedRouteDocumentIdRef.current === routeDocumentId
-    ) {
-      return;
-    }
-
-    const targetPath = activeDocumentId ? buildEditRoute(activeDocumentId) : "/";
-
-    if (pathname === targetPath) {
-      return;
-    }
-
-    router.replace(targetPath, { scroll: false });
-  }, [
+  const {
+    clearEditorSelection,
+    editorSelection,
+    flushPendingEditorContent,
+    handleEditorChange,
+    redoAction,
+    syncEditorSelection,
+    undoAction,
+  } = useMarkdownEditorController({
     activeDocumentId,
+    activeFile,
+    collaboration,
+    content,
+    editorRef,
+    isLargeDocument,
+    largeFileHistoryGroupWindowMs: LARGE_FILE_HISTORY_GROUP_WINDOW_MS,
+    largeFileSyncDelayMs: LARGE_FILE_SYNC_DELAY_MS,
+    maxHistoryEntries: MAX_HISTORY_ENTRIES,
+    onCommitContentAction: commitDocumentContent,
+    openDocuments,
+    setContentAction: setContent,
+    shouldTrackPreviewSelection,
+    syncPreviewContentAction: syncPreviewContent,
+  });
+
+  const deferredPreviewSelection = useDeferredValue(
+    shouldTrackPreviewSelection ? editorSelection : null
+  );
+
+  const {
+    copyShareUrlAction,
+    isShareBusy,
+    isShareDialogOpen,
+    openShareDialogAction,
+    removeSharePasswordAction,
+    setIsShareDialogOpen,
+    setSharePassword,
+    shareActionLabel,
+    shareActiveFileAction,
+    shareDialogSubmitLabel,
+    shareDialogUrl,
+    sharePassword,
+  } = useMarkdownShareFlow({
+    activeFile,
+    contentHash,
+    flushPendingEditorContentAction: flushPendingEditorContent,
+    onErrorAction: setUiError,
+    onShareUpdatedAction: (documentId, share, nextHash) => {
+      if (!share) {
+        return;
+      }
+
+      setDocumentShare(documentId, share);
+      setContentHash(nextHash);
+    },
+  });
+
+  const { clearPendingRouteAttempt } = useMarkdownRouteSync({
+    activeDocumentId,
+    activeFilePresent: Boolean(activeFile),
+    buildEditRouteAction: buildEditRoute,
+    clearErrorAction: clearError,
     hydrated,
     isWorkspaceDocument,
-    parsedDeepLink,
+    onOpenDeepLinkUrlAction: openDeepLinkUrl,
+    onOpenRouteDocumentAction: reopenRecentFile,
+    onSetActiveDocumentAction: setActiveDocument,
+    openDocuments,
     pathname,
+    parsedDeepLink,
     routeDocumentId,
     router,
-  ]);
+    storeError: error,
+  });
+  const {
+    clearDocumentAction,
+    closeDocumentAction,
+    editSharedFileLocallyAction,
+    goHomeAction,
+    handleRefresh,
+    openFolderAction,
+    openRecentFileAction,
+    openWorkspacePageAction,
+    saveActiveFileAction,
+    setActiveDocumentAction,
+    showCommandPalette,
+    showOpenUrlDialog,
+  } = useMarkdownShellActions({
+    activeFile: activeFile ? { id: activeFile.id, name: activeFile.name } : null,
+    clearDocumentAction: clearDocument,
+    clearErrorAction: clearError,
+    clearPendingRouteAttemptAction: clearPendingRouteAttempt,
+    closeDocumentInputAction: closeDocument,
+    createLocalCopyOfActiveFileAction: createLocalCopyOfActiveFile,
+    flushPendingEditorContentAction: flushPendingEditorContent,
+    goHomeInputAction: goHome,
+    onErrorAction: setUiError,
+    openFolderInputAction: openFolder,
+    openWorkspacePageByPathAction: openWorkspacePageByPath,
+    reopenRecentFileAction: reopenRecentFile,
+    router,
+    saveActiveFileInputAction: saveActiveFile,
+    setActiveDocumentInputAction: setActiveDocument,
+    setCommandPaletteOpenAction: setIsCommandPaletteOpen,
+    setOpenUrlDialogOpenAction: setIsOpenUrlDialogOpen,
+    setPendingRecentFileIdAction: setPendingRecentFileId,
+    setSaveBusyAction: setIsSaveBusy,
+    onResetCollabUnsavedTrackingAction: resetCollabUnsavedTracking,
+  });
+  const {
+    alphaListAction,
+    boldAction,
+    bulletListAction,
+    codeBlockAction,
+    exportHtmlFile,
+    exportMarkdownFile,
+    headingAction,
+    inlineCodeAction,
+    insertExternalLinkAction,
+    insertInternalLinkToPathAction,
+    insertTableAction,
+    italicAction,
+    openInternalPreviewLinkAction,
+    orderedListAction,
+    taskListAction,
+  } = useMarkdownEditorActions({
+    activeFile: activeFile
+      ? {
+          name: activeFile.name,
+          relativePath: activeFile.relativePath,
+        }
+      : null,
+    editorRef,
+    flushPendingEditorContentAction: flushPendingEditorContent,
+    onErrorAction: setUiError,
+    openWorkspacePageByPathAction: openWorkspacePageByPath,
+    workspacePresent: Boolean(workspace),
+  });
+  const { handleDragLeave, handleDragOver, handleDrop, isDragActive } =
+    useMarkdownDragDrop({
+      openDroppedFilesAction: openDroppedFiles,
+    });
 
   useEffect(() => {
-    if (!hydrated || !parsedCollabJoin) {
+    if (!hydrated || !parsedCollabJoin || activeFile) {
       return;
     }
 
-    if (!activeFile) {
-      openScratchDocument(parsedCollabJoin.fileName ?? "Collaborative document.md");
-    }
-
-    setCollabAccessMode(parsedCollabJoin.accessMode);
-    setCollabRoomId(parsedCollabJoin.roomId);
-    setCollabInviteToken(parsedCollabJoin.inviteToken ?? "");
-    setCollabJoinUrl(window.location.toString());
-    setPendingJoinRoomId(parsedCollabJoin.roomId);
-
-    if (parsedCollabJoin.accessMode === "password") {
-      setIsCollabDialogOpen(true);
-      return;
-    }
-
-    void joinCollaborationRoom({
-      roomId: parsedCollabJoin.roomId,
-      inviteToken: parsedCollabJoin.inviteToken,
-    })
-      .then((connection) => {
-        setCollabWsBaseUrl(connection.wsBaseUrl);
-        setCollabAuthToken(connection.token);
-        setPendingJoinRoomId(null);
-      })
-      .catch((error) => {
-        setUiError(getUnknownErrorMessage(error));
-      });
+    openScratchDocument(parsedCollabJoin.fileName ?? "Collaborative document.md");
   }, [activeFile, hydrated, openScratchDocument, parsedCollabJoin]);
 
   useEffect(() => {
@@ -674,11 +553,10 @@ export const MarkdownApp = () => {
     if (!activeFile) {
       setTimeout(() => setPreviewDetached(false), 0);
     }
-  }, [activeFile]);
+  }, [activeFile, setPreviewDetached]);
 
   useEffect(() => {
     if (!collabAuthToken) {
-      setCollaborationStartedAt(null);
       if (collabAutosaveTimeoutRef.current) {
         window.clearTimeout(collabAutosaveTimeoutRef.current);
         collabAutosaveTimeoutRef.current = null;
@@ -688,15 +566,7 @@ export const MarkdownApp = () => {
       resetCollabUnsavedTracking();
       return;
     }
-
-    setCollaborationStartedAt((currentValue) => currentValue ?? new Date().toISOString());
   }, [collabAuthToken, resetCollabUnsavedTracking]);
-
-  useEffect(() => {
-    if (!canSaveActiveFile && collabAutosaveEnabled) {
-      setCollabAutosaveEnabled(false);
-    }
-  }, [canSaveActiveFile, collabAutosaveEnabled]);
 
   useEffect(() => {
     if (!canCollaborativeAutosave) {
@@ -758,27 +628,7 @@ export const MarkdownApp = () => {
   useEffect(() => {
     if (!activeFile) {
       setContentHash(null);
-      setIsShareDialogOpen(false);
-      setSharePassword("");
-      setShareDialogUrl(null);
-      setCollabWsBaseUrl(null);
-      setCollabAuthToken(null);
-      setCollaborationStartedAt(null);
-      setPendingJoinRoomId(null);
-      setCollabJoinUrl(null);
-      setCollabPassword("");
       return;
-    }
-
-    if (activeFile.collab) {
-      setCollabAccessMode(activeFile.collab.accessMode);
-      setCollabRoomId(activeFile.collab.roomId);
-      setCollabInviteToken(activeFile.collab.inviteToken ?? "");
-      setCollabJoinUrl(activeFile.collab.joinUrl);
-    } else if (!parsedCollabJoin && !collabAuthToken) {
-      setCollabWsBaseUrl(null);
-      setCollabAuthToken(null);
-      setCollabJoinUrl(null);
     }
 
     let cancelled = false;
@@ -799,57 +649,7 @@ export const MarkdownApp = () => {
     return () => {
       cancelled = true;
     };
-  }, [activeDocumentId, activeFile, collabAuthToken, content, parsedCollabJoin]);
-
-  useEffect(() => {
-    if (!activeFile?.collab || collabAuthToken || pendingJoinRoomId) {
-      return;
-    }
-
-    if (activeFile.collab.accessMode === "password") {
-      setPendingJoinRoomId(activeFile.collab.roomId);
-      setCollabAccessMode("password");
-      setCollabRoomId(activeFile.collab.roomId);
-      setCollabJoinUrl(activeFile.collab.joinUrl);
-      setIsCollabDialogOpen(true);
-      return;
-    }
-
-    void joinCollaborationRoom({
-      roomId: activeFile.collab.roomId,
-      inviteToken: activeFile.collab.inviteToken,
-    })
-      .then((connection) => {
-        setCollabWsBaseUrl(connection.wsBaseUrl);
-        setCollabAuthToken(connection.token);
-      })
-      .catch((error) => {
-        setUiError(getUnknownErrorMessage(error));
-      });
-  }, [activeFile, collabAuthToken, pendingJoinRoomId]);
-
-  useEffect(() => {
-    if (!activeFile || activeFile.collab || !collabRoomId || !collabJoinUrl) {
-      return;
-    }
-
-    const inviteToken =
-      collabAccessMode === "invite" ? collabInviteToken.trim() || null : null;
-
-    setDocumentCollaboration(activeFile.id, {
-      roomId: collabRoomId,
-      accessMode: collabAccessMode,
-      inviteToken,
-      joinUrl: collabJoinUrl,
-    });
-  }, [
-    activeFile,
-    collabAccessMode,
-    collabInviteToken,
-    collabJoinUrl,
-    collabRoomId,
-    setDocumentCollaboration,
-  ]);
+  }, [activeDocumentId, activeFile, content]);
 
   useEffect(() => {
     const nextPreviewContent = isPreviewVisible
@@ -858,52 +658,6 @@ export const MarkdownApp = () => {
 
     syncPreviewContent(nextPreviewContent, { immediate: true });
   }, [activeDocumentId, content, isPreviewVisible, syncPreviewContent]);
-
-  useEffect(() => {
-    const nextHistory = new Map<string, EditorHistoryState>();
-
-    openDocuments.forEach((document) => {
-      const existingHistory = historyRef.current.get(document.id);
-      const initialSelection = {
-        start: document.content.length,
-        end: document.content.length,
-      };
-
-      if (!existingHistory) {
-        nextHistory.set(document.id, {
-          entries: [
-            {
-              content: document.content,
-              selection: initialSelection,
-              timestamp: Date.now(),
-            },
-          ],
-          index: 0,
-        });
-        return;
-      }
-
-      const activeEntry = existingHistory.entries[existingHistory.index];
-
-      if (!document.isDirty && activeEntry?.content !== document.content) {
-        nextHistory.set(document.id, {
-          entries: [
-            {
-              content: document.content,
-              selection: initialSelection,
-              timestamp: Date.now(),
-            },
-          ],
-          index: 0,
-        });
-        return;
-      }
-
-      nextHistory.set(document.id, existingHistory);
-    });
-
-    historyRef.current = nextHistory;
-  }, [openDocuments]);
 
   useEffect(() => {
     if (isSharedViewerMode) {
@@ -933,179 +687,6 @@ export const MarkdownApp = () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [isSharedViewerMode]);
-
-  const handleEditorChange = useCallback(
-    (event: ChangeEvent<HTMLTextAreaElement>) => {
-      const nextValue = event.target.value;
-      const documentId = activeDocumentId;
-      const now = Date.now();
-      const nextSelection = {
-        start: event.target.selectionStart,
-        end: event.target.selectionEnd,
-      };
-
-      if (collaboration.isActive) {
-        syncPreviewContent(nextValue);
-        collaboration.applyLocalContent(nextValue);
-        collaboration.updateLocalSelection(nextSelection);
-        if (shouldTrackPreviewSelection) {
-          setEditorSelection(nextSelection);
-        }
-        return;
-      }
-
-      if (activeDocumentId) {
-        const currentHistory = historyRef.current.get(activeDocumentId) ?? {
-          entries: [],
-          index: -1,
-        };
-        const activeEntry = currentHistory.entries[currentHistory.index];
-
-        if (activeEntry?.content !== nextValue) {
-          const shouldReplaceActiveEntry =
-            isLargeDocument &&
-            Boolean(activeEntry) &&
-            currentHistory.index === currentHistory.entries.length - 1 &&
-            now - (activeEntry?.timestamp ?? 0) <
-              LARGE_FILE_HISTORY_GROUP_WINDOW_MS;
-
-          if (shouldReplaceActiveEntry) {
-            currentHistory.entries[currentHistory.index] = {
-              content: nextValue,
-              selection: nextSelection,
-              timestamp: now,
-            };
-          } else {
-            const nextEntries = currentHistory.entries.slice(
-              0,
-              currentHistory.index + 1
-            );
-            nextEntries.push({
-              content: nextValue,
-              selection: nextSelection,
-              timestamp: now,
-            });
-
-            if (nextEntries.length > MAX_HISTORY_ENTRIES) {
-              nextEntries.splice(0, nextEntries.length - MAX_HISTORY_ENTRIES);
-            }
-
-            historyRef.current.set(activeDocumentId, {
-              entries: nextEntries,
-              index: nextEntries.length - 1,
-            });
-          }
-        }
-      }
-
-      if (contentSyncTimeoutRef.current) {
-        window.clearTimeout(contentSyncTimeoutRef.current);
-      }
-
-      syncPreviewContent(nextValue);
-
-      if (!isLargeDocument) {
-        startTransition(() => {
-          if (documentId) {
-            setDocumentContent(documentId, nextValue);
-            return;
-          }
-
-          setContent(nextValue);
-        });
-        return;
-      }
-
-      contentSyncTimeoutRef.current = window.setTimeout(() => {
-        startTransition(() => {
-          if (documentId) {
-            setDocumentContent(documentId, nextValue);
-            return;
-          }
-
-          setContent(nextValue);
-        });
-        contentSyncTimeoutRef.current = null;
-      }, LARGE_FILE_SYNC_DELAY_MS);
-    },
-    [
-      activeDocumentId,
-      collaboration,
-      isLargeDocument,
-      setContent,
-      setDocumentContent,
-      shouldTrackPreviewSelection,
-      syncPreviewContent,
-    ]
-  );
-
-  const flushPendingEditorContent = useCallback(() => {
-    if (contentSyncTimeoutRef.current) {
-      window.clearTimeout(contentSyncTimeoutRef.current);
-      contentSyncTimeoutRef.current = null;
-    }
-
-    const editorContent = editorRef.current?.value;
-
-    if (typeof editorContent === "string" && editorContent !== content) {
-      if (activeDocumentId) {
-        setDocumentContent(activeDocumentId, editorContent);
-      } else {
-        setContent(editorContent);
-      }
-    }
-
-    return editorContent ?? content;
-  }, [activeDocumentId, content, setContent, setDocumentContent]);
-
-  const clearEditorSelection = useCallback(() => {
-    flushPendingEditorContent();
-
-    setEditorSelection(null);
-  }, [flushPendingEditorContent]);
-
-  const syncEditorSelection = useCallback(
-    (editor: HTMLTextAreaElement | null) => {
-      if (!editor) {
-        return;
-      }
-
-      const nextSelection = {
-        start: editor.selectionStart,
-        end: editor.selectionEnd,
-      };
-
-      if (activeDocumentId) {
-        const currentHistory = historyRef.current.get(activeDocumentId);
-
-        if (currentHistory && currentHistory.index >= 0) {
-          currentHistory.entries[currentHistory.index] = {
-            ...currentHistory.entries[currentHistory.index],
-            selection: nextSelection,
-          };
-        }
-      }
-
-      if (!shouldTrackPreviewSelection) {
-        if (collaboration.isActive) {
-          collaboration.updateLocalSelection(nextSelection);
-        }
-        return;
-      }
-
-      if (collaboration.isActive) {
-        collaboration.updateLocalSelection(nextSelection);
-      }
-
-      setEditorSelection((currentValue) =>
-        currentValue?.start === nextSelection.start &&
-        currentValue?.end === nextSelection.end
-          ? currentValue
-          : nextSelection
-      );
-    },
-    [activeDocumentId, collaboration, shouldTrackPreviewSelection]
-  );
 
   const { handleEditorScroll, handlePreviewScroll, syncPreviewToEditor } =
     useScrollSync({
@@ -1138,491 +719,9 @@ export const MarkdownApp = () => {
     viewMode,
   ]);
 
-  useEffect(() => {
-    if (!shouldTrackPreviewSelection) {
-      return;
-    }
-
-    if (!activeFile) {
-      setTimeout(() => setEditorSelection(null), 0);
-      return;
-    }
-
-    if (pendingSelectionRef.current) {
-      return;
-    }
-
-    if (!editorSelection) {
-      return;
-    }
-
-    syncEditorSelection(editorRef.current);
-  }, [
-    activeFile,
-    content,
-    editorSelection,
-    shouldTrackPreviewSelection,
-    syncEditorSelection,
-  ]);
-
-  useLayoutEffect(() => {
-    const pendingSelection = pendingSelectionRef.current;
-    const editorElement = editorRef.current;
-
-    if (!pendingSelection || !editorElement) {
-      return;
-    }
-
-    editorElement.focus();
-    editorElement.setSelectionRange(
-      pendingSelection.start,
-      pendingSelection.end
-    );
-    if (shouldTrackPreviewSelection) {
-      setEditorSelection(pendingSelection);
-    }
-    pendingSelectionRef.current = null;
-  }, [activeDocumentId, content, shouldTrackPreviewSelection]);
-
-  useEffect(() => {
-    if (!activeFile) {
-      return;
-    }
-
-    const handleSelectionChange = () => {
-      const editorElement = editorRef.current;
-
-      if (!editorElement || document.activeElement !== editorElement) {
-        return;
-      }
-
-      syncEditorSelection(editorElement);
-    };
-
-    document.addEventListener("selectionchange", handleSelectionChange);
-
-    return () => {
-      document.removeEventListener("selectionchange", handleSelectionChange);
-    };
-  }, [activeFile, syncEditorSelection]);
-
-  const handleDragOver = useCallback(
-    (event: ReactDragEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      setIsDragActive(true);
-    },
-    []
-  );
-
-  const handleDragLeave = useCallback(
-    (event: ReactDragEvent<HTMLDivElement>) => {
-      event.preventDefault();
-
-      if (
-        event.currentTarget instanceof HTMLElement &&
-        event.currentTarget.contains(event.relatedTarget as Node | null)
-      ) {
-        return;
-      }
-
-      setIsDragActive(false);
-    },
-    []
-  );
-
-  const handleDrop = useCallback(
-    async (event: ReactDragEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      setIsDragActive(false);
-
-      const files = Array.from(event.dataTransfer?.files ?? []);
-
-      if (files.length === 0) {
-        return;
-      }
-
-      await openDroppedFiles(files, event.dataTransfer?.items ?? null);
-    },
-    [openDroppedFiles]
-  );
-
-  const handleRefresh = useCallback(async () => {
-    flushPendingEditorContent();
-
-    if (!activeFile) {
-      return;
-    }
-
-    clearError();
-    await reopenRecentFile(activeFile.id);
-    if (!useMarkdownStore.getState().error) {
-      toast.success("File reopened.", {
-        description: activeFile.name,
-      });
-    }
-  }, [activeFile, clearError, flushPendingEditorContent, reopenRecentFile]);
-
-  const openRecentFileAction = useCallback(
-    (id: string) => {
-      if (!activeFile) {
-        setPendingRecentFileId(id);
-      }
-
-      clearError();
-
-      void reopenRecentFile(id)
-        .finally(() => {
-          setPendingRecentFileId((currentValue) =>
-            currentValue === id ? null : currentValue
-          );
-        });
-    },
-    [activeFile, clearError, reopenRecentFile]
-  );
-
-  const saveActiveFileAction = useCallback(async () => {
-    flushPendingEditorContent();
-    clearError();
-    setIsSaveBusy(true);
-    try {
-      await saveActiveFile({ silent: true });
-      if (!useMarkdownStore.getState().error && activeFile) {
-        resetCollabUnsavedTracking();
-        toast.success("File saved.", {
-          description: activeFile.name,
-        });
-      }
-    } finally {
-      setIsSaveBusy(false);
-    }
-  }, [
-    activeFile,
-    clearError,
-    flushPendingEditorContent,
-    resetCollabUnsavedTracking,
-    saveActiveFile,
-  ]);
-
-  const editSharedFileLocallyAction = useCallback(async () => {
-    flushPendingEditorContent();
-    await createLocalCopyOfActiveFile();
-  }, [createLocalCopyOfActiveFile, flushPendingEditorContent]);
-
-  const copyShareUrlAction = useCallback(async () => {
-    if (!shareDialogUrl) {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(shareDialogUrl);
-      toast.success("Link copied to clipboard.");
-    } catch (error) {
-      setUiError(getUnknownErrorMessage(error));
-    }
-  }, [shareDialogUrl]);
-
-  const openShareDialogAction = useCallback(() => {
-    if (!activeFile) {
-      return;
-    }
-
-    setSharePassword("");
-    setShareDialogUrl(activeFile.share?.url ?? null);
-    setIsShareDialogOpen(true);
-  }, [activeFile]);
-
-  const openCollabDialogAction = useCallback(() => {
-    if (!activeFile) {
-      return;
-    }
-
-    const existingCollab = activeFile.collab ?? null;
-
-    setCollabAccessMode(existingCollab?.accessMode ?? "open");
-    setCollabRoomId(existingCollab?.roomId ?? createCollaborationRoomId());
-    setCollabInviteToken(
-      existingCollab?.inviteToken ?? createCollaborationToken()
-    );
-    setCollabPassword("");
-    setCollabJoinUrl(existingCollab?.joinUrl ?? collabJoinUrl);
-    setIsCollabDialogOpen(true);
-  }, [activeFile, collabJoinUrl]);
-
-  const startCollaborationAction = useCallback(async () => {
-    if (!activeFile) {
-      return;
-    }
-
-    setIsCollabBusy(true);
-
-    try {
-      if (pendingJoinRoomId) {
-        const connection = await joinCollaborationRoom({
-          roomId: pendingJoinRoomId,
-          inviteToken: collabAccessMode === "invite" ? collabInviteToken : null,
-          password: collabAccessMode === "password" ? collabPassword : null,
-        });
-
-        setCollabWsBaseUrl(connection.wsBaseUrl);
-        setCollabAuthToken(connection.token);
-        setPendingJoinRoomId(null);
-        setIsCollabDialogOpen(false);
-        toast.success("Joined collaboration.");
-        return;
-      }
-
-      const room = await createCollaborationRoom({
-        accessMode: collabAccessMode,
-        fileName: activeFile.name,
-        inviteToken: collabAccessMode === "invite" ? collabInviteToken : null,
-        password: collabAccessMode === "password" ? collabPassword : null,
-      });
-      const connection = await joinCollaborationRoom({
-        roomId: room.id,
-        inviteToken: room.inviteToken,
-        password: collabAccessMode === "password" ? collabPassword : null,
-      });
-
-      setCollabRoomId(room.id);
-      setCollabInviteToken(room.inviteToken ?? "");
-      setCollabJoinUrl(room.joinUrl);
-      setCollabWsBaseUrl(connection.wsBaseUrl);
-      setCollabAuthToken(connection.token);
-
-      const collab = {
-        roomId: room.id,
-        accessMode: collabAccessMode,
-        inviteToken: room.inviteToken,
-        joinUrl: room.joinUrl,
-      } as const;
-
-      setDocumentCollaboration(activeFile.id, collab);
-      toast.success("Collaboration started.");
-    } catch (error) {
-      setUiError(getUnknownErrorMessage(error));
-    } finally {
-      setIsCollabBusy(false);
-    }
-  }, [
-    activeFile,
-    collabAccessMode,
-    collabInviteToken,
-    collabPassword,
-    pendingJoinRoomId,
-    setDocumentCollaboration,
-  ]);
-
-  const stopCollaborationAction = useCallback(() => {
-    if (!activeFile) {
-      return;
-    }
-
-    setCollabWsBaseUrl(null);
-    setCollabAuthToken(null);
-    setCollabAutosaveEnabled(false);
-    setPendingJoinRoomId(null);
-    setCollabJoinUrl(null);
-    setCollabPassword("");
-    resetCollabUnsavedTracking();
-    setDocumentCollaboration(activeFile.id, null);
-    setIsCollabDialogOpen(false);
-    toast.success("Collaboration stopped.");
-  }, [activeFile, resetCollabUnsavedTracking, setDocumentCollaboration]);
-
-  const copyCollaborationLinkAction = useCallback(async () => {
-    if (!collabJoinUrl) {
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(collabJoinUrl);
-      toast.success("Collaboration link copied.");
-    } catch (error) {
-      setUiError(getUnknownErrorMessage(error));
-    }
-  }, [collabJoinUrl]);
-
   const regenerateCollaborationDisplayNameAction = useCallback(() => {
     setCollaborationDisplayName(faker.person.fullName());
   }, [setCollaborationDisplayName]);
-
-  const shareActiveFileAction = useCallback(async () => {
-    if (!activeFile) {
-      return;
-    }
-
-    const nextContent = flushPendingEditorContent();
-    const hadShare = Boolean(activeFile.share);
-    const wasShareUpdate = hadShare && (hasPendingShareChanges || sharePassword.trim() !== "");
-
-    setIsShareBusy(true);
-
-    try {
-      const result = await shareRecentMarkdownFile(activeFile.id, nextContent, {
-        password: sharePassword,
-      });
-
-      setDocumentShare(activeFile.id, result.share);
-      setContentHash(result.share.contentHash);
-      setShareDialogUrl(result.share.url);
-      setSharePassword("");
-      setIsShareDialogOpen(true);
-      toast.success(
-        !hadShare
-          ? "Link created."
-          : wasShareUpdate
-            ? "Link updated."
-            : "Link refreshed."
-      );
-    } catch (error) {
-      setUiError(getUnknownErrorMessage(error));
-    } finally {
-      setIsShareBusy(false);
-    }
-  }, [
-    activeFile,
-    flushPendingEditorContent,
-    hasPendingShareChanges,
-    setDocumentShare,
-    sharePassword,
-  ]);
-
-  const removeSharePasswordAction = useCallback(async () => {
-    if (!activeFile?.share?.requiresPassword) {
-      return;
-    }
-
-    const nextContent = flushPendingEditorContent();
-
-    setIsShareBusy(true);
-
-    try {
-      const result = await shareRecentMarkdownFile(activeFile.id, nextContent, {
-        removePassword: true,
-      });
-
-      setDocumentShare(activeFile.id, result.share);
-      setContentHash(result.share.contentHash);
-      setShareDialogUrl(result.share.url);
-      setSharePassword("");
-      setIsShareDialogOpen(true);
-      toast.success("Password removed from shared link.");
-    } catch (error) {
-      setUiError(getUnknownErrorMessage(error));
-    } finally {
-      setIsShareBusy(false);
-    }
-  }, [activeFile, flushPendingEditorContent, setDocumentShare]);
-
-  const goHomeAction = useCallback(() => {
-    navigatingHomeRef.current = true;
-    attemptedRouteDocumentIdRef.current = null;
-    flushPendingEditorContent();
-    goHome();
-    router.replace("/", { scroll: false });
-  }, [flushPendingEditorContent, goHome, router]);
-
-  const clearDocumentAction = useCallback(() => {
-    flushPendingEditorContent();
-    clearDocument();
-  }, [clearDocument, flushPendingEditorContent]);
-
-  const openWorkspacePageAction = useCallback(
-    (relativePath: string) => {
-      flushPendingEditorContent();
-      void openWorkspacePageByPath(relativePath);
-    },
-    [flushPendingEditorContent, openWorkspacePageByPath]
-  );
-
-  const setActiveDocumentAction = useCallback(
-    (id: string) => {
-      flushPendingEditorContent();
-      setActiveDocument(id);
-    },
-    [flushPendingEditorContent, setActiveDocument]
-  );
-
-  const closeDocumentAction = useCallback(
-    (id: string) => {
-      flushPendingEditorContent();
-      closeDocument(id);
-    },
-    [closeDocument, flushPendingEditorContent]
-  );
-
-  const undoAction = useCallback(() => {
-    if (collaboration.isActive) {
-      collaboration.undo();
-      return;
-    }
-
-    if (contentSyncTimeoutRef.current) {
-      window.clearTimeout(contentSyncTimeoutRef.current);
-      contentSyncTimeoutRef.current = null;
-    }
-
-    if (!activeDocumentId) {
-      return;
-    }
-
-    const currentHistory = historyRef.current.get(activeDocumentId);
-
-    if (!currentHistory || currentHistory.index <= 0) {
-      return;
-    }
-
-    const nextIndex = currentHistory.index - 1;
-    const nextEntry = currentHistory.entries[nextIndex];
-
-    historyRef.current.set(activeDocumentId, {
-      entries: currentHistory.entries,
-      index: nextIndex,
-    });
-    pendingSelectionRef.current = nextEntry.selection;
-    syncPreviewContent(nextEntry.content, { immediate: true });
-    startTransition(() => {
-      setContent(nextEntry.content);
-    });
-  }, [activeDocumentId, collaboration, setContent, syncPreviewContent]);
-
-  const redoAction = useCallback(() => {
-    if (collaboration.isActive) {
-      collaboration.redo();
-      return;
-    }
-
-    if (contentSyncTimeoutRef.current) {
-      window.clearTimeout(contentSyncTimeoutRef.current);
-      contentSyncTimeoutRef.current = null;
-    }
-
-    if (!activeDocumentId) {
-      return;
-    }
-
-    const currentHistory = historyRef.current.get(activeDocumentId);
-
-    if (
-      !currentHistory ||
-      currentHistory.index >= currentHistory.entries.length - 1
-    ) {
-      return;
-    }
-
-    const nextIndex = currentHistory.index + 1;
-    const nextEntry = currentHistory.entries[nextIndex];
-
-    historyRef.current.set(activeDocumentId, {
-      entries: currentHistory.entries,
-      index: nextIndex,
-    });
-    pendingSelectionRef.current = nextEntry.selection;
-    syncPreviewContent(nextEntry.content, { immediate: true });
-    startTransition(() => {
-      setContent(nextEntry.content);
-    });
-  }, [activeDocumentId, collaboration, setContent, syncPreviewContent]);
 
   useMarkdownHotkeys({
     enabled: Boolean(activeFile) && !isSharedViewerMode,
@@ -1634,81 +733,10 @@ export const MarkdownApp = () => {
     editorRef,
   });
 
-  const boldAction = useCallback(() => {
-    wrapSelectionAction(editorRef.current, "**", "**", "bold text");
-  }, []);
-
-  const italicAction = useCallback(() => {
-    wrapSelectionAction(editorRef.current, "_", "_", "italic text");
-  }, []);
-
-  const headingAction = useCallback((level: 1 | 2 | 3 | 4 | 5 | 6) => {
-    insertBlockAction(
-      editorRef.current,
-      `${"#".repeat(level)} `,
-      "",
-      "Heading"
-    );
-  }, []);
-
-  const inlineCodeAction = useCallback(() => {
-    wrapSelectionAction(editorRef.current, "`", "`", "inline code");
-  }, []);
-
-  const codeBlockAction = useCallback(() => {
-    insertBlockAction(editorRef.current, "```md\n", "\n```", "code block");
-  }, []);
-
-  const bulletListAction = useCallback(() => {
-    prefixLinesAction(editorRef.current, "- ", "List item");
-  }, []);
-
-  const orderedListAction = useCallback(() => {
-    prefixLinesAction(
-      editorRef.current,
-      (index) => `${index + 1}. `,
-      "List item"
-    );
-  }, []);
-
-  const alphaListAction = useCallback(() => {
-    prefixLinesAction(
-      editorRef.current,
-      (index) => {
-        let value = index;
-        let label = "";
-
-        do {
-          label = String.fromCharCode(97 + (value % 26)) + label;
-          value = Math.floor(value / 26) - 1;
-        } while (value >= 0);
-
-        return `${label}. `;
-      },
-      "List item"
-    );
-  }, []);
-
-  const taskListAction = useCallback(() => {
-    prefixLinesAction(editorRef.current, "- [ ] ", "Task item");
-  }, []);
-
-  const insertTableAction = useCallback((columns: number, rows: number) => {
-    insertMarkdownTableAction(editorRef.current, columns, rows);
-  }, []);
-
   const togglePreviewDetached = useCallback(() => {
     setUiError(null);
     setPreviewDetached((currentValue) => !currentValue);
-  }, []);
-
-  const closePreviewDetached = useCallback(() => {
-    setPreviewDetached(false);
-  }, []);
-
-  const showCommandPalette = useCallback(() => {
-    setIsCommandPaletteOpen(true);
-  }, []);
+  }, [setPreviewDetached]);
 
   useEffect(() => {
     if (!error) {
@@ -1727,136 +755,6 @@ export const MarkdownApp = () => {
     toast.error(uiError);
     setUiError(null);
   }, [uiError]);
-
-  const showOpenUrlDialog = useCallback(() => {
-    setIsCommandPaletteOpen(false);
-    setIsOpenUrlDialogOpen(true);
-  }, []);
-
-  const openFolderAction = useCallback(() => {
-    setIsCommandPaletteOpen(false);
-    clearError();
-    void openFolder();
-  }, [clearError, openFolder]);
-
-  const insertInternalLinkToPathAction = useCallback(
-    (targetPath: string) => {
-      if (!activeFile?.relativePath) {
-        return;
-      }
-
-      const relativeLink = buildRelativeWorkspaceLink(
-        activeFile.relativePath,
-        targetPath
-      );
-
-      if (!relativeLink) {
-        setUiError("Unable to build a relative link for this page.");
-        return;
-      }
-
-      const encodedRelativeLink = encodeURI(relativeLink);
-      const defaultLabel = targetPath
-        .split("/")
-        .at(-1)
-        ?.replace(/\.md$/iu, "")
-        ?.trim();
-
-      insertMarkdownLinkAction(
-        editorRef.current,
-        encodedRelativeLink,
-        defaultLabel && defaultLabel.length > 0 ? defaultLabel : "page"
-      );
-    },
-    [activeFile?.relativePath]
-  );
-
-  const insertExternalLinkAction = useCallback(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const inputValue = window.prompt(
-      "Enter the external URL to insert:",
-      "https://"
-    );
-
-    if (inputValue === null) {
-      return;
-    }
-
-    const trimmedValue = inputValue.trim();
-
-    if (!trimmedValue) {
-      return;
-    }
-
-    const href = /^[a-z][a-z\\d+.-]*:/iu.test(trimmedValue)
-      ? trimmedValue
-      : `https://${trimmedValue.replace(/^\/+/u, "")}`;
-
-    insertMarkdownLinkAction(editorRef.current, href, "link");
-  }, []);
-
-  const openInternalPreviewLinkAction = useCallback(
-    (href: string) => {
-      if (!workspace || !activeFile?.relativePath) {
-        return;
-      }
-
-      flushPendingEditorContent();
-
-      const targetPath = resolveWorkspaceRelativePath(
-        activeFile.relativePath,
-        href
-      );
-
-      if (!targetPath) {
-        setUiError("This internal link could not be resolved.");
-        return;
-      }
-
-      void openWorkspacePageByPath(targetPath).then((opened) => {
-        if (!opened) {
-          toast.error(`No page found for "${targetPath}".`);
-        }
-      });
-    },
-    [
-      activeFile?.relativePath,
-      flushPendingEditorContent,
-      openWorkspacePageByPath,
-      workspace,
-    ]
-  );
-
-  const exportMarkdownFile = useCallback(() => {
-    if (!activeFile) {
-      return;
-    }
-
-    const nextContent = flushPendingEditorContent();
-
-    downloadTextFile(
-      buildMarkdownExportFileName(activeFile.name, "md"),
-      nextContent,
-      "text/markdown;charset=utf-8"
-    );
-  }, [activeFile, flushPendingEditorContent]);
-
-  const exportHtmlFile = useCallback(() => {
-    if (!activeFile) {
-      return;
-    }
-
-    const nextContent = flushPendingEditorContent();
-
-    downloadTextFile(
-      buildMarkdownExportFileName(activeFile.name, "html"),
-      buildMarkdownExportHtml(activeFile.name, nextContent),
-      "text/html;charset=utf-8"
-    );
-  }, [activeFile, flushPendingEditorContent]);
 
   if (!hydrated) {
     return (
@@ -1965,218 +863,121 @@ export const MarkdownApp = () => {
           insertExternalLinkAction={insertExternalLinkAction}
         />
       ) : (
-        <div className="flex flex-1 flex-col">
-          <div className="pt-3 text-center text-xs text-muted-foreground">
-            <span className="font-semibold text-foreground">Tip:</span> press{" "}
-            <button
-              type="button"
-              onClick={showCommandPalette}
-              className="font-medium text-foreground underline underline-offset-4"
-            >
-              Ctrl/Cmd + K
-            </button>{" "}
-            for quick actions.
-          </div>
-
-          <div className="flex flex-1 items-center justify-center">
-            <div className="flex w-full max-w-3xl flex-col gap-4">
-              <MarkdownEmptyState
-                isDragActive={isDragActive}
-                isBusy={isBusy}
-                canPersistFiles={canPersistFiles}
-                openFileAction={openWithPicker}
-                openFolderAction={openFolderAction}
-                showOpenUrlDialogAction={showOpenUrlDialog}
-                createNewAction={createNewFile}
-              />
-
-              <MarkdownRecentFiles
-                recentFiles={recentFiles}
-                isBusy={isBusy}
-                openingRecentFileId={pendingRecentFileId}
-                openRecentAction={openRecentFileAction}
-                removeRecentAction={removeRecentFile}
-                clearRecentAction={clearRecentFiles}
-              />
-            </div>
-          </div>
-
-          <footer className="pb-3 text-center text-xs text-muted-foreground">
-            <div className="flex flex-col items-center gap-1">
-              <div>
-                Made by{" "}
-                <a
-                  href="https://github.com/steellgold"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 font-medium text-foreground transition-colors hover:text-primary hover:underline"
-                >
-                  Gaëtan H
-                  <ArrowUpRightIcon className="size-3" />
-                </a>
-              </div>
-
-              <div>
-                Contribute on{" "}
-                <a
-                  href="https://github.com/Steellgold/md"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 font-medium text-foreground transition-colors hover:text-primary hover:underline"
-                >
-                  GitHub
-                  <ArrowUpRightIcon className="size-3" />
-                </a>
-              </div>
-            </div>
-          </footer>
-        </div>
+        <MarkdownAppEmptyHome
+          canPersistFiles={canPersistFiles}
+          createNewAction={() => {
+            void createNewFile();
+          }}
+          isBusy={isBusy}
+          isDragActive={isDragActive}
+          openFileAction={openWithPicker}
+          openFolderAction={openFolderAction}
+          openRecentAction={openRecentFileAction}
+          openingRecentFileId={pendingRecentFileId}
+          recentFiles={recentFiles}
+          removeRecentAction={removeRecentFile}
+          clearRecentAction={clearRecentFiles}
+          showCommandPaletteAction={showCommandPalette}
+          showOpenUrlDialogAction={showOpenUrlDialog}
+        />
       )}
 
-      {isPageBusy ? (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-background/80 px-4 backdrop-blur-md">
-          <div className="flex w-full max-w-sm flex-col items-center gap-3 rounded-2xl border bg-background/95 px-6 py-5 text-center shadow-xl">
-            <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <Spinner className="size-5" />
-            </div>
-
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">
-                {effectiveBusyMessage}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {pendingRecentFile && !activeFile
-                  ? "Loading the document into the editor."
-                  : "Please wait a moment."}
-              </p>
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      <MarkdownRemoteSelectionDialog
-        isBusy={isBusy}
-        files={pendingRemoteOpen?.files ?? []}
-        openFileAction={(fileName) => {
-          void openPendingRemoteFile(fileName);
-        }}
-        clearRemoteSelectionAction={clearPendingRemoteOpen}
+      <MarkdownBusyOverlay
+        activeFilePresent={Boolean(activeFile)}
+        message={effectiveBusyMessage}
+        pendingRecentFilePresent={Boolean(pendingRecentFile)}
+        visible={isPageBusy}
       />
 
-      <MarkdownRemotePasswordDialog
-        isBusy={isBusy}
-        isOpen={Boolean(pendingRemoteOpen?.passwordRequired)}
-        onOpenChange={(open) => {
-          if (!open) {
-            clearPendingRemoteOpen();
-          }
+      <MarkdownAppDialogs
+        activeDocumentId={activeDocumentId}
+        activeFileName={activeFile?.name ?? null}
+        canSaveActiveFile={Boolean(!pendingJoinRoomId && canSaveActiveFile)}
+        clearPendingRemoteOpenAction={clearPendingRemoteOpen}
+        clearDocumentAction={clearDocumentAction}
+        collabAccessMode={collabAccessMode}
+        collabAutosaveEnabled={collabAutosaveEnabled}
+        collabInviteToken={collabInviteToken}
+        collabJoinUrl={collabJoinUrl}
+        collabPassword={collabPassword}
+        collabRoomId={collabRoomId}
+        collaborationConnected={collaboration.isConnected}
+        collaborationParticipantsCount={collaboration.participants.length}
+        createNewAction={() => {
+          void createNewFile();
         }}
-        openProtectedFileAction={(password) => {
-          void openPendingRemoteFile(undefined, password);
-        }}
-      />
-
-      <MarkdownOpenUrlDialog
+        exportHtmlAction={exportHtmlFile}
+        exportMarkdownAction={exportMarkdownFile}
+        goHomeAction={goHomeAction}
+        hasActiveFile={Boolean(activeFile)}
+        hasProtectedShare={Boolean(activeFile?.share?.requiresPassword)}
+        insertInternalLinkAction={insertInternalLinkToPathAction}
+        internalLinkTargets={internalLinkTargets}
         isBusy={isBusy}
-        openUrlAction={openFromUrl}
-        open={isOpenUrlDialogOpen}
-        onOpenChange={setIsOpenUrlDialogOpen}
-      />
-
-      <MarkdownShareDialog
-        isBusy={isShareBusy}
-        open={isShareDialogOpen}
-        onOpenChangeAction={(open) => {
+        isCollabBusy={isCollabBusy}
+        isCollabDialogOpen={isCollabDialogOpen}
+        isCommandPaletteOpen={isCommandPaletteOpen}
+        isOpenUrlDialogOpen={isOpenUrlDialogOpen}
+        isShareBusy={isShareBusy}
+        isShareDialogOpen={isShareDialogOpen}
+        onAccessModeChangeAction={setCollabAccessMode}
+        onAutosaveEnabledChangeAction={setCollabAutosaveEnabled}
+        onCollabDialogOpenChangeAction={setIsCollabDialogOpen}
+        onCollabInviteTokenChangeAction={setCollabInviteToken}
+        onCollabPasswordChangeAction={setCollabPassword}
+        onCopyCollaborationLinkAction={() => {
+          void copyCollaborationLinkAction();
+        }}
+        onCopyShareAction={() => {
+          void copyShareUrlAction();
+        }}
+        onOpenRecentAction={openRecentFileAction}
+        onOpenUrlDialogChangeAction={setIsOpenUrlDialogOpen}
+        onRemoveSharePasswordAction={() => {
+          void removeSharePasswordAction();
+        }}
+        onShareDialogOpenChangeAction={(open) => {
           setIsShareDialogOpen(open);
-
           if (!open) {
             setSharePassword("");
           }
         }}
-        onCopyAction={() => {
-          void copyShareUrlAction();
-        }}
-        onPasswordChangeAction={setSharePassword}
-        onRemovePasswordAction={() => {
-          void removeSharePasswordAction();
-        }}
-        onSubmitAction={() => {
+        onSharePasswordChangeAction={setSharePassword}
+        onShareSubmitAction={() => {
           void shareActiveFileAction();
         }}
-        password={sharePassword}
-        shareUrl={shareDialogUrl}
-        hasProtectedShare={Boolean(activeFile?.share?.requiresPassword)}
-        submitLabel={shareDialogSubmitLabel}
-      />
-
-      <MarkdownCollaborationDialog
-        open={isCollabDialogOpen}
-        isBusy={isCollabBusy}
-        roomId={collabRoomId}
-        accessMode={collabAccessMode}
-        inviteToken={collabInviteToken}
-        password={collabPassword}
-        joinUrl={collabJoinUrl}
-        connected={collaboration.isConnected}
-        participantsCount={collaboration.participants.length}
-        canEnableAutosave={Boolean(!pendingJoinRoomId && canSaveActiveFile)}
-        autosaveEnabled={collabAutosaveEnabled}
-        onOpenChangeAction={setIsCollabDialogOpen}
-        onAutosaveEnabledChangeAction={setCollabAutosaveEnabled}
-        onAccessModeChangeAction={setCollabAccessMode}
-        onInviteTokenChangeAction={setCollabInviteToken}
-        onPasswordChangeAction={setCollabPassword}
-        onSubmitAction={() => {
+        onStartCollaborationAction={() => {
           void startCollaborationAction();
         }}
-        onStopAction={stopCollaborationAction}
-        onCopyLinkAction={() => {
-          void copyCollaborationLinkAction();
-        }}
-      />
-
-      <MarkdownCommandPalette
-        open={isCommandPaletteOpen}
-        onOpenChange={setIsCommandPaletteOpen}
-        activeDocumentId={activeDocumentId}
-        activeFileName={activeFile?.name ?? null}
+        onStopCollaborationAction={stopCollaborationAction}
         openDocuments={openDocuments}
-        recentFiles={recentFiles}
-        viewMode={viewMode}
-        canSaveActiveFile={
-          activeFile?.source === "picker" ||
-          activeFile?.source === "drop" ||
-          activeFile?.source === "folder"
-        }
-        hasActiveFile={Boolean(activeFile)}
-        isBusy={isBusy || isShareBusy}
         openFileAction={() => {
           void openWithPicker();
         }}
         openFolderAction={openFolderAction}
-        openUrlDialogAction={showOpenUrlDialog}
-        createNewAction={() => {
-          void createNewFile();
+        openPendingRemoteFileAction={(fileName, password) => {
+          void openPendingRemoteFile(fileName, password);
+        }}
+        openUrlAction={openFromUrl}
+        pendingRemoteFiles={pendingRemoteOpen?.files ?? []}
+        pendingRemotePasswordRequired={Boolean(pendingRemoteOpen?.passwordRequired)}
+        recentFiles={recentFiles}
+        refreshFileAction={() => {
+          void handleRefresh();
         }}
         saveFileAction={() => {
           void saveActiveFileAction();
         }}
-        shareActionLabel={shareActionLabel}
-        shareFileAction={openShareDialogAction}
-        refreshFileAction={() => {
-          void handleRefresh();
-        }}
-        exportMarkdownAction={exportMarkdownFile}
-        exportHtmlAction={exportHtmlFile}
-        goHomeAction={goHomeAction}
-        closeDocumentAction={clearDocumentAction}
-        internalLinkTargets={internalLinkTargets}
-        insertInternalLinkAction={insertInternalLinkToPathAction}
-        openRecentAction={(id) => {
-          openRecentFileAction(id);
-        }}
         setActiveDocumentAction={setActiveDocumentAction}
+        setCommandPaletteOpenAction={setIsCommandPaletteOpen}
         setViewModeAction={setViewMode}
+        shareActionLabel={shareActionLabel}
+        shareDialogSubmitLabel={shareDialogSubmitLabel}
+        shareFileAction={openShareDialogAction}
+        sharePassword={sharePassword}
+        shareUrl={shareDialogUrl}
+        showOpenUrlDialogAction={showOpenUrlDialog}
+        viewMode={viewMode}
       />
     </div>
   );

@@ -35,7 +35,7 @@ type MarkdownOpenUrlDialogProps = {
     fileName?: string
   ) => Promise<MarkdownOpenFromUrlActionResult>;
   children?: ReactNode;
-  onOpenChange?: (open: boolean) => void;
+  onOpenChangeAction?: (open: boolean) => void;
   open?: boolean;
 };
 
@@ -43,7 +43,7 @@ export const MarkdownOpenUrlDialog = ({
   isBusy,
   openUrlAction,
   children,
-  onOpenChange,
+  onOpenChangeAction,
   open: controlledOpen,
 }: MarkdownOpenUrlDialogProps) => {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
@@ -63,7 +63,7 @@ export const MarkdownOpenUrlDialog = ({
       setUncontrolledOpen(nextOpen);
     }
 
-    onOpenChange?.(nextOpen);
+    onOpenChangeAction?.(nextOpen);
 
     if (!nextOpen) {
       resetState();
