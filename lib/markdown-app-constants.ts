@@ -1,0 +1,9 @@
+export const defaultDocumentTitle = ".MD";
+export const LARGE_FILE_THRESHOLD = 20_000;
+export const LARGE_FILE_SYNC_DELAY_MS = 180;
+export const LARGE_FILE_PREVIEW_SYNC_DELAY_MS = 80;
+export const LARGE_FILE_HISTORY_GROUP_WINDOW_MS = 800;
+export const MAX_HISTORY_ENTRIES = 100;
+export const COLLAB_AUTOSAVE_DEBOUNCE_MS = 1200;
+export const COLLAB_SAVE_REMINDER_AFTER_MS = 2.5 * 60 * 1000;
+export const COLLAB_SAVE_REMINDER_CHANGE_THRESHOLD = 100;

@@ -2,7 +2,7 @@
 
 import { rehypeMarkdownViewerSelection } from "@/lib/markdown-viewer-selection";
 import { remarkAlphaOrderedLists } from "@/lib/remark-alpha-ordered-lists";
-import { isInternalMarkdownLink } from "@/lib/markdown-file-system";
+import { isInternalMarkdownLink } from "@/lib/parsing/workspace-links";
 import { cn } from "@/lib/utils";
 import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection";
 import { useTheme } from "next-themes";

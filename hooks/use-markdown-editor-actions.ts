@@ -15,7 +15,7 @@ import {
 import {
   buildRelativeWorkspaceLink,
   resolveWorkspaceRelativePath,
-} from "@/lib/markdown-file-system";
+} from "@/lib/parsing/workspace-links";
 import { useCallback, type RefObject } from "react";
 import { toast } from "sonner";
 
