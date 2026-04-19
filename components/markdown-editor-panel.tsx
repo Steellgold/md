@@ -8,12 +8,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import {
   InputGroup,
   InputGroupAddon,
+  InputGroupInput,
   InputGroupTextarea,
 } from "@/components/ui/input-group";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   continueListOnEnterAction,
   indentListOnTabAction,
@@ -33,7 +38,11 @@ import {
 } from "@/types/markdown";
 import {
   BoldIcon,
+  CaseSensitiveIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   ChevronDownIcon,
+  ChevronUpIcon,
   Code2Icon,
   FileCode2Icon,
   Heading1Icon,
@@ -44,9 +53,10 @@ import {
   ListTodoIcon,
   PencilIcon,
   Redo2Icon,
+  RegexIcon,
   SearchIcon,
   Undo2Icon,
-  XIcon,
+  WholeWordIcon
 } from "lucide-react";
 import {
   ChangeEvent,
@@ -129,29 +139,64 @@ type SearchMatch = {
   end: number;
 };
 
-const buildSearchMatches = (value: string, query: string): SearchMatch[] => {
-  const normalizedQuery = query.trim().toLocaleLowerCase();
+type SearchOptions = {
+  matchCase: boolean;
+  matchWholeWord: boolean;
+  useRegularExpression: boolean;
+};
+
+const escapeRegularExpression = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const buildSearchExpression = (query: string, options: SearchOptions) => {
+  const normalizedQuery = query.trim();
 
   if (!normalizedQuery) {
+    return null;
+  }
+
+  const source = options.useRegularExpression
+    ? normalizedQuery
+    : escapeRegularExpression(normalizedQuery);
+  const wholeWordSource = options.matchWholeWord
+    ? `\\b(?:${source})\\b`
+    : source;
+
+  try {
+    return new RegExp(wholeWordSource, `${options.matchCase ? "g" : "gi"}u`);
+  } catch {
+    return null;
+  }
+};
+
+const buildSearchMatches = (
+  value: string,
+  query: string,
+  options: SearchOptions
+): SearchMatch[] => {
+  const expression = buildSearchExpression(query, options);
+
+  if (!expression) {
     return [];
   }
 
-  const normalizedValue = value.toLocaleLowerCase();
   const matches: SearchMatch[] = [];
-  let searchIndex = 0;
+  let match = expression.exec(value);
 
-  while (searchIndex < normalizedValue.length) {
-    const matchIndex = normalizedValue.indexOf(normalizedQuery, searchIndex);
+  while (match) {
+    const matchText = match[0] ?? "";
+    const start = match.index;
+    const end = start + matchText.length;
+    matches.push({
+      start,
+      end,
+    });
 
-    if (matchIndex === -1) {
-      break;
+    if (matchText.length === 0) {
+      expression.lastIndex += 1;
     }
 
-    matches.push({
-      start: matchIndex,
-      end: matchIndex + normalizedQuery.length,
-    });
-    searchIndex = matchIndex + Math.max(normalizedQuery.length, 1);
+    match = expression.exec(value);
   }
 
   return matches;
@@ -224,10 +269,15 @@ export const MarkdownEditorPanel = ({
   const [remoteMarkers, setRemoteMarkers] = useState<RemoteMarker[]>([]);
   const [searchableContent, setSearchableContent] = useState(content);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isReplaceOpen, setIsReplaceOpen] = useState(false);
+  const [isReplaceExpanded, setIsReplaceExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [replaceValue, setReplaceValue] = useState("");
   const [activeSearchMatchIndex, setActiveSearchMatchIndex] = useState(-1);
+  const [searchOptions, setSearchOptions] = useState<SearchOptions>({
+    matchCase: false,
+    matchWholeWord: false,
+    useRegularExpression: false,
+  });
   const actionMap = {
     undoAction,
     redoAction,
@@ -241,11 +291,17 @@ export const MarkdownEditorPanel = ({
     taskListAction,
   };
   const searchMatches = useMemo(
-    () => buildSearchMatches(searchableContent, searchQuery),
-    [searchQuery, searchableContent]
+    () => buildSearchMatches(searchableContent, searchQuery, searchOptions),
+    [searchOptions, searchQuery, searchableContent]
+  );
+  const searchExpression = useMemo(
+    () => buildSearchExpression(searchQuery, searchOptions),
+    [searchOptions, searchQuery]
   );
   const activeSearchMatch =
     activeSearchMatchIndex >= 0 ? searchMatches[activeSearchMatchIndex] : null;
+  const hasInvalidSearchExpression =
+    searchQuery.trim().length > 0 && searchExpression === null;
 
   useEffect(() => {
     const topbarElement = topbarRef.current;
@@ -343,7 +399,7 @@ export const MarkdownEditorPanel = ({
   }, []);
 
   const openSearch = useCallback(
-    (options?: { openReplace?: boolean }) => {
+    (options?: { openReplace?: boolean; toggle?: boolean }) => {
       const editorElement = editorRef.current;
       const selectedText = editorElement
         ? editorElement.value
@@ -351,10 +407,17 @@ export const MarkdownEditorPanel = ({
             .trim()
         : "";
 
+      if (options?.toggle && isSearchOpen) {
+        setIsSearchOpen(false);
+        setActiveSearchMatchIndex(-1);
+        editorRef.current?.focus();
+        return;
+      }
+
       setIsSearchOpen(true);
-      setIsReplaceOpen((currentValue) =>
-        options?.openReplace ? true : currentValue
-      );
+      if (options?.openReplace) {
+        setIsReplaceExpanded(true);
+      }
 
       if (selectedText) {
         setSearchQuery(selectedText);
@@ -362,12 +425,11 @@ export const MarkdownEditorPanel = ({
 
       focusSearchField(Boolean(options?.openReplace));
     },
-    [editorRef, focusSearchField]
+    [editorRef, focusSearchField, isSearchOpen]
   );
 
   const closeSearch = useCallback(() => {
     setIsSearchOpen(false);
-    setIsReplaceOpen(false);
     setActiveSearchMatchIndex(-1);
     editorRef.current?.focus();
   }, [editorRef]);
@@ -499,6 +561,10 @@ export const MarkdownEditorPanel = ({
 
   useEffect(() => {
     const handleWindowKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat) {
+        return;
+      }
+
       const isPrimaryModifier = event.ctrlKey || event.metaKey;
 
       if (!isPrimaryModifier || event.altKey) {
@@ -509,7 +575,7 @@ export const MarkdownEditorPanel = ({
 
       if (key === "f") {
         event.preventDefault();
-        openSearch();
+        openSearch({ toggle: true });
         return;
       }
 
@@ -621,13 +687,18 @@ export const MarkdownEditorPanel = ({
 
   const handleEditorKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.repeat) {
+        return;
+      }
+
       if (
         (event.ctrlKey || event.metaKey) &&
         !event.altKey &&
         event.key.toLowerCase() === "f"
       ) {
         event.preventDefault();
-        openSearch();
+        event.stopPropagation();
+        openSearch({ toggle: true });
         return;
       }
 
@@ -637,6 +708,7 @@ export const MarkdownEditorPanel = ({
         event.key.toLowerCase() === "h"
       ) {
         event.preventDefault();
+        event.stopPropagation();
         openSearch({ openReplace: true });
         return;
       }
@@ -807,22 +879,248 @@ export const MarkdownEditorPanel = ({
                     </DropdownMenuContent>
                   </DropdownMenu>
 
-                  <Button
-                    variant={isSearchOpen ? "secondary" : "ghost"}
-                    size="icon-sm"
-                    onClick={() => {
-                      if (isSearchOpen) {
-                        closeSearch();
-                        return;
-                      }
+                  <Popover open={isSearchOpen} onOpenChange={setIsSearchOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={isSearchOpen ? "secondary" : "ghost"}
+                        size="icon-sm"
+                        onClick={() => {
+                          void openSearch({ toggle: true });
+                        }}
+                        title="Find"
+                        aria-label="Find"
+                      >
+                        <SearchIcon />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      align="end"
+                      side="bottom"
+                      sideOffset={10}
+                      className="w-full gap-2 p-2"
+                    >
+                      <div className="flex flex-col gap-2">
+                        <InputGroup className="h-9">
+                          <InputGroupInput
+                            ref={searchInputRef}
+                            value={searchQuery}
+                            onChange={(event) => {
+                              setSearchQuery(event.target.value);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                jumpToSearchMatch(
+                                  event.shiftKey ? "previous" : "next"
+                                );
+                                return;
+                              }
 
-                      openSearch();
-                    }}
-                    title="Find"
-                    aria-label="Find"
-                  >
-                    <SearchIcon />
-                  </Button>
+                              if (event.key === "Escape") {
+                                event.preventDefault();
+                                closeSearch();
+                              }
+                            }}
+                            placeholder="Find"
+                            className="min-w-0"
+                          />
+
+                          <InputGroupAddon align="inline-end" className="gap-1">
+                            <ButtonGroup>
+                              <Button
+                                variant={searchOptions.matchCase ? "default" : "outline"}
+                                size="icon-sm"
+                                title="Match Case"
+                                aria-label="Match Case"
+                                onClick={() => {
+                                  setSearchOptions((currentValue) => ({
+                                    ...currentValue,
+                                    matchCase: !currentValue.matchCase,
+                                  }));
+                                  focusSearchField(false);
+                                }}
+                              >
+                                <CaseSensitiveIcon />
+                              </Button>
+
+                              <Button
+                                variant={searchOptions.matchWholeWord ? "default" : "outline"}
+                                size="icon-sm"
+                                title="Match Whole Word"
+                                aria-label="Match Whole Word"
+                                onClick={() => {
+                                  setSearchOptions((currentValue) => ({
+                                    ...currentValue,
+                                    matchWholeWord:
+                                      !currentValue.matchWholeWord,
+                                  }));
+                                  focusSearchField(false);
+                                }}
+                              >
+                                <WholeWordIcon />
+                              </Button>
+
+                              <Button
+                                variant={searchOptions.useRegularExpression ? "default" : "outline"}
+                                size="icon-sm"
+                                title="Use Regular Expression"
+                                aria-label="Use Regular Expression"
+                                onClick={() => {
+                                  setSearchOptions((currentValue) => ({
+                                    ...currentValue,
+                                    useRegularExpression:
+                                      !currentValue.useRegularExpression,
+                                  }));
+                                  focusSearchField(false);
+                                }}
+                              >
+                                <RegexIcon />
+                              </Button>
+                            </ButtonGroup>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              title={
+                                isReplaceExpanded
+                                  ? "Hide Replace"
+                                  : "Show Replace"
+                              }
+                              aria-label={
+                                isReplaceExpanded
+                                  ? "Hide Replace"
+                                  : "Show Replace"
+                              }
+                              onClick={() => {
+                                setIsReplaceExpanded((currentValue) => {
+                                  const nextValue = !currentValue;
+
+                                  if (nextValue) {
+                                    focusSearchField(true);
+                                  } else {
+                                    focusSearchField(false);
+                                  }
+
+                                  return nextValue;
+                                });
+                              }}
+                            >
+                              {isReplaceExpanded ? (
+                                <ChevronUpIcon />
+                              ) : (
+                                <ChevronDownIcon />
+                              )}
+                            </Button>
+                          </InputGroupAddon>
+                        </InputGroup>
+
+                        {isReplaceExpanded ? (
+                          <InputGroup className="h-9">
+                            <InputGroupInput
+                              ref={replaceInputRef}
+                              value={replaceValue}
+                              onChange={(event) => {
+                                setReplaceValue(event.target.value);
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  replaceCurrentSearchMatch();
+                                  return;
+                                }
+
+                                if (event.key === "Escape") {
+                                  event.preventDefault();
+                                  closeSearch();
+                                }
+                              }}
+                              placeholder="Replace"
+                              className="min-w-0"
+                            />
+                            <InputGroupAddon
+                              align="inline-end"
+                              className="gap-1"
+                            >
+                              <ButtonGroup>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={replaceCurrentSearchMatch}
+                                  disabled={
+                                    searchMatches.length === 0 ||
+                                    hasInvalidSearchExpression
+                                  }
+                                >
+                                  Replace
+                                </Button>
+
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={replaceAllSearchMatches}
+                                  disabled={
+                                    searchMatches.length === 0 ||
+                                    hasInvalidSearchExpression
+                                  }
+                                >
+                                  Replace all
+                                </Button>
+                              </ButtonGroup>
+                            </InputGroupAddon>
+                          </InputGroup>
+                        ) : null}
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div
+                          className={cn(
+                            "text-xs",
+                            hasInvalidSearchExpression
+                              ? "text-destructive"
+                              : searchQuery.trim() && searchMatches.length === 0
+                                ? "text-amber-600 dark:text-amber-400"
+                                : "text-muted-foreground"
+                          )}
+                        >
+                          {hasInvalidSearchExpression
+                            ? "Invalid regular expression."
+                            : searchQuery.trim()
+                              ? searchMatches.length === 0
+                                ? "No match found in the current document."
+                                : `${activeSearchMatchIndex >= 0 ? activeSearchMatchIndex + 1 : 0}/${searchMatches.length} · ${searchMatches.length} result${searchMatches.length > 1 ? "s" : ""}`
+                              : null}
+                        </div>
+
+                        <ButtonGroup>
+                          <Button
+                            variant="outline"
+                            size="icon-sm"
+                            title="Previous Match"
+                            aria-label="Previous Match"
+                            onClick={() => jumpToSearchMatch("previous")}
+                            disabled={
+                              searchMatches.length === 0 ||
+                              hasInvalidSearchExpression
+                            }
+                          >
+                            <ChevronLeftIcon />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon-sm"
+                            title="Next Match"
+                            aria-label="Next Match"
+                            onClick={() => jumpToSearchMatch("next")}
+                            disabled={
+                              searchMatches.length === 0 ||
+                              hasInvalidSearchExpression
+                            }
+                          >
+                            <ChevronRightIcon />
+                          </Button>
+                        </ButtonGroup>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
 
                   {quickActions.map((item) => {
                     const Icon = item.icon;
@@ -842,148 +1140,6 @@ export const MarkdownEditorPanel = ({
                   })}
                 </ButtonGroup>
               </div>
-
-              {isSearchOpen ? (
-                <div className="flex w-full flex-col gap-2 rounded-lg border bg-background/80 p-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="relative min-w-[220px] flex-1">
-                      <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        ref={searchInputRef}
-                        value={searchQuery}
-                        onChange={(event) => {
-                          setSearchQuery(event.target.value);
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            event.preventDefault();
-                            jumpToSearchMatch(
-                              event.shiftKey ? "previous" : "next"
-                            );
-                            return;
-                          }
-
-                          if (event.key === "Escape") {
-                            event.preventDefault();
-                            closeSearch();
-                          }
-                        }}
-                        placeholder="Find in document..."
-                        className="pl-8"
-                      />
-                    </div>
-
-                    <div className="min-w-14 text-center text-xs text-muted-foreground">
-                      {searchQuery.trim()
-                        ? searchMatches.length > 0 && activeSearchMatch
-                          ? `${activeSearchMatchIndex + 1}/${searchMatches.length}`
-                          : `0/${searchMatches.length}`
-                        : "0/0"}
-                    </div>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => jumpToSearchMatch("previous")}
-                      disabled={searchMatches.length === 0}
-                    >
-                      Prev
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => jumpToSearchMatch("next")}
-                      disabled={searchMatches.length === 0}
-                    >
-                      Next
-                    </Button>
-
-                    <Button
-                      variant={isReplaceOpen ? "secondary" : "outline"}
-                      size="sm"
-                      onClick={() => {
-                        setIsReplaceOpen((currentValue) => !currentValue);
-
-                        if (!isReplaceOpen) {
-                          focusSearchField(true);
-                        }
-                      }}
-                    >
-                      Replace
-                    </Button>
-
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={closeSearch}
-                      aria-label="Close find bar"
-                      title="Close find bar"
-                    >
-                      <XIcon />
-                    </Button>
-                  </div>
-
-                  {isReplaceOpen ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Input
-                        ref={replaceInputRef}
-                        value={replaceValue}
-                        onChange={(event) => {
-                          setReplaceValue(event.target.value);
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter") {
-                            event.preventDefault();
-                            replaceCurrentSearchMatch();
-                            return;
-                          }
-
-                          if (event.key === "Escape") {
-                            event.preventDefault();
-                            closeSearch();
-                          }
-                        }}
-                        placeholder="Replace with..."
-                        className="min-w-[220px] flex-1"
-                      />
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={replaceCurrentSearchMatch}
-                        disabled={searchMatches.length === 0}
-                      >
-                        Replace
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={replaceAllSearchMatches}
-                        disabled={searchMatches.length === 0}
-                      >
-                        Replace all
-                      </Button>
-                    </div>
-                  ) : null}
-
-                  <div
-                    className={cn(
-                      "text-xs",
-                      searchQuery.trim() && searchMatches.length === 0
-                        ? "text-amber-600 dark:text-amber-400"
-                        : "text-muted-foreground"
-                    )}
-                  >
-                    {searchQuery.trim()
-                      ? searchMatches.length === 0
-                        ? "No match found in the current document."
-                        : "Use Enter or the buttons to jump between matches."
-                      : "Use Ctrl/Cmd + F to search and Ctrl/Cmd + H to open replace."}
-                  </div>
-                </div>
-              ) : null}
             </div>
           </InputGroupAddon>
 
