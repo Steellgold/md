@@ -219,7 +219,7 @@ export const MarkdownToolbar = ({
   return (
     <div className="border-b bg-background/80 px-4 py-3 backdrop-blur">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="rounded-lg ring-1 ring-border rounded-l-xl px-2 pr-2 py-1 flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <Button
             variant="outline"
             size="icon"
