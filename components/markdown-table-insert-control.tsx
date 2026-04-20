@@ -45,7 +45,7 @@ export const MarkdownTableInsertControl = ({
     >
       <PopoverTrigger asChild>
         <Button
-          variant="ghost"
+          variant="outline"
           size="icon-sm"
           title="Insert table"
           aria-label="Insert table"

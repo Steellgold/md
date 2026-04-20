@@ -1,36 +1,23 @@
 "use client";
 
-import { MarkdownSearchPopover } from "@/components/markdown-search-popover";
-import { MarkdownTableInsertControl } from "@/components/markdown-table-insert-control";
 import { Button } from "@/components/ui/button";
-import { ButtonGroup } from "@/components/ui/button-group";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { InputGroupAddon } from "@/components/ui/input-group";
-import { buildActiveDocumentMeta } from "@/lib/markdown-helpers";
+import { type MarkdownDocumentStats, type RecentMarkdownFile } from "@/types/markdown";
 import {
-  type MarkdownDocumentStats,
-  type RecentMarkdownFile,
-} from "@/types/markdown";
-import {
-  BoldIcon,
-  ChevronDownIcon,
-  Code2Icon,
-  FileCode2Icon,
-  Heading1Icon,
-  ItalicIcon,
-  LinkIcon,
-  ListIcon,
+  BoldIcon, ChevronDownIcon, Code2Icon,
+  FileCode2Icon, Heading1Icon, ItalicIcon, LinkIcon, ListIcon,
   ListOrderedIcon,
   ListTodoIcon,
+  type LucideIcon,
   Redo2Icon,
-  Undo2Icon,
+  Undo2Icon
 } from "lucide-react";
+
 import { RefObject } from "react";
+import { MarkdownSearchPopover } from "./markdown-search-popover";
+import { MarkdownTableInsertControl } from "./markdown-table-insert-control";
+import { ButtonGroup } from "./ui/button-group";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./ui/dropdown-menu";
 
 type MarkdownEditorToolbarProps = {
   activeFile: RecentMarkdownFile;
@@ -83,9 +70,12 @@ type MarkdownEditorToolbarProps = {
   };
 };
 
-const quickActions = [
+const historyActions = [
   { label: "Undo", icon: Undo2Icon, actionKey: "undoAction" },
   { label: "Redo", icon: Redo2Icon, actionKey: "redoAction" },
+] as const;
+
+const formatActions = [
   { label: "Bold", icon: BoldIcon, actionKey: "boldAction" },
   { label: "Italic", icon: ItalicIcon, actionKey: "italicAction" },
   { label: "Inline code", icon: Code2Icon, actionKey: "inlineCodeAction" },
@@ -94,16 +84,8 @@ const quickActions = [
 
 const listActions = [
   { label: "Bullet list", icon: ListIcon, actionKey: "bulletListAction" },
-  {
-    label: "Numbered list",
-    icon: ListOrderedIcon,
-    actionKey: "orderedListAction",
-  },
-  {
-    label: "Lettered list",
-    icon: ListOrderedIcon,
-    actionKey: "alphaListAction",
-  },
+  { label: "Numbered list", icon: ListOrderedIcon, actionKey: "orderedListAction" },
+  { label: "Lettered list", icon: ListOrderedIcon, actionKey: "alphaListAction" },
   { label: "Checklist", icon: ListTodoIcon, actionKey: "taskListAction" },
 ] as const;
 
@@ -130,160 +112,160 @@ export const MarkdownEditorToolbar = ({
     taskListAction: actions.taskListAction,
   };
 
+  const renderIconActions = (
+    items: readonly {
+      label: string;
+      icon: LucideIcon;
+      actionKey: keyof typeof actionMap;
+    }[]
+  ) =>
+    items.map((item) => {
+      const Icon = item.icon;
+      return (
+        <Button
+          key={item.label}
+          variant="outline"
+          size="icon-sm"
+          onClick={actionMap[item.actionKey]}
+          title={item.label}
+          aria-label={item.label}
+        >
+          <Icon />
+        </Button>
+      );
+    });
+
   return (
     <InputGroupAddon
       ref={topbarRef}
       align="block-start"
-      className="cursor-default border-b px-6 py-3"
+      className="cursor-default border-b px-3 py-3"
     >
-      <div className="flex w-full flex-col gap-3">
-        <div className="flex w-full flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="truncate text-sm font-medium">{activeFile.name}</div>
-            <div className="truncate text-xs text-muted-foreground">
-              {buildActiveDocumentMeta(stats, activeFile)}
-            </div>
-          </div>
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <ButtonGroup className="flex-1">
+          {renderIconActions(historyActions)}
+        </ButtonGroup>
 
-          <ButtonGroup className="max-w-full flex-wrap">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  title="Heading level"
-                  aria-label="Heading level"
+        <ButtonGroup>
+          {renderIconActions(formatActions)}
+        </ButtonGroup>
+
+        <ButtonGroup>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                title="Heading level"
+                aria-label="Heading level"
+              >
+                <Heading1Icon />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-40">
+              {headingLevels.map((level) => (
+                <DropdownMenuItem
+                  key={level}
+                  onSelect={() => actions.headingAction(level)}
                 >
                   <Heading1Icon />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-40">
-                {headingLevels.map((level) => (
+                  Heading {level}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                title="List type"
+                aria-label="List type"
+              >
+                <ListIcon />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-44">
+              {listActions.map((item) => {
+                const Icon = item.icon;
+                return (
                   <DropdownMenuItem
-                    key={level}
-                    onSelect={() => actions.headingAction(level)}
+                    key={item.label}
+                    onSelect={actionMap[item.actionKey]}
                   >
-                    <Heading1Icon />
-                    Heading {level}
+                    <Icon />
+                    {item.label}
                   </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
+          <MarkdownTableInsertControl
+            onInsertAction={actions.insertTableAction}
+          />
+        </ButtonGroup>
+
+        <ButtonGroup>
+          <Button
+            variant="outline"
+            size="icon-sm"
+            title="Insert external link"
+            aria-label="Insert external link"
+            onClick={actions.insertExternalLinkAction}
+          >
+            <LinkIcon />
+          </Button>
+
+          {internalLinkTargets.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  title="List type"
-                  aria-label="List type"
-                >
-                  <ListIcon />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-44">
-                {listActions.map((item) => {
-                  const Icon = item.icon;
-
-                  return (
-                    <DropdownMenuItem
-                      key={item.label}
-                      onSelect={actionMap[item.actionKey]}
-                    >
-                      <Icon />
-                      {item.label}
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <MarkdownTableInsertControl
-              onInsertAction={actions.insertTableAction}
-            />
-
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              title="Insert external link"
-              aria-label="Insert external link"
-              onClick={actions.insertExternalLinkAction}
-            >
-              <LinkIcon />
-            </Button>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
+                  variant="outline"
                   size="icon-sm"
                   title="Insert workspace page link"
                   aria-label="Insert workspace page link"
-                  disabled={internalLinkTargets.length === 0}
                 >
                   <ChevronDownIcon />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-64">
-                {internalLinkTargets.length > 0 ? (
-                  internalLinkTargets.map((relativePath) => (
-                    <DropdownMenuItem
-                      key={relativePath}
-                      onSelect={() => actions.insertInternalLinkAction(relativePath)}
-                    >
-                      <LinkIcon />
-                      <span className="truncate">{relativePath}</span>
-                    </DropdownMenuItem>
-                  ))
-                ) : (
-                  <DropdownMenuItem disabled>
+                {internalLinkTargets.map((relativePath) => (
+                  <DropdownMenuItem
+                    key={relativePath}
+                    onSelect={() => actions.insertInternalLinkAction(relativePath)}
+                  >
                     <LinkIcon />
-                    No other workspace pages
+                    <span className="truncate">{relativePath}</span>
                   </DropdownMenuItem>
-                )}
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
+          )}
+        </ButtonGroup>
 
-            <MarkdownSearchPopover
-              activeSearchMatchIndex={search.activeSearchMatchIndex}
-              hasInvalidSearchExpression={search.hasInvalidSearchExpression}
-              isReplaceExpanded={search.isReplaceExpanded}
-              isSearchOpen={search.isSearchOpen}
-              jumpToSearchMatchAction={search.jumpToSearchMatch}
-              onOpenChangeAction={search.setSearchOpen}
-              onReplaceValueChangeAction={search.setReplaceValue}
-              onSearchQueryChangeAction={search.setSearchQuery}
-              openSearchAction={search.openSearch}
-              replaceCurrentSearchMatchAction={search.replaceCurrentSearchMatch}
-              replaceAllSearchMatchesAction={search.replaceAllSearchMatches}
-              replaceInputRef={search.replaceInputRef}
-              replaceValue={search.replaceValue}
-              searchInputRef={search.searchInputRef}
-              searchMatchesCount={search.searchMatches.length}
-              searchOptions={search.searchOptions}
-              searchQuery={search.searchQuery}
-              toggleReplaceExpandedAction={search.toggleReplaceExpanded}
-              toggleSearchOptionAction={search.toggleSearchOption}
-            />
-
-            {quickActions.map((item) => {
-              const Icon = item.icon;
-
-              return (
-                <Button
-                  key={item.label}
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={actionMap[item.actionKey]}
-                  title={item.label}
-                  aria-label={item.label}
-                >
-                  <Icon />
-                </Button>
-              );
-            })}
-          </ButtonGroup>
-        </div>
+        <MarkdownSearchPopover
+          activeSearchMatchIndex={search.activeSearchMatchIndex}
+          hasInvalidSearchExpression={search.hasInvalidSearchExpression}
+          isReplaceExpanded={search.isReplaceExpanded}
+          isSearchOpen={search.isSearchOpen}
+          jumpToSearchMatchAction={search.jumpToSearchMatch}
+          onOpenChangeAction={search.setSearchOpen}
+          onReplaceValueChangeAction={search.setReplaceValue}
+          onSearchQueryChangeAction={search.setSearchQuery}
+          openSearchAction={search.openSearch}
+          replaceCurrentSearchMatchAction={search.replaceCurrentSearchMatch}
+          replaceAllSearchMatchesAction={search.replaceAllSearchMatches}
+          replaceInputRef={search.replaceInputRef}
+          replaceValue={search.replaceValue}
+          searchInputRef={search.searchInputRef}
+          searchMatchesCount={search.searchMatches.length}
+          searchOptions={search.searchOptions}
+          searchQuery={search.searchQuery}
+          toggleReplaceExpandedAction={search.toggleReplaceExpanded}
+          toggleSearchOptionAction={search.toggleSearchOption}
+        />
       </div>
     </InputGroupAddon>
   );

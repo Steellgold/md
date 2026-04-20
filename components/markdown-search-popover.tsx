@@ -2,27 +2,10 @@
 
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import {
-  CaseSensitiveIcon,
-  ChevronDownIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  ChevronUpIcon,
-  RegexIcon,
-  SearchIcon,
-  WholeWordIcon,
-} from "lucide-react";
+import { CaseSensitiveIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, RegexIcon, SearchIcon, WholeWordIcon } from "lucide-react";
 import { RefObject } from "react";
 
 type MarkdownSearchPopoverProps = {
@@ -78,7 +61,7 @@ export const MarkdownSearchPopover = ({
     <Popover open={isSearchOpen} onOpenChange={onOpenChangeAction}>
       <PopoverTrigger asChild>
         <Button
-          variant={isSearchOpen ? "secondary" : "ghost"}
+          variant={isSearchOpen ? "secondary" : "outline"}
           size="icon-sm"
           onClick={() => {
             void openSearchAction({ toggle: true });
