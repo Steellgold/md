@@ -33,7 +33,7 @@ const buildHtmlDocument = (title: string, body: string) => `<!DOCTYPE html>
       main {
         max-width: 860px;
         margin: 0 auto;
-        padding: 48px 24px 80px;
+        padding: 12px 24px 56px;
       }
 
       article {
@@ -150,6 +150,18 @@ const buildHtmlDocument = (title: string, body: string) => `<!DOCTYPE html>
           border-color: rgba(82, 82, 91, 0.9);
         }
       }
+
+      @media print {
+        body {
+          background: #ffffff;
+          color: #111827;
+        }
+
+        main {
+          max-width: none;
+          padding: 0;
+        }
+      }
     </style>
   </head>
   <body>
@@ -162,7 +174,7 @@ const buildHtmlDocument = (title: string, body: string) => `<!DOCTYPE html>
 
 export const buildMarkdownExportFileName = (
   fileName: string | undefined,
-  extension: "md" | "html"
+  extension: "md" | "html" | "pdf"
 ) => {
   const safeName = (fileName?.trim() || "untitled").replace(/\.[^.]+$/u, "");
   return `${safeName}.${extension}`;
@@ -194,4 +206,51 @@ export const downloadTextFile = (
   window.setTimeout(() => {
     URL.revokeObjectURL(objectUrl);
   }, 0);
+};
+
+export const printHtmlAsPdf = (title: string, htmlDocument: string) => {
+  const iframe = document.createElement("iframe");
+
+  iframe.style.position = "fixed";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  iframe.style.opacity = "0";
+  iframe.setAttribute("aria-hidden", "true");
+
+  document.body.appendChild(iframe);
+
+  const iframeDocument =
+    iframe.contentDocument ?? iframe.contentWindow?.document ?? null;
+
+  if (!iframeDocument) {
+    iframe.remove();
+    throw new Error("Unable to create a print context.");
+  }
+
+  iframeDocument.open();
+  iframeDocument.write(htmlDocument);
+  iframeDocument.close();
+
+  const triggerPrint = () => {
+    if (!iframe.contentWindow) {
+      iframe.remove();
+      return;
+    }
+
+    iframe.contentWindow.document.title = title;
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+
+    window.setTimeout(() => {
+      iframe.remove();
+    }, 1_000);
+  };
+
+  if (iframeDocument.readyState === "complete") {
+    triggerPrint();
+    return;
+  }
+
+  iframe.addEventListener("load", triggerPrint, { once: true });
 };

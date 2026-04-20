@@ -24,11 +24,13 @@ import {
 } from "@/types/markdown";
 import {
   ChevronDownIcon, EllipsisIcon,
+  FileCode2Icon,
   HouseIcon,
   LinkIcon,
   MonitorUpIcon,
   PanelLeftIcon,
   PanelRightIcon,
+  PrinterIcon,
   RefreshCcwIcon,
   SaveIcon,
   TypeIcon,
@@ -62,6 +64,8 @@ type MarkdownToolbarProps = {
   collaborators: CollaborationParticipant[];
   collaborationConnected: boolean;
   refreshFileAction: () => void;
+  exportHtmlAction: () => void;
+  exportPdfAction: () => void;
   clearDocumentAction: () => void;
   openRecentAction: (id: string) => void;
   clearRecentAction: () => void;
@@ -100,6 +104,8 @@ export const MarkdownToolbar = ({
   collaborators,
   collaborationConnected,
   refreshFileAction,
+  exportHtmlAction,
+  exportPdfAction,
   clearDocumentAction,
   openRecentAction,
   clearRecentAction,
@@ -367,7 +373,7 @@ export const MarkdownToolbar = ({
             </DropdownMenuTrigger>
 
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>View</DropdownMenuLabel>
+              <DropdownMenuLabel>Preferences</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>
@@ -393,20 +399,10 @@ export const MarkdownToolbar = ({
               </DropdownMenuSub>
 
               <DropdownMenuSeparator />
-              <DropdownMenuLabel>Document actions</DropdownMenuLabel>
-              <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => setIsProfileDialogOpen(true)}>
                 <UserRoundIcon />
                 Profile
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={refreshFileAction}
-                disabled={!activeFile || isBusy}
-              >
-                <RefreshCcwIcon />
-                {refreshLabel}
-              </DropdownMenuItem>
-
               <DropdownMenuCheckboxItem
                 checked={syncScrollEnabled}
                 onCheckedChange={toggleSyncScrollAction}
@@ -415,6 +411,32 @@ export const MarkdownToolbar = ({
                 Sync scrolling
               </DropdownMenuCheckboxItem>
               <DropdownMenuSeparator />
+              <DropdownMenuLabel>Export</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={exportHtmlAction}
+                disabled={!activeFile || isBusy}
+              >
+                <FileCode2Icon />
+                Export as HTML
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={exportPdfAction}
+                disabled={!activeFile || isBusy}
+              >
+                <PrinterIcon />
+                Export as PDF
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Document actions</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={refreshFileAction}
+                disabled={!activeFile || isBusy}
+              >
+                <RefreshCcwIcon />
+                {refreshLabel}
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={clearDocumentAction}
                 disabled={!activeFile}

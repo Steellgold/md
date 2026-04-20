@@ -53,6 +53,7 @@ type MarkdownCommandPaletteProps = {
   refreshFileAction: () => void;
   exportMarkdownAction: () => void;
   exportHtmlAction: () => void;
+  exportPdfAction: () => void;
   goHomeAction: () => void;
   closeDocumentAction: () => void;
   internalLinkTargets: string[];
@@ -106,6 +107,7 @@ export const MarkdownCommandPalette = ({
   refreshFileAction,
   exportMarkdownAction,
   exportHtmlAction,
+  exportPdfAction,
   goHomeAction,
   closeDocumentAction,
   internalLinkTargets,
@@ -196,6 +198,13 @@ export const MarkdownCommandPalette = ({
             >
               <DownloadIcon />
               Export as HTML
+            </CommandItem>
+            <CommandItem
+              onSelect={() => runAction(exportPdfAction)}
+              disabled={!hasActiveFile || isBusy}
+            >
+              <DownloadIcon />
+              Export as PDF
             </CommandItem>
             <CommandItem
               onSelect={() => runAction(goHomeAction)}

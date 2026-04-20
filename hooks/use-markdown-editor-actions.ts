@@ -11,6 +11,7 @@ import {
   buildMarkdownExportFileName,
   buildMarkdownExportHtml,
   downloadTextFile,
+  printHtmlAsPdf,
 } from "@/lib/markdown-export";
 import {
   buildRelativeWorkspaceLink,
@@ -228,6 +229,24 @@ export const useMarkdownEditorActions = ({
     );
   }, [activeFile, flushPendingEditorContentAction]);
 
+  const exportPdfFile = useCallback(() => {
+    if (!activeFile) {
+      return;
+    }
+
+    const nextContent = flushPendingEditorContentAction();
+    const htmlDocument = buildMarkdownExportHtml(activeFile.name, nextContent);
+
+    try {
+      printHtmlAsPdf(
+        buildMarkdownExportFileName(activeFile.name, "pdf"),
+        htmlDocument
+      );
+    } catch {
+      onErrorAction("Unable to open the print dialog for PDF export.");
+    }
+  }, [activeFile, flushPendingEditorContentAction, onErrorAction]);
+
   return {
     alphaListAction,
     boldAction,
@@ -235,6 +254,7 @@ export const useMarkdownEditorActions = ({
     codeBlockAction,
     exportHtmlFile,
     exportMarkdownFile,
+    exportPdfFile,
     headingAction,
     inlineCodeAction,
     insertExternalLinkAction,

@@ -359,6 +359,7 @@ export const MarkdownApp = () => {
     codeBlockAction,
     exportHtmlFile,
     exportMarkdownFile,
+    exportPdfFile,
     headingAction,
     inlineCodeAction,
     insertExternalLinkAction,
@@ -522,6 +523,8 @@ export const MarkdownApp = () => {
           collaborators={collaboration.participants}
           collaborationConnected={collaboration.isConnected}
           refreshFileAction={handleRefresh}
+          exportHtmlAction={exportHtmlFile}
+          exportPdfAction={exportPdfFile}
           clearDocumentAction={clearDocumentAction}
           setActiveDocumentAction={setActiveDocumentAction}
           openWorkspacePageAction={openWorkspacePageAction}
@@ -595,6 +598,7 @@ export const MarkdownApp = () => {
             }}
             exportHtmlAction={exportHtmlFile}
             exportMarkdownAction={exportMarkdownFile}
+            exportPdfAction={exportPdfFile}
             goHomeAction={goHomeAction}
             hasActiveFile={Boolean(activeFile)}
             hasProtectedShare={Boolean(activeFile?.share?.requiresPassword)}

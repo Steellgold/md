@@ -78,6 +78,8 @@ type MarkdownActiveDocumentProps = {
   collaborators: CollaborationParticipant[];
   collaborationConnected: boolean;
   refreshFileAction: () => void;
+  exportHtmlAction: () => void;
+  exportPdfAction: () => void;
   clearDocumentAction: () => void;
   setActiveDocumentAction: (id: string) => void;
   openWorkspacePageAction: (relativePath: string) => void;
@@ -150,6 +152,8 @@ export const MarkdownActiveDocument = ({
   collaborators,
   collaborationConnected,
   refreshFileAction,
+  exportHtmlAction,
+  exportPdfAction,
   clearDocumentAction,
   setActiveDocumentAction,
   openWorkspacePageAction,
@@ -224,6 +228,8 @@ export const MarkdownActiveDocument = ({
         collaborators={collaborators}
         collaborationConnected={collaborationConnected}
         refreshFileAction={refreshFileAction}
+        exportHtmlAction={exportHtmlAction}
+        exportPdfAction={exportPdfAction}
         clearDocumentAction={clearDocumentAction}
         openRecentAction={openRecentAction}
         clearRecentAction={clearRecentAction}
@@ -275,11 +281,11 @@ export const MarkdownActiveDocument = ({
                     orderedListAction={orderedListAction}
                     alphaListAction={alphaListAction}
                     taskListAction={taskListAction}
-                          insertTableAction={insertTableAction}
-                          internalLinkTargets={internalLinkTargets}
-                          insertInternalLinkAction={insertInternalLinkAction}
-                          insertExternalLinkAction={insertExternalLinkAction}
-                        />
+                    insertTableAction={insertTableAction}
+                    internalLinkTargets={internalLinkTargets}
+                    insertInternalLinkAction={insertInternalLinkAction}
+                    insertExternalLinkAction={insertExternalLinkAction}
+                  />
                 </ResizablePanel>
 
                 <ResizableHandle withHandle className="bg-border/80" />

@@ -29,6 +29,7 @@ type MarkdownAppDialogsProps = {
   createNewAction: () => void;
   exportHtmlAction: () => void;
   exportMarkdownAction: () => void;
+  exportPdfAction: () => void;
   goHomeAction: () => void;
   hasActiveFile: boolean;
   hasProtectedShare: boolean;
@@ -99,6 +100,7 @@ export const MarkdownAppDialogs = ({
   createNewAction,
   exportHtmlAction,
   exportMarkdownAction,
+  exportPdfAction,
   goHomeAction,
   hasActiveFile,
   hasProtectedShare,
@@ -235,6 +237,7 @@ export const MarkdownAppDialogs = ({
         refreshFileAction={refreshFileAction}
         exportMarkdownAction={exportMarkdownAction}
         exportHtmlAction={exportHtmlAction}
+        exportPdfAction={exportPdfAction}
         goHomeAction={goHomeAction}
         closeDocumentAction={clearDocumentAction}
         internalLinkTargets={internalLinkTargets}
