@@ -198,6 +198,12 @@ export const useMarkdownCollabFlow = ({
 
   useEffect(() => {
     if (!activeFile) {
+      if (parsedCollabJoin || pendingJoinRoomId || collabAuthToken) {
+        // While joining from a collaboration URL, activeFile can be temporarily
+        // null before the scratch document is created. Keep connection state.
+        return;
+      }
+
       setCollabWsBaseUrl(null);
       setCollabAuthToken(null);
       setCollaborationStartedAt(null);
@@ -217,7 +223,7 @@ export const useMarkdownCollabFlow = ({
       setCollabAuthToken(null);
       setCollabJoinUrl(null);
     }
-  }, [activeFile, collabAuthToken, parsedCollabJoin]);
+  }, [activeFile, collabAuthToken, parsedCollabJoin, pendingJoinRoomId]);
 
   useEffect(() => {
     if (!activeFile?.collab || collabAuthToken || pendingJoinRoomId) {

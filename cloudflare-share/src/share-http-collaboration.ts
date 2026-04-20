@@ -62,9 +62,7 @@ const createCollabJoinUrl = (
   const appUrl = new URL(
     normalizeBaseUrl(appBaseUrl?.trim() || getBaseUrl(request, env))
   );
-  appUrl.pathname = "/";
-  appUrl.searchParams.set("collab", "1");
-  appUrl.searchParams.set("room", room.id);
+  appUrl.pathname = `/c/${encodeURIComponent(room.id)}`;
   appUrl.searchParams.set("access", room.accessMode);
 
   if (room.accessMode === "invite" && inviteToken) {
@@ -264,11 +262,17 @@ export const handleJoinCollaborationRoom = async (
   }
 
   const joinToken = await issueCollaborationJoinToken(env, room.id);
+  const wsBaseUrl = `${getWsBaseUrl(request, env)}/v1/collab/connect`;
+  console.info("[collab] join issued", {
+    roomId: room.id,
+    accessMode: room.accessMode,
+    wsBaseUrl,
+  });
 
   return json({
     connection: {
       roomId: room.id,
-      wsBaseUrl: `${getWsBaseUrl(request, env)}/v1/collab/connect`,
+      wsBaseUrl,
       token: joinToken,
     },
   });
@@ -311,6 +315,10 @@ export const handleCollaborationWebSocket = async (
     roomId,
     new URL(request.url).searchParams.get("token")
   );
+  console.info("[collab] websocket upgrade accepted", {
+    roomId,
+    url: request.url,
+  });
 
   const roomStub = env.COLLAB_ROOMS.get(env.COLLAB_ROOMS.idFromName(roomId));
 

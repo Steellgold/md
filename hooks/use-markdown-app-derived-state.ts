@@ -4,7 +4,7 @@ import { extractMarkdownDeepLink } from "@/lib/markdown-deep-link";
 import { getMarkdownDocumentStats } from "@/lib/markdown-helpers";
 import { getRouteDocumentId } from "@/lib/markdown-app-routing";
 import { isMarkdownShareDirectUrl } from "@/lib/markdown-share";
-import { parseCollaborationJoinParams } from "@/lib/markdown-collaboration";
+import { parseCollaborationJoinFromLocation } from "@/lib/markdown-collaboration";
 import type { MarkdownWorkspace, OpenMarkdownDocument, RecentMarkdownFile } from "@/types/markdown";
 import { useDeferredValue, useMemo } from "react";
 
@@ -61,8 +61,12 @@ export const useMarkdownAppDerivedState = ({
   );
   const routeDocumentId = useMemo(() => getRouteDocumentId(pathname), [pathname]);
   const parsedCollabJoin = useMemo(
-    () => parseCollaborationJoinParams(new URLSearchParams(searchParamsKey)),
-    [searchParamsKey]
+    () =>
+      parseCollaborationJoinFromLocation(
+        pathname,
+        new URLSearchParams(searchParamsKey)
+      ),
+    [pathname, searchParamsKey]
   );
   const collaborativeUserName = useMemo(
     () => collaborationDisplayName.trim() || "Anonymous",

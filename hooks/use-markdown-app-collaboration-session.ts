@@ -177,7 +177,7 @@ export const useMarkdownAppCollaborationSession = ({
   }, [canCollaborativeAutosave, runCollabAutosave]);
 
   const collaboration = useMarkdownCollaboration({
-    enabled: Boolean(activeFile && collabRoomId && collabWsBaseUrl && collabAuthToken),
+    enabled: Boolean(collabRoomId && collabWsBaseUrl && collabAuthToken),
     roomId: collabRoomId || null,
     wsBaseUrl: collabWsBaseUrl,
     authToken: collabAuthToken,

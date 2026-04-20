@@ -119,6 +119,11 @@ export const useMarkdownCollaboration = ({
       connect: true,
     });
     providerRef.current = provider;
+    console.info("[collab] provider:init", {
+      roomId,
+      wsBaseUrl,
+      hasAuthToken: Boolean(authToken),
+    });
 
     const localUserColor =
       assignUniqueCollaborationColors([localUserId]).get(localUserId) ??
@@ -197,6 +202,7 @@ export const useMarkdownCollaboration = ({
 
     const handleSynced = (isSynced: boolean) => {
       setIsConnected(isSynced);
+      console.info("[collab] provider:sync", { roomId, isSynced });
 
       if (!isSynced) {
         return;
@@ -216,6 +222,32 @@ export const useMarkdownCollaboration = ({
     yText.observe(handleContentChange);
     provider.awareness.on("change", handleAwarenessChange);
     provider.on("sync", handleSynced);
+    provider.on("status", (event: { status: "connected" | "disconnected" }) => {
+      const isNowConnected = event.status === "connected";
+      setIsConnected(isNowConnected);
+      console.info("[collab] provider:status", {
+        roomId,
+        status: event.status,
+      });
+    });
+    (provider as unknown as {
+      on?: (event: string, callback: (...args: unknown[]) => void) => void;
+    }).on?.("connection-error", (event: unknown) => {
+      console.error("[collab] provider:connection-error", {
+        roomId,
+        wsBaseUrl,
+        event,
+      });
+    });
+    (provider as unknown as {
+      on?: (event: string, callback: (...args: unknown[]) => void) => void;
+    }).on?.("connection-close", (event: unknown) => {
+      console.warn("[collab] provider:connection-close", {
+        roomId,
+        wsBaseUrl,
+        event,
+      });
+    });
     syncParticipants();
 
     return () => {

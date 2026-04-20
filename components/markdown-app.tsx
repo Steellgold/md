@@ -310,6 +310,7 @@ export const MarkdownApp = () => {
     onSetActiveDocumentAction: setActiveDocument,
     openDocuments,
     pathname,
+    parsedCollabJoin,
     parsedDeepLink,
     routeDocumentId,
     router,

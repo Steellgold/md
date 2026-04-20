@@ -7,6 +7,13 @@ type DeepLink = {
   targetUrl: string;
 } | null;
 
+type ParsedCollabJoin = {
+  roomId: string;
+  accessMode: "open" | "invite" | "password";
+  inviteToken: string | null;
+  fileName: string | null;
+} | null;
+
 type UseMarkdownRouteSyncParams = {
   activeDocumentId: string | null;
   activeFilePresent: boolean;
@@ -19,6 +26,7 @@ type UseMarkdownRouteSyncParams = {
   onSetActiveDocumentAction: (id: string) => void;
   openDocuments: { id: string }[];
   pathname: string;
+  parsedCollabJoin: ParsedCollabJoin;
   parsedDeepLink: DeepLink;
   routeDocumentId: string | null;
   router: {
@@ -39,6 +47,7 @@ export const useMarkdownRouteSync = ({
   onSetActiveDocumentAction,
   openDocuments,
   pathname,
+  parsedCollabJoin,
   parsedDeepLink,
   routeDocumentId,
   router,
@@ -163,7 +172,14 @@ export const useMarkdownRouteSync = ({
       return;
     }
 
-    if (!activeDocumentId && parsedDeepLink) {
+    if (parsedCollabJoin) {
+      // Keep the user on /c/[roomId] during collaborative sessions.
+      // Navigating to /edit/... remounts the page route and can drop
+      // in-memory collaboration bootstrap state on the joiner tab.
+      return;
+    }
+
+    if (!activeDocumentId && (parsedDeepLink || parsedCollabJoin)) {
       return;
     }
 
@@ -189,6 +205,7 @@ export const useMarkdownRouteSync = ({
     buildEditRouteAction,
     hydrated,
     isWorkspaceDocument,
+    parsedCollabJoin,
     parsedDeepLink,
     pathname,
     routeDocumentId,

@@ -10,6 +10,7 @@ const COLLAB_QUERY_ROOM = "room";
 const COLLAB_QUERY_MODE = "access";
 const COLLAB_QUERY_TOKEN = "token";
 const COLLAB_QUERY_FILE_NAME = "name";
+const COLLAB_PATH_PREFIX = "/c/";
 
 const colorPalette = [
   "#3B82F6",
@@ -23,6 +24,13 @@ const colorPalette = [
 ] as const;
 
 const normalizeBaseUrl = (value: string) => value.replace(/\/+$/u, "");
+const decodePathSegment = (value: string) => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
 
 export const createCollaborationToken = (byteLength = 16) => {
   const bytes = crypto.getRandomValues(new Uint8Array(byteLength));
@@ -39,9 +47,7 @@ export const buildCollaborationJoinUrl = (
   session: Pick<CollaborationSession, "roomId" | "accessMode" | "inviteToken">
 ) => {
   const url = new URL(normalizeBaseUrl(baseUrl));
-  url.pathname = "/";
-  url.searchParams.set(COLLAB_QUERY_FLAG, "1");
-  url.searchParams.set(COLLAB_QUERY_ROOM, session.roomId);
+  url.pathname = `${COLLAB_PATH_PREFIX}${encodeURIComponent(session.roomId)}`;
   url.searchParams.set(COLLAB_QUERY_MODE, session.accessMode);
 
   if (session.accessMode === "invite" && session.inviteToken) {
@@ -92,6 +98,44 @@ export const parseCollaborationJoinParams = (
     fileName,
   };
 };
+
+const parsePathBasedCollaborationJoinParams = (
+  pathname: string,
+  searchParams: URLSearchParams
+): ParsedCollaborationJoinParams | null => {
+  if (!pathname.startsWith(COLLAB_PATH_PREFIX)) {
+    return null;
+  }
+
+  const encodedRoomId = pathname.slice(COLLAB_PATH_PREFIX.length).split("/")[0] ?? "";
+  const roomId = decodePathSegment(encodedRoomId).trim();
+  const mode = searchParams.get(COLLAB_QUERY_MODE);
+  const inviteToken = searchParams.get(COLLAB_QUERY_TOKEN)?.trim() ?? null;
+  const fileName = searchParams.get(COLLAB_QUERY_FILE_NAME)?.trim() ?? null;
+  const resolvedMode = isCollaborativeAccessMode(mode) ? mode : "open";
+
+  if (!roomId) {
+    return null;
+  }
+
+  if (resolvedMode === "invite" && !inviteToken) {
+    return null;
+  }
+
+  return {
+    roomId,
+    accessMode: resolvedMode,
+    inviteToken,
+    fileName,
+  };
+};
+
+export const parseCollaborationJoinFromLocation = (
+  pathname: string,
+  searchParams: URLSearchParams
+) =>
+  parsePathBasedCollaborationJoinParams(pathname, searchParams) ??
+  parseCollaborationJoinParams(searchParams);
 
 type CreateCollaborationRoomPayload = {
   accessMode: CollaborativeAccessMode;
