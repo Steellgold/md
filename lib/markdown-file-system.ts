@@ -5,6 +5,7 @@ import { persistRecentEntry, reopenLocalRecentFile } from "@/lib/markdown-file-s
 import {
   createNewMarkdownFile,
   openDroppedMarkdownFiles,
+  openMarkdownWithInputPicker,
   openMarkdownWithPicker,
 } from "@/lib/markdown-local-open";
 import { openMarkdownFromUrl } from "@/lib/markdown-remote-open";
@@ -50,6 +51,7 @@ export {
 export {
   createNewMarkdownFile,
   openDroppedMarkdownFiles,
+  openMarkdownWithInputPicker,
   openMarkdownFromUrl,
   openMarkdownWithPicker,
 };

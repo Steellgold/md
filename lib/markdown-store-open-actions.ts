@@ -4,6 +4,7 @@ import {
   createNewMarkdownFile,
   openDroppedMarkdownFiles,
   openMarkdownFolder,
+  openMarkdownWithInputPicker,
   openMarkdownFromUrl,
   openMarkdownWithPicker,
   openWorkspaceMarkdownPage,
@@ -113,7 +114,12 @@ export const markdownStoreOpenActions = (
     set(getBusyState("Opening file..."));
 
     try {
-      const result = await openMarkdownWithPicker();
+      const preferInputPickerFallback =
+        typeof window !== "undefined" &&
+        window.matchMedia("(pointer: coarse)").matches;
+      const result = preferInputPickerFallback
+        ? await openMarkdownWithInputPicker()
+        : await openMarkdownWithPicker();
 
       if (result.status === "selection-required") {
         set((state) =>

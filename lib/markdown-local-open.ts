@@ -90,6 +90,74 @@ export const openMarkdownWithPicker = async (options: PickerOptions = {}) => {
   };
 };
 
+const pickFilesFromInput = (accept = ".md,.markdown,.mdown,.txt") =>
+  new Promise<File[]>((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = accept;
+    input.multiple = true;
+
+    input.addEventListener("change", () => {
+      resolve(Array.from(input.files ?? []));
+    });
+
+    // If focus returns and no file was selected, treat as canceled.
+    input.addEventListener(
+      "blur",
+      () => {
+        window.setTimeout(() => {
+          if (!input.files || input.files.length === 0) {
+            resolve([]);
+          }
+        }, 0);
+      },
+      { once: true }
+    );
+
+    input.click();
+  });
+
+export const openMarkdownWithInputPicker = async (
+  options: PickerOptions = {}
+) => {
+  const files = await pickFilesFromInput();
+
+  if (files.length === 0) {
+    throw new DOMException("The user aborted a request.", "AbortError");
+  }
+
+  const documents: PendingMarkdownImport[] = [];
+
+  for (const file of files) {
+    const content = normalizeMarkdownContent(await file.text());
+    documents.push({
+      entry: createEntryFromFile(file, content, options.source ?? "picker"),
+      content,
+    });
+  }
+
+  const recentFiles = persistRecentEntries(
+    documents.map((document) => document.entry)
+  );
+
+  if (documents.length === 1) {
+    const [document] = documents;
+
+    return {
+      status: "opened" as const,
+      entry: document.entry,
+      content: document.content,
+      recentFiles,
+    };
+  }
+
+  return {
+    status: "selection-required" as const,
+    documents,
+    recentFiles,
+  };
+};
+
 export const openDroppedMarkdownFiles = async (
   files: File[],
   items?: DataTransferItemList | null
