@@ -22,7 +22,7 @@ type MarkdownUiStore = {
 export const useMarkdownUiStore = create<MarkdownUiStore>()(
   persist(
     (set) => ({
-      viewMode: "split",
+      viewMode: "editor",
       syncScrollEnabled: true,
       recentFilesExpanded: true,
       recentFilesVisibleCount: 9,
