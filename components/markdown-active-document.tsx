@@ -229,8 +229,6 @@ export const MarkdownActiveDocument = ({
         clearRecentAction={clearRecentAction}
         viewMode={viewMode}
         setViewModeAction={setViewModeAction}
-        previewDetached={previewDetached}
-        togglePreviewDetachedAction={togglePreviewDetachedAction}
         syncScrollEnabled={syncScrollEnabled}
         toggleSyncScrollAction={toggleSyncScrollAction}
       />
@@ -360,6 +358,8 @@ export const MarkdownActiveDocument = ({
               onOpenInternalLinkAction={onOpenInternalLinkAction}
               topOverlayHeight={editorTopbarHeight}
               onScroll={onPreviewScroll}
+              previewDetached={previewDetached}
+              togglePreviewDetachedAction={togglePreviewDetachedAction}
             />
           </ResizablePanel>
         </ResizablePanelGroup>
@@ -425,6 +425,8 @@ export const MarkdownActiveDocument = ({
                 onOpenInternalLinkAction={onOpenInternalLinkAction}
                 topOverlayHeight={editorTopbarHeight}
                 onScroll={onPreviewScroll}
+                previewDetached={previewDetached}
+                togglePreviewDetachedAction={togglePreviewDetachedAction}
               />
             </ResizablePanel>
           ) : null}
@@ -443,6 +445,8 @@ export const MarkdownActiveDocument = ({
           editorSelection={previewSelection}
           onOpenInternalLinkAction={onOpenInternalLinkAction}
           onScroll={onPreviewScroll}
+          previewDetached={previewDetached}
+          togglePreviewDetachedAction={togglePreviewDetachedAction}
         />
       </DetachedWindowPortal>
     </div>

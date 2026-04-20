@@ -1,10 +1,12 @@
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MarkdownPreview } from "@/components/markdown-preview";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
 } from "@/components/ui/card";
 import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection";
+import { ArrowUpRightIcon } from "lucide-react";
 import { type RefObject } from "react";
 
 type MarkdownPreviewPanelProps = {
@@ -14,6 +16,8 @@ type MarkdownPreviewPanelProps = {
   onOpenInternalLinkAction?: (href: string) => void;
   topOverlayHeight?: number;
   onScroll: () => void;
+  previewDetached: boolean;
+  togglePreviewDetachedAction: () => void;
 };
 
 export const MarkdownPreviewPanel = ({
@@ -23,6 +27,8 @@ export const MarkdownPreviewPanel = ({
   onOpenInternalLinkAction,
   topOverlayHeight,
   onScroll,
+  previewDetached,
+  togglePreviewDetachedAction,
 }: MarkdownPreviewPanelProps) => {
   const isMobile = useIsMobile();
   const shouldShowTopOverlay = !isMobile && !!topOverlayHeight && topOverlayHeight > 0;
@@ -32,9 +38,23 @@ export const MarkdownPreviewPanel = ({
       <CardContent className="relative flex flex-1 min-h-0 flex-col px-0">
         {shouldShowTopOverlay ? (
           <div
-            className="z-10 shrink-0 border-b bg-background/75 backdrop-blur-xl"
+            className="z-10 flex shrink-0 items-center justify-end border-b bg-background/75 px-3 backdrop-blur-xl"
             style={{ height: `${topOverlayHeight}px` }}
-          />
+          >
+            <Button
+              variant={previewDetached ? "secondary" : "outline"}
+              size="sm"
+              onClick={togglePreviewDetachedAction}
+              title={
+                previewDetached
+                  ? "Move the preview back into the main window"
+                  : "Open the preview in a separate window"
+              }
+            >
+              <ArrowUpRightIcon data-icon="inline-start" />
+              {previewDetached ? "Attach preview" : "Detach preview"}
+            </Button>
+          </div>
         ) : null}
 
         <div
