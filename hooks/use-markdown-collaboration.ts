@@ -222,7 +222,7 @@ export const useMarkdownCollaboration = ({
     yText.observe(handleContentChange);
     provider.awareness.on("change", handleAwarenessChange);
     provider.on("sync", handleSynced);
-    provider.on("status", (event: { status: "connected" | "disconnected" }) => {
+    provider.on("status", (event: { status: "connected" | "disconnected" | "connecting" }) => {
       const isNowConnected = event.status === "connected";
       setIsConnected(isNowConnected);
       console.info("[collab] provider:status", {
