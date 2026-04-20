@@ -131,7 +131,6 @@ export const MarkdownToolbar = ({
     () => (collaborationStartedAt ? new Date(collaborationStartedAt) : null),
     [collaborationStartedAt]
   );
-
   useEffect(() => {
     if (!collaborationActive || !collaborationStartDate) {
       return;

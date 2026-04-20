@@ -1,5 +1,6 @@
 import { ArrowUpRightIcon, EyeIcon } from "lucide-react";
 
+import { useIsMobile } from "@/hooks/use-mobile";
 import { MarkdownPreview } from "@/components/markdown-preview";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +33,9 @@ export const MarkdownPreviewPanel = ({
   previewDetached,
   togglePreviewDetachedAction,
 }: MarkdownPreviewPanelProps) => {
+  const isMobile = useIsMobile();
+  const shouldShowTopOverlay = !isMobile && !!topOverlayHeight && topOverlayHeight > 0;
+
   return (
     <Card className="flex h-full min-h-0 flex-col gap-0 rounded-none border-0 bg-transparent py-0 ring-0">
       <CardHeader className="border-b px-4 py-4">
@@ -44,24 +48,26 @@ export const MarkdownPreviewPanel = ({
             <CardTitle>Viewer</CardTitle>
           </div>
 
-          <Button
-            variant={previewDetached ? "secondary" : "outline"}
-            size="sm"
-            onClick={togglePreviewDetachedAction}
-            title={
-              previewDetached
-                ? "Move the preview back into the main window"
-                : "Open the preview in a separate window"
-            }
-          >
-            <ArrowUpRightIcon data-icon="inline-start" />
-            {previewDetached ? "Attach preview" : "Detach preview"}
-          </Button>
+          {!isMobile ? (
+            <Button
+              variant={previewDetached ? "secondary" : "outline"}
+              size="sm"
+              onClick={togglePreviewDetachedAction}
+              title={
+                previewDetached
+                  ? "Move the preview back into the main window"
+                  : "Open the preview in a separate window"
+              }
+            >
+              <ArrowUpRightIcon data-icon="inline-start" />
+              {previewDetached ? "Attach preview" : "Detach preview"}
+            </Button>
+          ) : null}
         </div>
       </CardHeader>
 
       <CardContent className="relative flex flex-1 min-h-0 flex-col px-0">
-        {topOverlayHeight && topOverlayHeight > 0 ? (
+        {shouldShowTopOverlay ? (
           <div
             className="z-10 shrink-0 border-b bg-background/75 backdrop-blur-xl"
             style={{ height: `${topOverlayHeight}px` }}

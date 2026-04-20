@@ -19,7 +19,7 @@ import {
   upsertOpenDocument,
   upsertOpenDocuments,
 } from "@/lib/markdown-store-helpers";
-import { getUnknownErrorMessage } from "@/lib/markdown-helpers";
+import { getUnknownErrorMessage, isUserAbortError } from "@/lib/markdown-helpers";
 import { type MarkdownStore } from "@/types/markdown";
 import type { StoreApi } from "zustand";
 
@@ -46,6 +46,11 @@ export const markdownStoreOpenActions = (
         )
       );
     } catch (error) {
+      if (isUserAbortError(error)) {
+        set(getIdleTransitionState());
+        return;
+      }
+
       set(getErrorState(error));
     }
   },
@@ -129,6 +134,11 @@ export const markdownStoreOpenActions = (
         )
       );
     } catch (error) {
+      if (isUserAbortError(error)) {
+        set(getIdleTransitionState());
+        return;
+      }
+
       set(getErrorState(error));
     }
   },
@@ -339,6 +349,11 @@ export const markdownStoreOpenActions = (
         )
       );
     } catch (error) {
+      if (isUserAbortError(error)) {
+        set(getIdleTransitionState());
+        return;
+      }
+
       set(getErrorState(error));
     }
   },
@@ -370,6 +385,11 @@ export const markdownStoreOpenActions = (
         )
       );
     } catch (error) {
+      if (isUserAbortError(error)) {
+        set(getIdleTransitionState());
+        return;
+      }
+
       set(getErrorState(error));
     }
   },

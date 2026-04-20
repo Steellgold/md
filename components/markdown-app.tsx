@@ -166,6 +166,13 @@ export const MarkdownApp = () => {
 
     setViewMode(isMobile ? "editor" : "split");
   }, [isMobile, setViewMode]);
+  useEffect(() => {
+    if (!isMobile || !previewDetached) {
+      return;
+    }
+
+    closePreviewDetached();
+  }, [closePreviewDetached, isMobile, previewDetached]);
 
   const { contentHash, setContentHash } = useMarkdownContentHash({
     activeDocumentId,

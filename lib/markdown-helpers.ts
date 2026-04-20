@@ -23,6 +23,23 @@ export const getUnknownErrorMessage = (error: unknown) => {
   return "An unknown error occurred.";
 };
 
+export const isUserAbortError = (error: unknown) => {
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return true;
+  }
+
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const normalizedMessage = error.message.toLowerCase();
+  return (
+    error.name === "AbortError" ||
+    normalizedMessage.includes("user aborted") ||
+    normalizedMessage.includes("aborted a request")
+  );
+};
+
 export const sortRecentFiles = (files: RecentMarkdownFile[]) =>
   [...files].sort(
     (left, right) =>

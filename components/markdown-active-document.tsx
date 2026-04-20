@@ -2,6 +2,7 @@ import { DetachedWindowPortal } from "@/components/detached-window-portal";
 import { MarkdownDocumentTabs } from "@/components/markdown-document-tabs";
 import { MarkdownWorkspaceTree } from "@/components/markdown-workspace-tree";
 import { MarkdownToolbar } from "@/components/markdown-toolbar";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -18,6 +19,7 @@ import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection"
 import {
   ChevronDownIcon,
   ChevronUpIcon,
+  GripHorizontalIcon,
   GripVerticalIcon,
 } from "lucide-react";
 import { usePanelRef } from "react-resizable-panels";
@@ -170,10 +172,13 @@ export const MarkdownActiveDocument = ({
   insertInternalLinkAction,
   insertExternalLinkAction,
 }: MarkdownActiveDocumentProps) => {
+  const isMobile = useIsMobile();
   const [editorTopbarHeight, setEditorTopbarHeight] = useState(0);
   const [isWorkspaceTreeCollapsed, setIsWorkspaceTreeCollapsed] = useState(false);
   const workspaceTreePanelRef = usePanelRef();
   const displayedViewMode = previewDetached ? "editor" : viewMode;
+  const isSplitView = displayedViewMode === "split";
+  const splitOrientation = isMobile && isSplitView ? "vertical" : "horizontal";
 
   const toggleWorkspaceTreeCollapsed = () => {
     const panel = workspaceTreePanelRef.current;
@@ -360,7 +365,7 @@ export const MarkdownActiveDocument = ({
         </ResizablePanelGroup>
       ) : (
         <ResizablePanelGroup
-          orientation="horizontal"
+          orientation={splitOrientation}
           className="min-h-0 flex-1 bg-background"
         >
           {displayedViewMode !== "preview" ? (
@@ -398,9 +403,13 @@ export const MarkdownActiveDocument = ({
             </ResizablePanel>
           ) : null}
 
-          {displayedViewMode === "split" ? (
+          {isSplitView ? (
             <ResizableHandle withHandle className="bg-border/80">
-              <GripVerticalIcon />
+              {splitOrientation === "vertical" ? (
+                <GripHorizontalIcon />
+              ) : (
+                <GripVerticalIcon />
+              )}
             </ResizableHandle>
           ) : null}
 
