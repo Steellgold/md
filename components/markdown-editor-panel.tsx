@@ -1,5 +1,5 @@
 import { MarkdownEditorToolbar } from "@/components/markdown-editor-toolbar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   InputGroup,
   InputGroupTextarea,
@@ -19,7 +19,6 @@ import {
   type MarkdownDocumentStats,
   type RecentMarkdownFile,
 } from "@/types/markdown";
-import { PencilIcon } from "lucide-react";
 import {
   ChangeEvent,
   KeyboardEvent,
@@ -339,16 +338,6 @@ export const MarkdownEditorPanel = ({
 
   return (
     <Card className="flex h-full min-h-0 flex-col gap-0 rounded-none border-0 bg-transparent py-0 ring-0">
-      <CardHeader className="border-b px-4 py-4">
-        <div className="flex items-center gap-2">
-          <div className="rounded-md bg-primary/10 p-2">
-            <PencilIcon className="size-4" />
-          </div>
-
-          <CardTitle>Editor</CardTitle>
-        </div>
-      </CardHeader>
-
       <CardContent className="relative min-h-0 flex-1 p-0">
         <InputGroup
           ref={overlayRef}

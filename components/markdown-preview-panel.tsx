@@ -1,13 +1,8 @@
-import { ArrowUpRightIcon, EyeIcon } from "lucide-react";
-
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MarkdownPreview } from "@/components/markdown-preview";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection";
 import { type RefObject } from "react";
@@ -19,8 +14,6 @@ type MarkdownPreviewPanelProps = {
   onOpenInternalLinkAction?: (href: string) => void;
   topOverlayHeight?: number;
   onScroll: () => void;
-  previewDetached: boolean;
-  togglePreviewDetachedAction: () => void;
 };
 
 export const MarkdownPreviewPanel = ({
@@ -30,42 +23,12 @@ export const MarkdownPreviewPanel = ({
   onOpenInternalLinkAction,
   topOverlayHeight,
   onScroll,
-  previewDetached,
-  togglePreviewDetachedAction,
 }: MarkdownPreviewPanelProps) => {
   const isMobile = useIsMobile();
   const shouldShowTopOverlay = !isMobile && !!topOverlayHeight && topOverlayHeight > 0;
 
   return (
     <Card className="flex h-full min-h-0 flex-col gap-0 rounded-none border-0 bg-transparent py-0 ring-0">
-      <CardHeader className="border-b px-4 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="rounded-md bg-primary/10 p-2">
-              <EyeIcon className="size-4" />
-            </div>
-
-            <CardTitle>Viewer</CardTitle>
-          </div>
-
-          {!isMobile ? (
-            <Button
-              variant={previewDetached ? "secondary" : "outline"}
-              size="sm"
-              onClick={togglePreviewDetachedAction}
-              title={
-                previewDetached
-                  ? "Move the preview back into the main window"
-                  : "Open the preview in a separate window"
-              }
-            >
-              <ArrowUpRightIcon data-icon="inline-start" />
-              {previewDetached ? "Attach preview" : "Detach preview"}
-            </Button>
-          ) : null}
-        </div>
-      </CardHeader>
-
       <CardContent className="relative flex flex-1 min-h-0 flex-col px-0">
         {shouldShowTopOverlay ? (
           <div

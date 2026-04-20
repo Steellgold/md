@@ -5,6 +5,7 @@ import { MarkdownCollaboratorAvatars } from "@/components/markdown-collaborator-
 import { MarkdownToolbarOpenMenu } from "@/components/markdown-toolbar-open-menu";
 import { MarkdownToolbarProfileDialog } from "@/components/markdown-toolbar-profile-dialog";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -23,6 +24,7 @@ import {
   type RecentMarkdownFile,
 } from "@/types/markdown";
 import {
+  ArrowUpRightIcon,
   ChevronDownIcon, EllipsisIcon,
   HouseIcon,
   LinkIcon,
@@ -67,6 +69,8 @@ type MarkdownToolbarProps = {
   clearRecentAction: () => void;
   viewMode: "split" | "editor" | "preview";
   setViewModeAction: (value: "split" | "editor" | "preview") => void;
+  previewDetached: boolean;
+  togglePreviewDetachedAction: () => void;
   syncScrollEnabled: boolean;
   toggleSyncScrollAction: () => void;
 };
@@ -105,9 +109,12 @@ export const MarkdownToolbar = ({
   clearRecentAction,
   viewMode,
   setViewModeAction,
+  previewDetached,
+  togglePreviewDetachedAction,
   syncScrollEnabled,
   toggleSyncScrollAction,
 }: MarkdownToolbarProps) => {
+  const isMobile = useIsMobile();
   const [isClearHistoryConfirmOpen, setIsClearHistoryConfirmOpen] = useState(false);
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
   const [homeConfirmIndex, setHomeConfirmIndex] = useState<number | null>(null);
@@ -296,6 +303,22 @@ export const MarkdownToolbar = ({
                 <SaveIcon data-icon="inline-start" />
               )}
               Save
+            </Button>
+          ) : null}
+
+          {!isMobile ? (
+            <Button
+              variant={previewDetached ? "secondary" : "outline"}
+              onClick={togglePreviewDetachedAction}
+              disabled={!activeFile}
+              title={
+                previewDetached
+                  ? "Move the preview back into the main window"
+                  : "Open the preview in a separate window"
+              }
+            >
+              <ArrowUpRightIcon data-icon="inline-start" />
+              {previewDetached ? "Attach preview" : "Detach preview"}
             </Button>
           ) : null}
 
