@@ -11,17 +11,18 @@ import { Spinner } from "@/components/ui/spinner";
 import { useMarkdownAppCollaborationSession } from "@/hooks/use-markdown-app-collaboration-session";
 import { useMarkdownAppDerivedState } from "@/hooks/use-markdown-app-derived-state";
 import { useMarkdownAppShellEffects } from "@/hooks/use-markdown-app-shell-effects";
-import { useMarkdownDragDrop } from "@/hooks/use-markdown-drag-drop";
-import { useMarkdownHotkeys } from "@/hooks/use-markdown-hotkeys";
-import { useMarkdownContentHash } from "@/hooks/use-markdown-content-hash";
 import { useMarkdownCommandPaletteShortcut } from "@/hooks/use-markdown-command-palette-shortcut";
+import { useMarkdownContentHash } from "@/hooks/use-markdown-content-hash";
+import { useMarkdownDragDrop } from "@/hooks/use-markdown-drag-drop";
 import { useMarkdownEditorActions } from "@/hooks/use-markdown-editor-actions";
 import { useMarkdownEditorController } from "@/hooks/use-markdown-editor-controller";
-import { useMarkdownPreviewSynchronization } from "@/hooks/use-markdown-preview-synchronization";
+import { useMarkdownHotkeys } from "@/hooks/use-markdown-hotkeys";
 import { useMarkdownPreviewState } from "@/hooks/use-markdown-preview-state";
+import { useMarkdownPreviewSynchronization } from "@/hooks/use-markdown-preview-synchronization";
 import { useMarkdownRouteSync } from "@/hooks/use-markdown-route-sync";
-import { useMarkdownShellActions } from "@/hooks/use-markdown-shell-actions";
 import { useMarkdownShareFlow } from "@/hooks/use-markdown-share-flow";
+import { useMarkdownShellActions } from "@/hooks/use-markdown-shell-actions";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useScrollSync } from "@/hooks/use-scroll-sync";
 import {
   LARGE_FILE_HISTORY_GROUP_WINDOW_MS,
@@ -36,8 +37,7 @@ import { useMarkdownUiStore } from "@/lib/markdown-ui-store";
 import { cn } from "@/lib/utils";
 import { faker } from "@faker-js/faker";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useDeferredValue, useRef, useState } from "react";
-
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
 
 export const MarkdownApp = () => {
   const {
@@ -87,6 +87,7 @@ export const MarkdownApp = () => {
   const syncScrollEnabled = useMarkdownUiStore(
     (state) => state.syncScrollEnabled
   );
+
   const collaborationDisplayName = useMarkdownUiStore(
     (state) => state.collaborationDisplayName
   );
@@ -99,12 +100,14 @@ export const MarkdownApp = () => {
   const toggleSyncScroll = useMarkdownUiStore(
     (state) => state.toggleSyncScroll
   );
+  const isMobile = useIsMobile();
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isOpenUrlDialogOpen, setIsOpenUrlDialogOpen] = useState(false);
   const [isSaveBusy, setIsSaveBusy] = useState(false);
   const [pendingRecentFileId, setPendingRecentFileId] = useState<string | null>(null);
   const [uiError, setUiError] = useState<string | null>(null);
+
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const searchParamsKey = searchParams.toString();
@@ -122,10 +125,12 @@ export const MarkdownApp = () => {
     largeFilePreviewSyncDelayMs: LARGE_FILE_PREVIEW_SYNC_DELAY_MS,
     viewMode,
   });
+
   const shouldTrackPreviewSelection =
     !isLargeDocument && (previewDetached || viewMode !== "editor");
 
   const pendingRecentFile = recentFiles.find((file) => file.id === pendingRecentFileId) ?? null;
+
   const {
     activeDocumentStats,
     activeOpenDocument,
@@ -147,7 +152,21 @@ export const MarkdownApp = () => {
     searchParamsKey,
     workspace,
   });
+
   const isWorkspaceDocument = activeFile?.source === "folder";
+
+  useEffect(() => {
+    const persistedUiSettings = window.localStorage.getItem(
+      "markdown-app:user-settings"
+    );
+
+    if (persistedUiSettings) {
+      return;
+    }
+
+    setViewMode(isMobile ? "editor" : "split");
+  }, [isMobile, setViewMode]);
+
   const { contentHash, setContentHash } = useMarkdownContentHash({
     activeDocumentId,
     activeFile,
@@ -211,6 +230,7 @@ export const MarkdownApp = () => {
     setUiErrorAction: setUiError,
     syncPreviewContentAction: syncPreviewContent,
   });
+
   const isPageBusy = (isBusy && busyMessage !== null) || isCollabBusy;
   const effectiveBusyMessage = busyMessage ?? (isCollabBusy ? "Connecting..." : null);
 
@@ -323,6 +343,7 @@ export const MarkdownApp = () => {
     setSaveBusyAction: setIsSaveBusy,
     onResetCollabUnsavedTrackingAction: resetCollabUnsavedTracking,
   });
+
   const {
     alphaListAction,
     boldAction,
@@ -352,6 +373,7 @@ export const MarkdownApp = () => {
     openWorkspacePageByPathAction: openWorkspacePageByPath,
     workspacePresent: Boolean(workspace),
   });
+
   const { handleDragLeave, handleDragOver, handleDrop, isDragActive } =
     useMarkdownDragDrop({
       openDroppedFilesAction: openDroppedFiles,

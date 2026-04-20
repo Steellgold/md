@@ -6,16 +6,6 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 export type RecentFilesVisibleCount = 3 | 6 | 9 | 12;
 
-const getDefaultViewMode = (): ViewMode => {
-  if (typeof window === "undefined") {
-    return "split";
-  }
-
-  return window.matchMedia("(min-width: 768px)").matches
-    ? "split"
-    : "editor";
-};
-
 type MarkdownUiStore = {
   viewMode: ViewMode;
   syncScrollEnabled: boolean;
@@ -32,7 +22,7 @@ type MarkdownUiStore = {
 export const useMarkdownUiStore = create<MarkdownUiStore>()(
   persist(
     (set) => ({
-      viewMode: getDefaultViewMode(),
+      viewMode: "split",
       syncScrollEnabled: true,
       recentFilesExpanded: true,
       recentFilesVisibleCount: 9,
