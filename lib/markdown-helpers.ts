@@ -28,15 +28,35 @@ export const isUserAbortError = (error: unknown) => {
     return true;
   }
 
-  if (!(error instanceof Error)) {
-    return false;
-  }
+  const errorName =
+    error instanceof Error
+      ? error.name
+      : typeof error === "object" &&
+          error !== null &&
+          "name" in error &&
+          typeof (error as { name?: unknown }).name === "string"
+        ? (error as { name: string }).name
+        : "";
+  const errorMessage =
+    error instanceof Error
+      ? error.message
+      : typeof error === "object" &&
+          error !== null &&
+          "message" in error &&
+          typeof (error as { message?: unknown }).message === "string"
+        ? (error as { message: string }).message
+        : String(error ?? "");
+  const normalizedMessage = errorMessage.toLowerCase();
 
-  const normalizedMessage = error.message.toLowerCase();
   return (
-    error.name === "AbortError" ||
+    errorName === "AbortError" ||
+    errorName === "NotAllowedError" ||
     normalizedMessage.includes("user aborted") ||
-    normalizedMessage.includes("aborted a request")
+    normalizedMessage.includes("aborted a request") ||
+    normalizedMessage.includes("operation was aborted") ||
+    normalizedMessage.includes("request aborted") ||
+    normalizedMessage.includes("cancelled") ||
+    normalizedMessage.includes("canceled")
   );
 };
 
