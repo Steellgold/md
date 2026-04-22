@@ -1,29 +1,44 @@
-# MD [![Open this file](./public/open-this.svg)](https://better-md.vercel.app/open/https:%2F%2Fraw.githubusercontent.com%2FSteellgold%2Fmd%2Fstable%2FREADME.md)
+# MD
 
-Focused Markdown editor built with Next.js.
+[![Open this file](./public/open-this.svg)](https://better-md.vercel.app/open/https:%2F%2Fraw.githubusercontent.com%2FSteellgold%2Fmd%2Fstable%2FREADME.md)
 
-MD lets you write, preview, reopen, and import Markdown files quickly from local storage or remote URLs such as GitHub and Gist.
+MD is a focused Markdown editor built with Next.js. It is designed for fast writing and previewing, with support for local files, remote sources, and read-only sharing flows.
 
-## Features
+## Highlights
 
-- Local Markdown file opening through the File System Access API
-- Drag and drop support, including multi-file imports
-- Import selection dialog when multiple files are opened at once
-- Live Markdown preview with syntax highlighting
-- Split, editor-only, and preview-only views
-- Persistent user settings with Zustand
-- Recent files history with clear confirmation
-- Read-only sharing via a dedicated Cloudflare Worker
-- Optional password protection for shared links
-- Real-time collaborative editing rooms (Cloudflare Durable Objects + WebSocket)
-- Collaboration access modes: open link, invite token, or password
-- Remote opening from:
+- Fast local Markdown editing with live preview
+- Drag-and-drop import, including multiple files at once
+- Remote open from GitHub, Gist, and direct markdown/text URLs
+- Read-only remote documents for safer external content handling
+- Persistent editor preferences and recent files history
+- Optional protected sharing via a dedicated Cloudflare service
+- Real-time collaborative rooms backed by Durable Objects and WebSockets
+
+## Core Features
+
+### Editor Experience
+
+- Split, editor-only, and preview-only layouts
+- Syntax-highlighted Markdown preview
+- Multi-file import picker when several files are dropped/opened
+- Stored UI preferences (view mode, sync behavior, etc.)
+
+### File Sources
+
+- Local files through the File System Access API
+- Drag-and-drop local imports
+- Remote files from:
   - GitHub file URLs
-  - Gist URLs, including multi-file gist selection
-  - direct text or markdown URLs
-- Read-only handling for remote files
+  - Gist URLs (with file selection for multi-file gists)
+  - Direct `.md` / plain text links
 
-## Stack
+### Sharing and Collaboration
+
+- Read-only share links via external Cloudflare Worker API
+- Optional password gate for shared documents
+- Collaborative rooms with access modes (open link, invite token, password)
+
+## Tech Stack
 
 - Next.js 16
 - React 19
@@ -31,47 +46,40 @@ MD lets you write, preview, reopen, and import Markdown files quickly from local
 - Tailwind CSS 4
 - shadcn/ui
 - Zustand
-- react-markdown
-- react-syntax-highlighter
-- Cloudflare Worker + Durable Objects + R2 + KV
+- react-markdown + remark-gfm + rehype-highlight
+- Cloudflare Workers + Durable Objects + R2 + KV
 
-## Getting Started
+## Quick Start
 
-Install dependencies with Bun or pnpm:
-
-```bash
-bun install
-```
-
-or
+1. Install dependencies:
 
 ```bash
 pnpm install
 ```
 
-Start the development server:
+2. Start the app in development mode:
 
 ```bash
-bun dev
+pnpm dev
 ```
 
-Open `http://localhost:3000`.
+3. Open [http://localhost:3000](http://localhost:3000)
 
 ## Scripts
 
 ```bash
-bun dev
-bun build
-bun start
-bun lint
-bun typecheck
-bun run share:dev
-bun run share:deploy
+pnpm dev
+pnpm build
+pnpm start
+pnpm lint
+pnpm typecheck
+pnpm share:dev
+pnpm share:deploy
 ```
 
-## Environment
+## Environment Variables
 
-Vercel / Next.js app:
+Create `.env.local` from `.env.example` and set:
 
 ```bash
 NEXT_PUBLIC_APP_URL=https://your-domain.com
@@ -79,27 +87,17 @@ SHARE_API_BASE_URL=https://share.example.com
 SHARE_API_TOKEN=replace-me-if-you-protect-the-worker-write-api
 ```
 
-Use `NEXT_PUBLIC_APP_URL` for absolute links and `SHARE_API_BASE_URL` for the
-standalone Cloudflare share service.
+- `NEXT_PUBLIC_APP_URL`: absolute app URL used for generated links
+- `SHARE_API_BASE_URL`: base URL of the Cloudflare share service
+- `SHARE_API_TOKEN`: optional token to protect write operations on share API
 
-The Cloudflare worker has its own config under [`cloudflare-share/`](./cloudflare-share).
+Cloudflare worker config lives in [`cloudflare-share/`](./cloudflare-share).
 
-Copy `.env.example` to `.env.local` for local development.
-
-## Notes
-
-- Local file reopening depends on browser support for the File System Access API.
-- Remote URLs are validated server-side and local or private network addresses are blocked.
-- Remote documents can be opened and reloaded, but they are intentionally read-only.
-- Shared documents open through the existing remote URL flow and remain read-only.
-- Shared documents can optionally require a password before the app opens them.
-- UI preferences such as split view and sync scroll are persisted in local storage.
-
-## Project Structure
+## Project Layout
 
 ```text
 app/
-  api/open-from-url/    Remote markdown resolution and download
+  api/open-from-url/    Remote markdown resolution and fetch
   api/share/            Proxy to the external Cloudflare share service
   api/collab/           Proxy to collaborative room create/join endpoints
 components/
@@ -111,27 +109,34 @@ lib/
 types/
   *.ts / *.d.ts         App and integration types
 public/
-  banner and favicons
+  Static assets (icons, social visuals, open-this badge)
 ```
 
 ## Deployment
 
-Deploy the Next.js app to Vercel as usual.
+### Next.js App (Vercel)
 
 ```bash
-bun build
+pnpm build
 ```
 
-Deploy the share service separately to Cloudflare:
+### Share Service (Cloudflare Workers)
 
 ```bash
-bun run share:deploy
+pnpm share:deploy
 ```
 
-The worker needs:
+Required Cloudflare resources:
 
-- one Workers KV namespace
-- one R2 bucket
-- one Durable Object namespace (`COLLAB_ROOMS`)
+- 1 Workers KV namespace
+- 1 R2 bucket
+- 1 Durable Object namespace (`COLLAB_ROOMS`)
 - `SHARE_PASSWORD_PEPPER` secret
-- optionally `SHARE_API_TOKEN` if you want the write API locked down
+- Optional `SHARE_API_TOKEN` secret for protected write endpoints
+
+## Operational Notes
+
+- Local file reopen depends on browser support for File System Access API.
+- Remote URLs are validated server-side; local/private network addresses are blocked.
+- Remote and shared documents are intentionally opened as read-only.
+- Shared links can require a password before content is resolved.
