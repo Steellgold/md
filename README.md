@@ -1,6 +1,4 @@
-# MD
-
-[![Open this file](./public/open-this.svg)](https://better-md.vercel.app/open/https:%2F%2Fraw.githubusercontent.com%2FSteellgold%2Fmd%2Fstable%2FREADME.md)
+# MD [![Open this file](./public/open-this.svg)](https://better-md.vercel.app/open/https:%2F%2Fraw.githubusercontent.com%2FSteellgold%2Fmd%2Fstable%2FREADME.md)
 
 MD is a focused Markdown editor built with Next.js. It is designed for fast writing and previewing, with support for local files, remote sources, and read-only sharing flows.
 
