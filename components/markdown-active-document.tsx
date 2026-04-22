@@ -1,19 +1,20 @@
 import { DetachedWindowPortal } from "@/components/detached-window-portal";
 import { MarkdownDocumentTabs } from "@/components/markdown-document-tabs";
-import { MarkdownWorkspaceTree } from "@/components/markdown-workspace-tree";
 import { MarkdownToolbar } from "@/components/markdown-toolbar";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { MarkdownWorkspaceTree } from "@/components/markdown-workspace-tree";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { getScrollRatio, setScrollRatio } from "@/lib/markdown-helpers";
 import {
   type CollaborationParticipant,
   type MarkdownDocumentStats,
+  type MarkdownWorkspace,
   type OpenMarkdownDocument,
   type RecentMarkdownFile,
-  type MarkdownWorkspace,
 } from "@/types/markdown";
 import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection";
 import {
@@ -22,12 +23,14 @@ import {
   GripHorizontalIcon,
   GripVerticalIcon,
 } from "lucide-react";
-import { usePanelRef } from "react-resizable-panels";
 import {
   ChangeEvent,
   RefObject,
+  useEffect,
+  useRef,
   useState,
 } from "react";
+import { usePanelRef } from "react-resizable-panels";
 import { type ViewMode } from "../types/view-mode";
 import { MarkdownEditorPanel } from "./markdown-editor-panel";
 import { MarkdownPreviewPanel } from "./markdown-preview-panel";
@@ -54,6 +57,8 @@ type MarkdownActiveDocumentProps = {
   previewSelection: MarkdownViewerSelection | null;
   viewMode: ViewMode;
   setViewModeAction: (value: ViewMode) => void;
+  editorFocusMode: boolean;
+  toggleEditorFocusModeAction: () => void;
   previewDetached: boolean;
   togglePreviewDetachedAction: () => void;
   closePreviewDetachedAction: () => void;
@@ -128,6 +133,8 @@ export const MarkdownActiveDocument = ({
   previewSelection,
   viewMode,
   setViewModeAction,
+  editorFocusMode,
+  toggleEditorFocusModeAction,
   previewDetached,
   togglePreviewDetachedAction,
   closePreviewDetachedAction,
@@ -179,6 +186,8 @@ export const MarkdownActiveDocument = ({
   const isMobile = useIsMobile();
   const [editorTopbarHeight, setEditorTopbarHeight] = useState(0);
   const [isWorkspaceTreeCollapsed, setIsWorkspaceTreeCollapsed] = useState(false);
+  const [focusView, setFocusView] = useState<"editor" | "preview">("editor");
+  const focusScrollRatioRef = useRef(0);
   const workspaceTreePanelRef = usePanelRef();
   const displayedViewMode = previewDetached ? "editor" : viewMode;
   const isSplitView = displayedViewMode === "split";
@@ -200,6 +209,166 @@ export const MarkdownActiveDocument = ({
     panel.resize(WORKSPACE_TREE_HEADER_ONLY_SIZE);
     setIsWorkspaceTreeCollapsed(true);
   };
+
+  useEffect(() => {
+    if (!editorFocusMode) {
+      return;
+    }
+
+    const onWindowKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (
+        event.key !== "Tab" ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey ||
+        event.repeat
+      ) {
+        return;
+      }
+
+      const activeElement =
+        focusView === "editor" ? editorRef.current : previewRef.current;
+
+      if (activeElement) {
+        focusScrollRatioRef.current = getScrollRatio(activeElement);
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      setFocusView((currentView) =>
+        currentView === "editor" ? "preview" : "editor"
+      );
+    };
+
+    window.addEventListener("keydown", onWindowKeyDown, { capture: true });
+
+    return () => {
+      window.removeEventListener("keydown", onWindowKeyDown, {
+        capture: true,
+      });
+    };
+  }, [editorFocusMode, editorRef, focusView, previewRef]);
+
+  useEffect(() => {
+    if (!editorFocusMode || focusView !== "preview") {
+      return;
+    }
+
+    const editorElement = editorRef.current;
+    const previewElement = previewRef.current;
+
+    if (!editorElement || !previewElement) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      if (previewRef.current) {
+        setScrollRatio(previewRef.current, focusScrollRatioRef.current);
+        previewRef.current.focus();
+      }
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [editorFocusMode, focusView, editorRef, previewRef]);
+
+  useEffect(() => {
+    if (!editorFocusMode || focusView !== "editor") {
+      return;
+    }
+
+    const previewElement = previewRef.current;
+    const editorElement = editorRef.current;
+
+    if (!previewElement || !editorElement) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      if (editorRef.current) {
+        setScrollRatio(editorRef.current, focusScrollRatioRef.current);
+        editorRef.current.focus();
+      }
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [editorFocusMode, focusView, editorRef, previewRef]);
+
+  const handleFocusEditorScroll = () => {
+    const editorElement = editorRef.current;
+
+    if (editorElement) {
+      focusScrollRatioRef.current = getScrollRatio(editorElement);
+    }
+
+    onEditorScroll();
+  };
+
+  const handleFocusPreviewScroll = () => {
+    const previewElement = previewRef.current;
+
+    if (previewElement) {
+      focusScrollRatioRef.current = getScrollRatio(previewElement);
+    }
+
+    onPreviewScroll();
+  };
+
+  if (editorFocusMode) {
+    return (
+      <div className="relative flex min-h-0 flex-1 items-stretch justify-center overflow-hidden bg-background p-4">
+        <div className="h-full w-full">
+          {focusView === "editor" ? (
+            <MarkdownEditorPanel
+              activeFile={activeFile}
+              content={content}
+              stats={stats}
+              editorRef={editorRef}
+              onChange={onEditorChange}
+              onBlur={onEditorBlur}
+              onSelectionChange={onEditorSelectionChange}
+              onScroll={handleFocusEditorScroll}
+              collaboratorSelections={collaboratorSelections}
+              undoAction={undoAction}
+              redoAction={redoAction}
+              boldAction={boldAction}
+              italicAction={italicAction}
+              headingAction={headingAction}
+              inlineCodeAction={inlineCodeAction}
+              codeBlockAction={codeBlockAction}
+              bulletListAction={bulletListAction}
+              orderedListAction={orderedListAction}
+              alphaListAction={alphaListAction}
+              taskListAction={taskListAction}
+              insertTableAction={insertTableAction}
+              internalLinkTargets={internalLinkTargets}
+              insertInternalLinkAction={insertInternalLinkAction}
+              insertExternalLinkAction={insertExternalLinkAction}
+              focusMode
+              onExitFocusModeAction={toggleEditorFocusModeAction}
+              className="rounded-md border border-border/70 bg-card"
+              textareaClassName="p-4 text-base"
+            />
+          ) : (
+            <div className="h-full rounded-md border border-border/70 bg-card">
+              <MarkdownPreviewPanel
+                content={previewContent}
+                previewRef={previewRef}
+                editorSelection={previewSelection}
+                onOpenInternalLinkAction={onOpenInternalLinkAction}
+                onScroll={handleFocusPreviewScroll}
+                previewDetached={previewDetached}
+                togglePreviewDetachedAction={togglePreviewDetachedAction}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <MarkdownToolbar
@@ -234,7 +403,9 @@ export const MarkdownActiveDocument = ({
         openRecentAction={openRecentAction}
         clearRecentAction={clearRecentAction}
         viewMode={viewMode}
+        editorFocusMode={editorFocusMode}
         setViewModeAction={setViewModeAction}
+        toggleEditorFocusModeAction={toggleEditorFocusModeAction}
         syncScrollEnabled={syncScrollEnabled}
         toggleSyncScrollAction={toggleSyncScrollAction}
       />

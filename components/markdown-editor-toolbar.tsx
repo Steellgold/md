@@ -8,9 +8,10 @@ import {
   FileCode2Icon, Heading1Icon, ItalicIcon, LinkIcon, ListIcon,
   ListOrderedIcon,
   ListTodoIcon,
-  type LucideIcon,
+  Minimize2Icon,
   Redo2Icon,
-  Undo2Icon
+  Undo2Icon,
+  type LucideIcon
 } from "lucide-react";
 
 import { RefObject } from "react";
@@ -52,6 +53,8 @@ type MarkdownEditorToolbarProps = {
   };
   stats: MarkdownDocumentStats;
   topbarRef: RefObject<HTMLDivElement | null>;
+  focusMode?: boolean;
+  onExitFocusModeAction?: () => void;
   actions: {
     undoAction: () => void;
     redoAction: () => void;
@@ -97,8 +100,13 @@ export const MarkdownEditorToolbar = ({
   search,
   stats,
   topbarRef,
+  focusMode = false,
+  onExitFocusModeAction,
   actions,
 }: MarkdownEditorToolbarProps) => {
+  void activeFile;
+  void stats;
+
   const actionMap = {
     undoAction: actions.undoAction,
     redoAction: actions.redoAction,
@@ -139,9 +147,22 @@ export const MarkdownEditorToolbar = ({
     <InputGroupAddon
       ref={topbarRef}
       align="block-start"
-      className="cursor-default border-b px-3 py-3"
+      className="cursor-default border-b p-2"
     >
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        {focusMode ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onExitFocusModeAction}
+            title="Exit focus mode"
+            aria-label="Exit focus mode"
+          >
+            <Minimize2Icon data-icon="inline-start" />
+            Press Esc to exit
+          </Button>
+        ) : null}
+          
         <ButtonGroup className="flex-1">
           {renderIconActions(historyActions)}
         </ButtonGroup>

@@ -8,11 +8,14 @@ export type RecentFilesVisibleCount = 3 | 6 | 9 | 12;
 
 type MarkdownUiStore = {
   viewMode: ViewMode;
+  editorFocusMode: boolean;
   syncScrollEnabled: boolean;
   recentFilesExpanded: boolean;
   recentFilesVisibleCount: RecentFilesVisibleCount;
   collaborationDisplayName: string;
   setViewMode: (value: ViewMode) => void;
+  toggleEditorFocusMode: () => void;
+  setEditorFocusMode: (value: boolean) => void;
   toggleSyncScroll: () => void;
   setRecentFilesExpanded: (value: boolean) => void;
   setRecentFilesVisibleCount: (value: RecentFilesVisibleCount) => void;
@@ -23,11 +26,17 @@ export const useMarkdownUiStore = create<MarkdownUiStore>()(
   persist(
     (set) => ({
       viewMode: "editor",
+      editorFocusMode: false,
       syncScrollEnabled: true,
       recentFilesExpanded: true,
       recentFilesVisibleCount: 9,
       collaborationDisplayName: "",
       setViewMode: (value) => set({ viewMode: value }),
+      toggleEditorFocusMode: () =>
+        set((state) => ({
+          editorFocusMode: !state.editorFocusMode,
+        })),
+      setEditorFocusMode: (value) => set({ editorFocusMode: value }),
       toggleSyncScroll: () =>
         set((state) => ({
           syncScrollEnabled: !state.syncScrollEnabled,
@@ -43,6 +52,7 @@ export const useMarkdownUiStore = create<MarkdownUiStore>()(
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         viewMode: state.viewMode,
+        editorFocusMode: state.editorFocusMode,
         syncScrollEnabled: state.syncScrollEnabled,
         recentFilesExpanded: state.recentFilesExpanded,
         recentFilesVisibleCount: state.recentFilesVisibleCount,

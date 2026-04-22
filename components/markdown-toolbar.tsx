@@ -1,9 +1,9 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { MarkdownCollaboratorAvatars } from "@/components/markdown-collaborator-avatars";
 import { MarkdownToolbarOpenMenu } from "@/components/markdown-toolbar-open-menu";
 import { MarkdownToolbarProfileDialog } from "@/components/markdown-toolbar-profile-dialog";
+import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   DropdownMenu,
@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
+import { useCtrlKey } from "@/hooks/use-ctrl-key";
 import {
   type CollaborationParticipant,
   type RecentMarkdownFile,
@@ -27,18 +28,17 @@ import {
   FileCode2Icon,
   HouseIcon,
   LinkIcon,
+  Maximize2Icon,
   MonitorUpIcon,
   PanelLeftIcon,
   PanelRightIcon,
-  PrinterIcon,
-  RefreshCcwIcon,
-  SaveIcon,
+  PrinterIcon, SaveIcon,
   TypeIcon,
   UserRoundIcon,
-  UsersIcon,
-  XIcon
+  UsersIcon
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Kbd } from "./ui/kbd";
 
 type MarkdownToolbarProps = {
   activeFile: RecentMarkdownFile | null;
@@ -70,7 +70,9 @@ type MarkdownToolbarProps = {
   openRecentAction: (id: string) => void;
   clearRecentAction: () => void;
   viewMode: "split" | "editor" | "preview";
+  editorFocusMode: boolean;
   setViewModeAction: (value: "split" | "editor" | "preview") => void;
+  toggleEditorFocusModeAction: () => void;
   syncScrollEnabled: boolean;
   toggleSyncScrollAction: () => void;
 };
@@ -111,6 +113,7 @@ export const MarkdownToolbar = ({
   clearRecentAction,
   viewMode,
   setViewModeAction,
+  toggleEditorFocusModeAction,
   syncScrollEnabled,
   toggleSyncScrollAction,
 }: MarkdownToolbarProps) => {
@@ -119,6 +122,8 @@ export const MarkdownToolbar = ({
   const [homeConfirmIndex, setHomeConfirmIndex] = useState<number | null>(null);
   const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
   const homeConfirmAdvancingRef = useRef(false);
+
+  const ctrlKey = useCtrlKey();
 
   const secondaryLabel = activeFile?.url
     ? "Remote document"
@@ -302,6 +307,8 @@ export const MarkdownToolbar = ({
                 <SaveIcon data-icon="inline-start" />
               )}
               Save
+
+              <Kbd className="ml-auto">{`${ctrlKey}+S`}</Kbd>
             </Button>
           ) : null}
 
@@ -398,6 +405,15 @@ export const MarkdownToolbar = ({
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
 
+              <DropdownMenuItem
+                onSelect={toggleEditorFocusModeAction}
+              >
+                <Maximize2Icon />
+                Focus
+
+                <Kbd className="ml-auto">{ctrlKey} + Shift + M</Kbd>
+              </DropdownMenuItem>
+
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => setIsProfileDialogOpen(true)}>
                 <UserRoundIcon />
@@ -426,24 +442,6 @@ export const MarkdownToolbar = ({
               >
                 <PrinterIcon />
                 Export as PDF
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Document actions</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onSelect={refreshFileAction}
-                disabled={!activeFile || isBusy}
-              >
-                <RefreshCcwIcon />
-                {refreshLabel}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={clearDocumentAction}
-                disabled={!activeFile}
-                variant="destructive"
-              >
-                <XIcon />
-                {closeLabel}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

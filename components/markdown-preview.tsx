@@ -20,6 +20,7 @@ type MarkdownPreviewProps = {
   content: string;
   editorSelection: MarkdownViewerSelection | null;
   onOpenInternalLinkAction?: (href: string) => void;
+  focusMode?: boolean;
   className?: string;
 };
 
@@ -50,6 +51,7 @@ export const MarkdownPreview = ({
   content,
   editorSelection,
   onOpenInternalLinkAction,
+  focusMode = false,
   className,
 }: MarkdownPreviewProps) => {
   const { resolvedTheme } = useTheme();
@@ -74,6 +76,7 @@ export const MarkdownPreview = ({
       className={cn(
         // Root: layout and body text (flex + gap so lists, hr, etc. don’t stack flush)
         "markdown-preview flex min-h-full flex-col gap-4 px-6 py-5 text-sm leading-7 wrap-break-word",
+        focusMode ? "mx-auto w-full max-w-3xl px-8 py-8 text-base leading-8" : null,
 
         // Synced selection from the editor (caret + range)
         "[&_.md-viewer-caret]:mx-px [&_.md-viewer-caret]:inline-block [&_.md-viewer-caret]:h-[1em] [&_.md-viewer-caret]:w-[2px] [&_.md-viewer-caret]:rounded-full [&_.md-viewer-caret]:bg-primary [&_.md-viewer-caret]:align-[-0.1em]",

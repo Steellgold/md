@@ -6,8 +6,8 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { type MarkdownViewerSelection } from "@/types/markdown-viewer-selection";
-import { ArrowUpRightIcon } from "lucide-react";
-import { type RefObject } from "react";
+import { ArrowUpRightIcon, Maximize2Icon, Minimize2Icon } from "lucide-react";
+import { type RefObject, useState } from "react";
 
 type MarkdownPreviewPanelProps = {
   content: string;
@@ -31,6 +31,7 @@ export const MarkdownPreviewPanel = ({
   togglePreviewDetachedAction,
 }: MarkdownPreviewPanelProps) => {
   const isMobile = useIsMobile();
+  const [focusMode, setFocusMode] = useState(false);
   const shouldShowTopOverlay = !isMobile && !!topOverlayHeight && topOverlayHeight > 0;
 
   return (
@@ -38,9 +39,26 @@ export const MarkdownPreviewPanel = ({
       <CardContent className="relative flex flex-1 min-h-0 flex-col px-0">
         {shouldShowTopOverlay ? (
           <div
-            className="z-10 flex shrink-0 items-center justify-end border-b bg-background/75 px-3 backdrop-blur-xl"
+            className="z-10 flex shrink-0 items-center justify-end gap-2 border-b bg-background/75 px-3 backdrop-blur-xl"
             style={{ height: `${topOverlayHeight}px` }}
           >
+            <Button
+              variant={focusMode ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setFocusMode((currentValue) => !currentValue)}
+              title={
+                focusMode
+                  ? "Exit focus mode"
+                  : "Enable focus mode for distraction-free reading"
+              }
+            >
+              {focusMode ? (
+                <Minimize2Icon data-icon="inline-start" />
+              ) : (
+                <Maximize2Icon data-icon="inline-start" />
+              )}
+              {focusMode ? "Exit focus" : "Focus mode"}
+            </Button>
             <Button
               variant={previewDetached ? "secondary" : "outline"}
               size="sm"
@@ -68,6 +86,7 @@ export const MarkdownPreviewPanel = ({
               content={content}
               editorSelection={editorSelection}
               onOpenInternalLinkAction={onOpenInternalLinkAction}
+              focusMode={focusMode}
             />
           ) : (
             <div className="flex h-full items-center justify-center px-6 py-8 text-sm text-muted-foreground">

@@ -2,6 +2,7 @@
 
 import { MarkdownEmptyState } from "@/components/markdown-empty-state";
 import { MarkdownRecentFiles } from "@/components/markdown-recent-files";
+import { useCtrlKey } from "@/hooks/use-ctrl-key";
 import { type RecentMarkdownFile } from "@/types/markdown";
 import { ArrowUpRightIcon } from "lucide-react";
 
@@ -36,6 +37,8 @@ export const MarkdownAppEmptyHome = ({
   showCommandPaletteAction,
   showOpenUrlDialogAction,
 }: MarkdownAppEmptyHomeProps) => {
+  const ctrlKey = useCtrlKey();
+
   return (
     <div className="flex flex-1 flex-col">
       <div className="pt-3 text-center text-xs text-muted-foreground">
@@ -45,7 +48,7 @@ export const MarkdownAppEmptyHome = ({
           onClick={showCommandPaletteAction}
           className="font-medium text-foreground underline underline-offset-4"
         >
-          Ctrl/Cmd + K
+          {ctrlKey} + K
         </button>{" "}
         for quick actions.
       </div>

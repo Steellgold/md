@@ -11,6 +11,7 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/components/ui/command";
+import { useCtrlKey } from "@/hooks/use-ctrl-key";
 import {
   type OpenMarkdownDocument,
   type RecentMarkdownFile,
@@ -63,11 +64,6 @@ type MarkdownCommandPaletteProps = {
   setViewModeAction: (value: "split" | "editor" | "preview") => void;
 };
 
-const platformShortcut =
-  typeof navigator !== "undefined" && /mac/i.test(navigator.platform)
-    ? "\u2318"
-    : "Ctrl+";
-
 const viewOptions = [
   {
     value: "split" as const,
@@ -116,6 +112,8 @@ export const MarkdownCommandPalette = ({
   setActiveDocumentAction,
   setViewModeAction,
 }: MarkdownCommandPaletteProps) => {
+  const ctrlKey = useCtrlKey();
+
   const runAction = (action: () => void) => {
     onOpenChangeAction(false);
     action();
@@ -169,7 +167,7 @@ export const MarkdownCommandPalette = ({
             >
               <SaveIcon />
               Save current file
-              <CommandShortcut>{platformShortcut}S</CommandShortcut>
+              <CommandShortcut>{`${ctrlKey}+S`}</CommandShortcut>
             </CommandItem>
             <CommandItem
               onSelect={() => runAction(shareFileAction)}

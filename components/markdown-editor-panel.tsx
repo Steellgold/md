@@ -14,6 +14,7 @@ import {
   getTextareaRangeCoordinates,
   type TextareaRangeCoordinates,
 } from "@/lib/textarea-caret";
+import { cn } from "@/lib/utils";
 import {
   type CollaborationParticipant,
   type MarkdownDocumentStats,
@@ -56,6 +57,11 @@ type MarkdownEditorPanelProps = {
   internalLinkTargets: string[];
   insertInternalLinkAction: (relativePath: string) => void;
   insertExternalLinkAction: () => void;
+  hideToolbar?: boolean;
+  focusMode?: boolean;
+  onExitFocusModeAction?: () => void;
+  className?: string;
+  textareaClassName?: string;
 };
 
 type RemoteMarker = {
@@ -94,6 +100,11 @@ export const MarkdownEditorPanel = ({
   internalLinkTargets,
   insertInternalLinkAction,
   insertExternalLinkAction,
+  hideToolbar = false,
+  focusMode = false,
+  onExitFocusModeAction,
+  className,
+  textareaClassName,
 }: MarkdownEditorPanelProps) => {
   const topbarRef = useRef<HTMLDivElement | null>(null);
   const overlayRef = useRef<HTMLDivElement | null>(null);
@@ -337,35 +348,44 @@ export const MarkdownEditorPanel = ({
   );
 
   return (
-    <Card className="flex h-full min-h-0 flex-col gap-0 rounded-none border-0 bg-transparent py-0 ring-0">
+    <Card
+      className={cn(
+        "flex h-full min-h-0 flex-col gap-0 rounded-none border-0 bg-transparent py-0 ring-0",
+        className
+      )}
+    >
       <CardContent className="relative min-h-0 flex-1 p-0">
         <InputGroup
           ref={overlayRef}
           className="h-full! min-h-0 flex-1 flex-col items-stretch overflow-hidden rounded-none border-0 bg-transparent has-[[data-slot=input-group-control]:focus-visible]:border-input has-[[data-slot=input-group-control]:focus-visible]:ring-0"
         >
-          <MarkdownEditorToolbar
-            activeFile={activeFile}
-            internalLinkTargets={internalLinkTargets}
-            search={search}
-            stats={stats}
-            topbarRef={topbarRef}
-            actions={{
-              undoAction,
-              redoAction,
-              boldAction,
-              italicAction,
-              headingAction,
-              inlineCodeAction,
-              codeBlockAction,
-              bulletListAction,
-              orderedListAction,
-              alphaListAction,
-              taskListAction,
-              insertTableAction,
-              insertInternalLinkAction,
-              insertExternalLinkAction,
-            }}
-          />
+          {hideToolbar ? null : (
+            <MarkdownEditorToolbar
+              activeFile={activeFile}
+              internalLinkTargets={internalLinkTargets}
+              search={search}
+              stats={stats}
+              topbarRef={topbarRef}
+              focusMode={focusMode}
+              onExitFocusModeAction={onExitFocusModeAction}
+              actions={{
+                undoAction,
+                redoAction,
+                boldAction,
+                italicAction,
+                headingAction,
+                inlineCodeAction,
+                codeBlockAction,
+                bulletListAction,
+                orderedListAction,
+                alphaListAction,
+                taskListAction,
+                insertTableAction,
+                insertInternalLinkAction,
+                insertExternalLinkAction,
+              }}
+            />
+          )}
 
           <InputGroupTextarea
             ref={editorRef}
@@ -377,7 +397,10 @@ export const MarkdownEditorPanel = ({
             onKeyDown={handleEditorKeyDown}
             onSelect={handleEditorSelectionChange}
             placeholder="Write or paste your markdown here..."
-            className="h-full min-h-0 flex-1 basis-0 px-6 py-5 font-mono text-sm"
+            className={cn(
+              "h-full min-h-0 flex-1 basis-0 px-6 py-5 font-mono text-sm",
+              textareaClassName
+            )}
           />
 
           {remoteMarkers.map((marker) => (

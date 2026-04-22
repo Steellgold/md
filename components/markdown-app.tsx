@@ -84,6 +84,7 @@ export const MarkdownApp = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const viewMode = useMarkdownUiStore((state) => state.viewMode);
+  const editorFocusMode = useMarkdownUiStore((state) => state.editorFocusMode);
   const syncScrollEnabled = useMarkdownUiStore(
     (state) => state.syncScrollEnabled
   );
@@ -93,6 +94,12 @@ export const MarkdownApp = () => {
   );
 
   const setViewMode = useMarkdownUiStore((state) => state.setViewMode);
+  const setEditorFocusMode = useMarkdownUiStore(
+    (state) => state.setEditorFocusMode
+  );
+  const toggleEditorFocusMode = useMarkdownUiStore(
+    (state) => state.toggleEditorFocusMode
+  );
   const setCollaborationDisplayName = useMarkdownUiStore(
     (state) => state.setCollaborationDisplayName
   );
@@ -173,6 +180,27 @@ export const MarkdownApp = () => {
 
     closePreviewDetached();
   }, [closePreviewDetached, isMobile, previewDetached]);
+
+  useEffect(() => {
+    if (!editorFocusMode) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      event.preventDefault();
+      setEditorFocusMode(false);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [editorFocusMode, setEditorFocusMode]);
 
   const { contentHash, setContentHash } = useMarkdownContentHash({
     activeDocumentId,
@@ -422,6 +450,7 @@ export const MarkdownApp = () => {
     saveEnabled: canSaveActiveFile,
     onSaveAction: saveActiveFileAction,
     onOpenSwitcherAction: () => setIsCommandPaletteOpen(true),
+    onToggleFocusModeAction: toggleEditorFocusMode,
     onUndoAction: undoAction,
     onRedoAction: redoAction,
     editorRef,
@@ -497,6 +526,8 @@ export const MarkdownApp = () => {
           previewSelection={deferredPreviewSelection}
           viewMode={viewMode}
           setViewModeAction={setViewMode}
+          editorFocusMode={editorFocusMode}
+          toggleEditorFocusModeAction={toggleEditorFocusMode}
           previewDetached={previewDetached}
           togglePreviewDetachedAction={togglePreviewDetached}
           closePreviewDetachedAction={closePreviewDetached}

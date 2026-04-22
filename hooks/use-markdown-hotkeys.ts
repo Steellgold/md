@@ -12,6 +12,7 @@ type UseMarkdownHotkeysParams = {
   saveEnabled: boolean;
   onSaveAction: () => Promise<void> | void;
   onOpenSwitcherAction: () => void;
+  onToggleFocusModeAction: () => void;
   onUndoAction: () => void;
   onRedoAction: () => void;
   editorRef: RefObject<HTMLTextAreaElement | null>;
@@ -22,6 +23,7 @@ export const useMarkdownHotkeys = ({
   saveEnabled,
   onSaveAction,
   onOpenSwitcherAction,
+  onToggleFocusModeAction,
   onUndoAction,
   onRedoAction,
   editorRef,
@@ -70,6 +72,15 @@ export const useMarkdownHotkeys = ({
           }
 
           onOpenSwitcherAction();
+          return;
+        }
+        case "m": {
+          if (!event.shiftKey) {
+            return;
+          }
+
+          event.preventDefault();
+          onToggleFocusModeAction();
           return;
         }
         case "e": {
@@ -121,6 +132,7 @@ export const useMarkdownHotkeys = ({
     editorRef,
     enabled,
     onOpenSwitcherAction,
+    onToggleFocusModeAction,
     onRedoAction,
     onSaveAction,
     onUndoAction,
