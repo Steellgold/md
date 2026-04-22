@@ -118,7 +118,27 @@ const getCaretTarget = (caret: number, segments: TextSegment[]) => {
     };
   }
 
+  let previousSegment: TextSegment | null = null;
+
   for (const segment of segments) {
+    if (caret === segment.end) {
+      return {
+        node: segment.node,
+        offset: segment.node.value.length,
+      };
+    }
+
+    if (
+      previousSegment &&
+      caret > previousSegment.end &&
+      caret < segment.start
+    ) {
+      return {
+        node: previousSegment.node,
+        offset: previousSegment.node.value.length,
+      };
+    }
+
     if (caret <= segment.start) {
       return {
         node: segment.node,
@@ -132,6 +152,8 @@ const getCaretTarget = (caret: number, segments: TextSegment[]) => {
         offset: getLocalTextOffset(segment.node, caret),
       };
     }
+
+    previousSegment = segment;
   }
 
   const lastSegment = segments.at(-1);
