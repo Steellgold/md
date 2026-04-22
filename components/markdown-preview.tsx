@@ -1,6 +1,7 @@
 "use client";
 
 import { rehypeMarkdownViewerSelection } from "@/lib/markdown-viewer-selection";
+import { normalizeMarkdownBlocks } from "@/lib/markdown-blocks";
 import { remarkAlphaOrderedLists } from "@/lib/remark-alpha-ordered-lists";
 import { isInternalMarkdownLink } from "@/lib/parsing/workspace-links";
 import { cn } from "@/lib/utils";
@@ -53,6 +54,10 @@ export const MarkdownPreview = ({
   className,
 }: MarkdownPreviewProps) => {
   const { resolvedTheme } = useTheme();
+  const normalizedContent = useMemo(
+    () => normalizeMarkdownBlocks(content),
+    [content]
+  );
   const syntaxTheme = resolvedTheme === "dark" ? oneDark : oneLight;
   const shouldHighlightSelection =
     content.length <= MAX_SELECTION_HIGHLIGHT_CONTENT_LENGTH;
@@ -191,7 +196,7 @@ export const MarkdownPreview = ({
           },
         }}
       >
-        {content}
+        {normalizedContent}
       </ReactMarkdown>
     </div>
   );

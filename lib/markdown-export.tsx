@@ -1,5 +1,6 @@
 import ReactMarkdown from "react-markdown";
 import { renderToStaticMarkup } from "react-dom/server";
+import { normalizeMarkdownBlocks } from "@/lib/markdown-blocks";
 import { remarkAlphaOrderedLists } from "@/lib/remark-alpha-ordered-lists";
 import remarkGfm from "remark-gfm";
 
@@ -189,9 +190,10 @@ export const buildMarkdownExportFileName = (
 };
 
 export const buildMarkdownExportHtml = (title: string, content: string) => {
+  const normalizedContent = normalizeMarkdownBlocks(content);
   const body = renderToStaticMarkup(
     <ReactMarkdown remarkPlugins={[remarkAlphaOrderedLists, remarkGfm]}>
-      {content}
+      {normalizedContent}
     </ReactMarkdown>
   );
 
