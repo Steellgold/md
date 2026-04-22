@@ -41,6 +41,10 @@ const buildHtmlDocument = (title: string, body: string) => `<!DOCTYPE html>
         font-size: 15px;
       }
 
+      article > :first-child {
+        margin-top: 0;
+      }
+
       h1,
       h2,
       h3,
@@ -152,6 +156,10 @@ const buildHtmlDocument = (title: string, body: string) => `<!DOCTYPE html>
       }
 
       @media print {
+        @page {
+          margin: 12mm 14mm;
+        }
+
         body {
           background: #ffffff;
           color: #111827;
